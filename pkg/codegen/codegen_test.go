@@ -214,9 +214,13 @@ func TestRuntimeGeneration(t *testing.T) {
 		}
 	})
 
-	t.Run("HasWeakRefSupport", func(t *testing.T) {
-		if !strings.Contains(runtime, "WeakRef* mk_weak_ref") {
-			t.Error("missing mk_weak_ref function")
+	t.Run("HasInternalWeakRefSupport", func(t *testing.T) {
+		// WeakRef is now internal (_InternalWeakRef) - users don't use it directly
+		if !strings.Contains(runtime, "_InternalWeakRef") {
+			t.Error("missing _InternalWeakRef type")
+		}
+		if !strings.Contains(runtime, "_mk_weak_ref") {
+			t.Error("missing _mk_weak_ref function")
 		}
 		if !strings.Contains(runtime, "invalidate_weak_refs_for") {
 			t.Error("missing invalidate_weak_refs_for function")

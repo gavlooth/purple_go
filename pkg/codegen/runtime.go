@@ -287,48 +287,53 @@ Obj* not_op(Obj* a) {
 }
 
 // GenerateWeakRefs generates weak reference support
+// NOTE: WeakRef is INTERNAL to the runtime - users should not use it directly.
+// The compiler automatically handles back-edges through type analysis.
 func (g *RuntimeGenerator) GenerateWeakRefs() {
-	g.emit(`/* Weak Reference Support */
-typedef struct WeakRef {
+	g.emit(`/* Internal Weak Reference Support */
+/* NOTE: This is internal to the runtime. Users should not use WeakRef directly.
+   The compiler automatically detects back-edges and generates appropriate code. */
+
+typedef struct _InternalWeakRef {
     void* target;
     int alive;
-} WeakRef;
+} _InternalWeakRef;
 
-typedef struct WeakRefNode {
-    WeakRef* ref;
-    struct WeakRefNode* next;
-} WeakRefNode;
+typedef struct _InternalWeakRefNode {
+    _InternalWeakRef* ref;
+    struct _InternalWeakRefNode* next;
+} _InternalWeakRefNode;
 
-WeakRefNode* WEAK_REF_HEAD = NULL;
+_InternalWeakRefNode* _WEAK_REF_HEAD = NULL;
 
-WeakRef* mk_weak_ref(void* target) {
-    WeakRef* w = malloc(sizeof(WeakRef));
+static _InternalWeakRef* _mk_weak_ref(void* target) {
+    _InternalWeakRef* w = malloc(sizeof(_InternalWeakRef));
     if (!w) return NULL;
     w->target = target;
     w->alive = 1;
-    WeakRefNode* node = malloc(sizeof(WeakRefNode));
+    _InternalWeakRefNode* node = malloc(sizeof(_InternalWeakRefNode));
     if (!node) { free(w); return NULL; }
     node->ref = w;
-    node->next = WEAK_REF_HEAD;
-    WEAK_REF_HEAD = node;
+    node->next = _WEAK_REF_HEAD;
+    _WEAK_REF_HEAD = node;
     return w;
 }
 
-void* deref_weak(WeakRef* w) {
+static void* _deref_weak(_InternalWeakRef* w) {
     if (w && w->alive) return w->target;
     return NULL;
 }
 
-void invalidate_weak(WeakRef* w) {
+static void _invalidate_weak(_InternalWeakRef* w) {
     if (w) w->alive = 0;
 }
 
 void invalidate_weak_refs_for(void* target) {
-    WeakRefNode* n = WEAK_REF_HEAD;
+    _InternalWeakRefNode* n = _WEAK_REF_HEAD;
     while (n) {
-        WeakRef* obj = n->ref;
+        _InternalWeakRef* obj = n->ref;
         if (obj->target == target) {
-            invalidate_weak(obj);
+            _invalidate_weak(obj);
         }
         n = n->next;
     }
@@ -507,6 +512,210 @@ Obj* reuse_as_pair(Obj* old, Obj* a, Obj* b) {
 `)
 }
 
+// GenerateUserTypes generates struct definitions for user-defined types
+func (g *RuntimeGenerator) GenerateUserTypes() {
+	if g.registry == nil {
+		return
+	}
+
+	g.emit(`/* User-Defined Types */
+/* Generated from deftype declarations with automatic back-edge detection */
+
+`)
+
+	for name, typeDef := range g.registry.Types {
+		// Skip built-in types
+		if name == "Pair" || name == "List" || name == "Tree" || name == "Obj" {
+			continue
+		}
+
+		g.emit("/* Type: %s */\n", name)
+		g.emit("typedef struct %s {\n", name)
+
+		for _, field := range typeDef.Fields {
+			cType := g.fieldTypeToCType(field)
+			strengthComment := ""
+			switch field.Strength {
+			case FieldWeak:
+				strengthComment = " /* WEAK - auto-detected back-edge */"
+			case FieldStrong:
+				strengthComment = " /* STRONG */"
+			}
+			g.emit("    %s %s;%s\n", cType, field.Name, strengthComment)
+		}
+
+		g.emit("} %s;\n\n", name)
+	}
+}
+
+// fieldTypeToCType converts a field type to a C type
+func (g *RuntimeGenerator) fieldTypeToCType(field TypeField) string {
+	if !field.IsScannable {
+		// Primitive type
+		switch field.Type {
+		case "int", "i32":
+			return "int"
+		case "long", "i64":
+			return "long"
+		case "float", "f32":
+			return "float"
+		case "double", "f64":
+			return "double"
+		case "bool", "boolean":
+			return "int"
+		case "char":
+			return "char"
+		default:
+			return "int"
+		}
+	}
+	// Pointer type
+	return fmt.Sprintf("struct %s*", field.Type)
+}
+
+// GenerateTypeReleaseFunctions generates release functions for user-defined types
+func (g *RuntimeGenerator) GenerateTypeReleaseFunctions() {
+	if g.registry == nil {
+		return
+	}
+
+	g.emit(`/* Type-Aware Release Functions */
+/* Automatically skip weak fields (back-edges) to prevent double-free */
+
+`)
+
+	for name, typeDef := range g.registry.Types {
+		// Skip built-in types
+		if name == "Pair" || name == "List" || name == "Tree" || name == "Obj" {
+			continue
+		}
+
+		g.emit("void release_%s(%s* x) {\n", name, name)
+		g.emit("    if (!x) return;\n")
+
+		// Process each field
+		for _, field := range typeDef.Fields {
+			if !field.IsScannable {
+				continue // Skip primitive fields
+			}
+
+			switch field.Strength {
+			case FieldStrong:
+				// Strong field - decrement reference
+				g.emit("    if (x->%s) dec_ref((Obj*)x->%s); /* strong */\n", field.Name, field.Name)
+			case FieldWeak:
+				// Weak field - DO NOT decrement, just comment
+				g.emit("    /* x->%s: weak back-edge - skip to prevent cycle */\n", field.Name)
+			}
+		}
+
+		g.emit("    invalidate_weak_refs_for(x);\n")
+		g.emit("    free(x);\n")
+		g.emit("}\n\n")
+	}
+}
+
+// GenerateTypeConstructors generates constructor functions for user-defined types
+func (g *RuntimeGenerator) GenerateTypeConstructors() {
+	if g.registry == nil {
+		return
+	}
+
+	g.emit(`/* Type Constructors */
+
+`)
+
+	for name, typeDef := range g.registry.Types {
+		// Skip built-in types
+		if name == "Pair" || name == "List" || name == "Tree" || name == "Obj" {
+			continue
+		}
+
+		// Generate parameter list
+		var params []string
+		for _, field := range typeDef.Fields {
+			cType := g.fieldTypeToCType(field)
+			params = append(params, fmt.Sprintf("%s %s", cType, field.Name))
+		}
+		paramStr := strings.Join(params, ", ")
+		if paramStr == "" {
+			paramStr = "void"
+		}
+
+		g.emit("%s* mk_%s(%s) {\n", name, name, paramStr)
+		g.emit("    %s* x = malloc(sizeof(%s));\n", name, name)
+		g.emit("    if (!x) return NULL;\n")
+
+		for _, field := range typeDef.Fields {
+			if field.IsScannable && field.Strength == FieldStrong {
+				g.emit("    if (%s) inc_ref((Obj*)%s); /* strong ref */\n", field.Name, field.Name)
+			}
+			g.emit("    x->%s = %s;\n", field.Name, field.Name)
+		}
+
+		g.emit("    return x;\n")
+		g.emit("}\n\n")
+	}
+}
+
+// GenerateFieldAccessors generates getter/setter functions that respect field strength
+func (g *RuntimeGenerator) GenerateFieldAccessors() {
+	if g.registry == nil {
+		return
+	}
+
+	g.emit(`/* Field Accessors */
+/* Getters for weak fields do not increment reference count */
+/* Setters for strong fields manage reference counts automatically */
+
+`)
+
+	for name, typeDef := range g.registry.Types {
+		// Skip built-in types
+		if name == "Pair" || name == "List" || name == "Tree" || name == "Obj" {
+			continue
+		}
+
+		for _, field := range typeDef.Fields {
+			if !field.IsScannable {
+				continue // Skip primitive fields for now
+			}
+
+			cType := g.fieldTypeToCType(field)
+
+			// Getter
+			if field.Strength == FieldWeak {
+				g.emit("/* %s.%s getter - WEAK field, no ref count increment */\n", name, field.Name)
+				g.emit("%s get_%s_%s(%s* x) {\n", cType, name, field.Name, name)
+				g.emit("    return x ? x->%s : NULL;\n", field.Name)
+				g.emit("}\n\n")
+			} else {
+				g.emit("/* %s.%s getter - STRONG field */\n", name, field.Name)
+				g.emit("%s get_%s_%s(%s* x) {\n", cType, name, field.Name, name)
+				g.emit("    if (!x) return NULL;\n")
+				g.emit("    if (x->%s) inc_ref((Obj*)x->%s);\n", field.Name, field.Name)
+				g.emit("    return x->%s;\n", field.Name)
+				g.emit("}\n\n")
+			}
+
+			// Setter
+			g.emit("/* %s.%s setter */\n", name, field.Name)
+			g.emit("void set_%s_%s(%s* x, %s value) {\n", name, field.Name, name, cType)
+			g.emit("    if (!x) return;\n")
+
+			if field.Strength == FieldStrong {
+				g.emit("    if (value) inc_ref((Obj*)value); /* new value */\n")
+				g.emit("    if (x->%s) dec_ref((Obj*)x->%s); /* old value */\n", field.Name, field.Name)
+			} else {
+				g.emit("    /* weak field - no ref count management */\n")
+			}
+
+			g.emit("    x->%s = value;\n", field.Name)
+			g.emit("}\n\n")
+		}
+	}
+}
+
 // GenerateAll generates the complete runtime
 func (g *RuntimeGenerator) GenerateAll() {
 	g.GenerateHeader()
@@ -518,6 +727,10 @@ func (g *RuntimeGenerator) GenerateAll() {
 	g.GenerateComparison()
 	g.GeneratePerceusRuntime()
 	g.GenerateScanner("List", true)
+	g.GenerateUserTypes()
+	g.GenerateTypeReleaseFunctions()
+	g.GenerateTypeConstructors()
+	g.GenerateFieldAccessors()
 }
 
 // GenerateRuntime generates the complete C99 runtime to a string

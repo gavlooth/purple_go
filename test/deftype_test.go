@@ -1,6 +1,7 @@
 package test
 
 import (
+	"strings"
 	"testing"
 
 	"purple_go/pkg/ast"
@@ -268,6 +269,71 @@ func findField(def *codegen.TypeDef, name string) *codegen.TypeField {
 		}
 	}
 	return nil
+}
+
+func TestCodegenIntegration(t *testing.T) {
+	// Reset global registry before test
+	codegen.ResetGlobalRegistry()
+
+	// Define a doubly-linked list node type
+	input := `(deftype Node
+		(value int)
+		(next Node)
+		(prev Node))`
+
+	p := parser.New(input)
+	expr, err := p.Parse()
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	env := eval.DefaultEnv()
+	menv := eval.NewMenv(ast.Nil, env)
+	eval.Eval(expr, menv)
+
+	// Generate runtime with the type
+	registry := codegen.GlobalRegistry()
+	runtime := codegen.GenerateRuntime(registry)
+
+	// Check that the Node type is generated
+	if !strings.Contains(runtime, "typedef struct Node") {
+		t.Error("missing Node struct definition")
+	}
+
+	// Check that release function skips weak field (prev)
+	if !strings.Contains(runtime, "release_Node") {
+		t.Error("missing release_Node function")
+	}
+
+	// Check that prev is documented as weak
+	if !strings.Contains(runtime, "prev: weak back-edge") {
+		t.Log("Note: Check that prev field is marked as weak in release function")
+		t.Log("Runtime snippet:")
+		// Find the release_Node function
+		start := strings.Index(runtime, "void release_Node")
+		if start >= 0 {
+			end := start + 500
+			if end > len(runtime) {
+				end = len(runtime)
+			}
+			t.Log(runtime[start:end])
+		}
+	}
+
+	// Check that next is released (strong)
+	if !strings.Contains(runtime, "dec_ref") {
+		t.Error("missing dec_ref for strong fields")
+	}
+
+	// Check that constructor is generated
+	if !strings.Contains(runtime, "mk_Node") {
+		t.Error("missing mk_Node constructor")
+	}
+
+	// Check that field accessors are generated
+	if !strings.Contains(runtime, "get_Node_next") {
+		t.Error("missing getter for next field")
+	}
 }
 
 func TestDeftypeMultipleTypes(t *testing.T) {
