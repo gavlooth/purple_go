@@ -11,14 +11,16 @@ import (
 
 // CodeGenerator generates C99 code from AST
 type CodeGenerator struct {
-	w            io.Writer
-	registry     *TypeRegistry
-	escapeCtx    *analysis.AnalysisContext
-	shapeCtx     *analysis.ShapeContext
-	arenaGen     *ArenaCodeGenerator
-	tempCounter  int
-	indentLevel  int
+	w                io.Writer
+	registry         *TypeRegistry
+	escapeCtx        *analysis.AnalysisContext
+	shapeCtx         *analysis.ShapeContext
+	rcOptCtx         *analysis.RCOptContext // RC optimization context
+	arenaGen         *ArenaCodeGenerator
+	tempCounter      int
+	indentLevel      int
 	useArenaFallback bool
+	enableRCOpt      bool // Enable RC optimization (Lobster-style)
 }
 
 // NewCodeGenerator creates a new code generator
@@ -30,9 +32,16 @@ func NewCodeGenerator(w io.Writer) *CodeGenerator {
 		registry:         registry,
 		escapeCtx:        analysis.NewAnalysisContext(),
 		shapeCtx:         analysis.NewShapeContext(),
+		rcOptCtx:         analysis.NewRCOptContext(),
 		arenaGen:         NewArenaCodeGenerator(),
 		useArenaFallback: true, // Enable arena fallback for CYCLIC/UNKNOWN shapes
+		enableRCOpt:      true, // Enable Lobster-style RC optimization
 	}
+}
+
+// SetRCOptimization enables or disables RC optimization
+func (g *CodeGenerator) SetRCOptimization(enabled bool) {
+	g.enableRCOpt = enabled
 }
 
 // SetArenaFallback enables or disables arena fallback for cyclic shapes
@@ -112,6 +121,17 @@ func (g *CodeGenerator) GenerateLet(bindings []struct {
 		g.shapeCtx.AnalyzeShapes(bi.val)
 		g.shapeCtx.AddShape(bi.sym.Str, g.shapeCtx.ResultShape)
 
+		// RC Optimization: Track aliases and uniqueness
+		if g.enableRCOpt {
+			if ast.IsSym(bi.val) {
+				// Value is a variable reference - creates an alias
+				g.rcOptCtx.DefineAlias(bi.sym.Str, bi.val.Str)
+			} else {
+				// Fresh allocation - starts as unique
+				g.rcOptCtx.DefineVar(bi.sym.Str)
+			}
+		}
+
 		// Check if arena fallback is needed
 		if g.useArenaFallback {
 			shape := g.shapeCtx.ResultShape
@@ -177,15 +197,32 @@ func (g *CodeGenerator) GenerateLet(bindings []struct {
 			shape = shapeInfo.Shape
 		}
 
-		freeFn := analysis.ShapeFreeStrategy(shape)
+		// RC Optimization: Get optimized free function
+		var freeFn string
+		var rcOptComment string
+		if g.enableRCOpt {
+			freeFn = g.rcOptCtx.GetFreeFunction(bi.sym.Str, shape)
+			if freeFn == "" {
+				// RC optimization eliminated this free
+				rcOptComment = fmt.Sprintf("    /* %s: RC elided (alias of another var) */\n", bi.sym.Str)
+			} else if freeFn == "free_unique" {
+				rcOptComment = fmt.Sprintf("    %s(%s); /* RC opt: proven unique */\n", freeFn, bi.sym.Str)
+			} else {
+				rcOptComment = fmt.Sprintf("    %s(%s); /* ASAP Clean (shape: %s) */\n",
+					freeFn, bi.sym.Str, analysis.ShapeString(shape))
+			}
+		} else {
+			freeFn = analysis.ShapeFreeStrategy(shape)
+			rcOptComment = fmt.Sprintf("    %s(%s); /* ASAP Clean (shape: %s) */\n",
+				freeFn, bi.sym.Str, analysis.ShapeString(shape))
+		}
 
 		if isCaptured {
 			sb.WriteString(fmt.Sprintf("    /* %s captured by closure - no free */\n", bi.sym.Str))
 		} else if escapeClass == analysis.EscapeGlobal {
 			sb.WriteString(fmt.Sprintf("    /* %s escapes to return - no free */\n", bi.sym.Str))
 		} else {
-			sb.WriteString(fmt.Sprintf("    %s(%s); /* ASAP Clean (shape: %s) */\n",
-				freeFn, bi.sym.Str, analysis.ShapeString(shape)))
+			sb.WriteString(rcOptComment)
 		}
 	}
 

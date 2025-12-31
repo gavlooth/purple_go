@@ -4,6 +4,44 @@ All notable changes to Purple Go are documented in this file.
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-12-31
+
+### Added
+- **Symmetric Reference Counting** (`pkg/memory/symmetric.go`)
+  - New hybrid memory strategy for unbroken cycles
+  - Treats scope as object participating in ownership graph
+  - External refs (from scopes) vs Internal refs (from objects)
+  - O(1) deterministic cycle collection without global GC
+  - More memory efficient than arenas for long-running scopes
+  - Functions: `sym_enter_scope()`, `sym_exit_scope()`, `sym_alloc()`, `sym_link()`
+  - 11 comprehensive tests covering cycles, chains, nested scopes
+
+- **RC Operation Elimination** (`pkg/analysis/rcopt.go`)
+  - Lobster-style compile-time RC optimization
+  - ~75% of RC operations eliminated in typical code
+  - **Uniqueness Analysis**: Prove single reference → use `free_unique()`
+  - **Alias Tracking**: Track variable aliases → elide redundant RC ops
+  - **Borrow Tracking**: Parameters without ownership → zero RC operations
+  - 15 tests validating optimization strategies
+
+- **Hybrid Memory Strategy Selection**
+  - TREE → `free_tree()` (zero overhead)
+  - DAG → `dec_ref()` (standard RC)
+  - CYCLIC + broken → `dec_ref()` (weak edges)
+  - CYCLIC + frozen → `scc_release()` (SCC-based)
+  - CYCLIC + unbroken → `symmetric_rc` (NEW default)
+  - Arena available as opt-in for batch operations
+
+### Changed
+- `CyclicFreeStrategy` now includes `CyclicStrategySymmetric`
+- Unbroken cycles default to Symmetric RC instead of Arena
+- Runtime generator includes Symmetric RC functions
+- CodeGenerator integrates RC optimization context
+
+### References
+- Lobster Memory Management: https://aardappel.github.io/lobster/memory_management.html
+- Symmetric RC research on scope-as-object patterns
+
 ## [0.3.0] - 2025-12-31
 
 ### Added

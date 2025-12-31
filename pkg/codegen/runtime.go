@@ -179,6 +179,25 @@ void inc_ref(Obj* x) {
     x->mark++;
 }
 
+/* RC Optimization: Direct free for proven-unique references (Lobster-style) */
+/* When compile-time analysis proves a reference is the only one, skip RC check */
+void free_unique(Obj* x) {
+    if (!x) return;
+    if (is_stack_obj(x)) return;
+    /* Proven unique at compile time - no RC check needed */
+    if (x->is_pair) {
+        /* Children might not be unique, use dec_ref for safety */
+        dec_ref(x->a);
+        dec_ref(x->b);
+    }
+    invalidate_weak_refs_for(x);
+    free(x);
+}
+
+/* RC Optimization: Borrowed reference - no RC ops needed */
+/* For parameters and temporary references that don't transfer ownership */
+#define BORROWED_REF(x) (x)  /* No-op marker for documentation */
+
 /* Free list operations */
 void free_obj(Obj* x) {
     if (!x) return;
@@ -924,6 +943,206 @@ void set_deferred_batch_size(int size) {
 `)
 }
 
+// GenerateSymmetricRuntime generates symmetric reference counting runtime
+// This is the preferred method for handling unbroken cycles - more memory efficient than arenas
+func (g *RuntimeGenerator) GenerateSymmetricRuntime() {
+	g.emit(`/* Symmetric Reference Counting (Hybrid Memory Strategy) */
+/* Key insight: Treat scope as an object that participates in ownership graph */
+/* External refs: From live scopes/roots */
+/* Internal refs: Within the object graph */
+/* When external_rc drops to 0, the object (or cycle) is orphaned garbage */
+
+typedef struct SymObj SymObj;
+typedef struct SymScope SymScope;
+
+struct SymObj {
+    int external_rc;      /* References from live scopes */
+    int internal_rc;      /* References from other objects */
+    SymObj** refs;        /* Objects this object references */
+    int ref_count;        /* Number of outgoing references */
+    int ref_capacity;
+    void* data;           /* Actual data payload (Obj*) */
+    int freed;            /* Mark to prevent double-free */
+};
+
+struct SymScope {
+    SymObj** owned;       /* Objects owned by this scope */
+    int owned_count;
+    int owned_capacity;
+    SymScope* parent;
+};
+
+/* Global symmetric RC context */
+static struct {
+    SymScope* current;
+    SymScope** stack;
+    int stack_size;
+    int stack_capacity;
+    int objects_created;
+    int cycles_collected;
+} SYM_CTX = {NULL, NULL, 0, 0, 0, 0};
+
+/* Forward declarations */
+static void sym_check_free(SymObj* obj);
+
+SymObj* sym_obj_new(void* data) {
+    SymObj* obj = malloc(sizeof(SymObj));
+    if (!obj) return NULL;
+    obj->external_rc = 0;
+    obj->internal_rc = 0;
+    obj->refs = NULL;
+    obj->ref_count = 0;
+    obj->ref_capacity = 0;
+    obj->data = data;
+    obj->freed = 0;
+    return obj;
+}
+
+static void sym_obj_add_ref(SymObj* obj, SymObj* target) {
+    if (!obj || !target) return;
+    if (obj->ref_count >= obj->ref_capacity) {
+        int new_cap = obj->ref_capacity == 0 ? 8 : obj->ref_capacity * 2;
+        SymObj** new_refs = realloc(obj->refs, new_cap * sizeof(SymObj*));
+        if (!new_refs) return;
+        obj->refs = new_refs;
+        obj->ref_capacity = new_cap;
+    }
+    obj->refs[obj->ref_count++] = target;
+}
+
+SymScope* sym_scope_new(SymScope* parent) {
+    SymScope* scope = malloc(sizeof(SymScope));
+    if (!scope) return NULL;
+    scope->owned = NULL;
+    scope->owned_count = 0;
+    scope->owned_capacity = 0;
+    scope->parent = parent;
+    return scope;
+}
+
+void sym_scope_own(SymScope* scope, SymObj* obj) {
+    if (!scope || !obj || obj->freed) return;
+    if (scope->owned_count >= scope->owned_capacity) {
+        int new_cap = scope->owned_capacity == 0 ? 8 : scope->owned_capacity * 2;
+        SymObj** new_owned = realloc(scope->owned, new_cap * sizeof(SymObj*));
+        if (!new_owned) return;
+        scope->owned = new_owned;
+        scope->owned_capacity = new_cap;
+    }
+    obj->external_rc++;
+    scope->owned[scope->owned_count++] = obj;
+}
+
+void sym_dec_external(SymObj* obj) {
+    if (!obj || obj->freed) return;
+    obj->external_rc--;
+    sym_check_free(obj);
+}
+
+void sym_dec_internal(SymObj* obj) {
+    if (!obj || obj->freed) return;
+    obj->internal_rc--;
+    sym_check_free(obj);
+}
+
+static void sym_check_free(SymObj* obj) {
+    if (!obj || obj->freed) return;
+    /* Object is garbage when it has no external references */
+    if (obj->external_rc <= 0) {
+        obj->freed = 1;
+        /* Cascade: decrement internal refs for all objects we reference */
+        for (int i = 0; i < obj->ref_count; i++) {
+            sym_dec_internal(obj->refs[i]);
+        }
+        /* Free the data (Obj*) if present */
+        if (obj->data) {
+            dec_ref((Obj*)obj->data);
+        }
+        free(obj->refs);
+        free(obj);
+    }
+}
+
+void sym_scope_release(SymScope* scope) {
+    if (!scope) return;
+    for (int i = 0; i < scope->owned_count; i++) {
+        sym_dec_external(scope->owned[i]);
+    }
+    scope->owned_count = 0;
+}
+
+void sym_scope_free(SymScope* scope) {
+    if (!scope) return;
+    free(scope->owned);
+    free(scope);
+}
+
+/* Context operations */
+void sym_init(void) {
+    if (SYM_CTX.current) return;  /* Already initialized */
+    SYM_CTX.current = sym_scope_new(NULL);
+    SYM_CTX.stack = malloc(8 * sizeof(SymScope*));
+    SYM_CTX.stack[0] = SYM_CTX.current;
+    SYM_CTX.stack_size = 1;
+    SYM_CTX.stack_capacity = 8;
+}
+
+SymScope* sym_enter_scope(void) {
+    if (!SYM_CTX.current) sym_init();
+    SymScope* scope = sym_scope_new(SYM_CTX.current);
+    if (!scope) return NULL;
+    if (SYM_CTX.stack_size >= SYM_CTX.stack_capacity) {
+        int new_cap = SYM_CTX.stack_capacity * 2;
+        SymScope** new_stack = realloc(SYM_CTX.stack, new_cap * sizeof(SymScope*));
+        if (!new_stack) { sym_scope_free(scope); return NULL; }
+        SYM_CTX.stack = new_stack;
+        SYM_CTX.stack_capacity = new_cap;
+    }
+    SYM_CTX.stack[SYM_CTX.stack_size++] = scope;
+    SYM_CTX.current = scope;
+    return scope;
+}
+
+void sym_exit_scope(void) {
+    if (SYM_CTX.stack_size <= 1) return;  /* Don't exit global */
+    SymScope* scope = SYM_CTX.stack[--SYM_CTX.stack_size];
+    SYM_CTX.current = SYM_CTX.stack[SYM_CTX.stack_size - 1];
+    /* Count cycles for stats */
+    for (int i = 0; i < scope->owned_count; i++) {
+        SymObj* obj = scope->owned[i];
+        if (obj && !obj->freed && obj->internal_rc > 0 && obj->external_rc == 1) {
+            SYM_CTX.cycles_collected++;
+        }
+    }
+    sym_scope_release(scope);
+    sym_scope_free(scope);
+}
+
+/* Allocate object in current scope */
+SymObj* sym_alloc(Obj* data) {
+    if (!SYM_CTX.current) sym_init();
+    SymObj* obj = sym_obj_new(data);
+    if (!obj) return NULL;
+    sym_scope_own(SYM_CTX.current, obj);
+    SYM_CTX.objects_created++;
+    return obj;
+}
+
+/* Create internal reference (from one object to another) */
+void sym_link(SymObj* from, SymObj* to) {
+    if (!from || !to || to->freed) return;
+    to->internal_rc++;
+    sym_obj_add_ref(from, to);
+}
+
+/* Get the Obj* from a SymObj* */
+Obj* sym_get_data(SymObj* obj) {
+    return obj ? (Obj*)obj->data : NULL;
+}
+
+`)
+}
+
 // GenerateUserTypes generates struct definitions for user-defined types
 func (g *RuntimeGenerator) GenerateUserTypes() {
 	if g.registry == nil {
@@ -1137,6 +1356,7 @@ func (g *RuntimeGenerator) GenerateAll() {
 	g.GenerateArenaRuntime()
 	g.GenerateSCCRuntime()
 	g.GenerateDeferredRuntime()
+	g.GenerateSymmetricRuntime()
 	g.GenerateArithmetic()
 	g.GenerateComparison()
 	g.GeneratePerceusRuntime()

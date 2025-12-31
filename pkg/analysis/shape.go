@@ -302,10 +302,11 @@ func ShapeFreeStrategy(s Shape) string {
 type CyclicFreeStrategy int
 
 const (
-	CyclicStrategyArena     CyclicFreeStrategy = iota // Arena fallback
+	CyclicStrategyArena     CyclicFreeStrategy = iota // Arena fallback (opt-in for batch ops)
 	CyclicStrategyDecRef                              // dec_ref (cycles broken by weak edges)
 	CyclicStrategySCC                                 // SCC-based RC (for frozen cycles)
 	CyclicStrategyDeferred                            // Deferred release
+	CyclicStrategySymmetric                           // Symmetric RC (default for unbroken cycles)
 )
 
 // CyclicStrategyString returns string representation
@@ -319,8 +320,10 @@ func CyclicStrategyString(s CyclicFreeStrategy) string {
 		return "scc_release"
 	case CyclicStrategyDeferred:
 		return "deferred_release"
+	case CyclicStrategySymmetric:
+		return "symmetric_rc"
 	default:
-		return "deferred_release"
+		return "symmetric_rc" // Default to symmetric for unbroken cycles
 	}
 }
 
@@ -349,10 +352,11 @@ func (s *ShapeWithCycleInfo) DetermineStrategy() CyclicFreeStrategy {
 			// Immutable cyclic data - use SCC
 			return CyclicStrategySCC
 		}
-		// Mutable cyclic data with unbroken cycles - arena or deferred
-		return CyclicStrategyArena
+		// Mutable cyclic data with unbroken cycles - use Symmetric RC
+		// (More memory efficient than arena - frees immediately when orphaned)
+		return CyclicStrategySymmetric
 	default:
-		return CyclicStrategyDeferred
+		return CyclicStrategySymmetric // Default to symmetric for unknown cyclic
 	}
 }
 
@@ -370,6 +374,8 @@ func (s *ShapeWithCycleInfo) GetFreeFunction() string {
 		return "" // Arena uses bulk deallocation
 	case CyclicStrategyDeferred:
 		return "deferred_release"
+	case CyclicStrategySymmetric:
+		return "sym_exit_scope" // Symmetric RC releases on scope exit
 	default:
 		return "dec_ref"
 	}
