@@ -426,6 +426,56 @@ func Eval(expr, menv *ast.Value) *ast.Value {
 			return Eval(e, parent)
 		}
 
+		if ast.SymEqStr(op, "run") {
+			// (run code) - execute code value at base level
+			codeVal := Eval(args.Car, menv)
+			if ast.IsCode(codeVal) {
+				// In interpretation mode, we can't execute C code
+				// Return the code value as-is
+				return codeVal
+			}
+			// If it's an AST, evaluate it
+			return Eval(codeVal, menv)
+		}
+
+		if ast.SymEqStr(op, "eval") {
+			// (eval expr) - evaluate expression at runtime
+			exprVal := Eval(args.Car, menv)
+			return Eval(exprVal, menv)
+		}
+
+		if ast.SymEqStr(op, "quasiquote") {
+			return evalQuasiquote(args.Car, menv)
+		}
+
+		if ast.SymEqStr(op, "sym-eq?") {
+			a := Eval(args.Car, menv)
+			b := Eval(args.Cdr.Car, menv)
+			if ast.IsSym(a) && ast.IsSym(b) && a.Str == b.Str {
+				return SymT
+			}
+			return ast.Nil
+		}
+
+		if ast.SymEqStr(op, "gensym") {
+			// (gensym) or (gensym prefix)
+			prefix := "g"
+			if !ast.IsNil(args) {
+				prefixVal := Eval(args.Car, menv)
+				if ast.IsSym(prefixVal) {
+					prefix = prefixVal.Str
+				}
+			}
+			return ast.NewSym(fmt.Sprintf("%s%d", prefix, gensymCounter()))
+		}
+
+		if ast.SymEqStr(op, "trace") {
+			// (trace expr) - evaluate and print result
+			result := Eval(args.Car, menv)
+			fmt.Printf("TRACE: %s\n", result.String())
+			return result
+		}
+
 		if ast.SymEqStr(op, "scan") {
 			typeSym := Eval(args.Car, menv)
 			val := Eval(args.Cdr.Car, menv)
@@ -643,4 +693,105 @@ func Run(expr *ast.Value) *ast.Value {
 	env := DefaultEnv()
 	menv := NewMenv(ast.Nil, env)
 	return Eval(expr, menv)
+}
+
+// gensymCount is the global counter for gensym
+var gensymCount int64 = 0
+
+// gensymCounter returns the next gensym number
+func gensymCounter() int64 {
+	gensymCount++
+	return gensymCount
+}
+
+// evalQuasiquote handles quasiquote, unquote, and unquote-splicing
+func evalQuasiquote(expr *ast.Value, menv *ast.Value) *ast.Value {
+	return evalQQ(expr, menv, 0)
+}
+
+func evalQQ(expr *ast.Value, menv *ast.Value, depth int) *ast.Value {
+	if expr == nil || ast.IsNil(expr) {
+		return ast.Nil
+	}
+
+	// Non-list values are returned as-is
+	if !ast.IsCell(expr) {
+		return expr
+	}
+
+	head := expr.Car
+
+	// Check for unquote: ,x or (unquote x)
+	if ast.SymEqStr(head, "unquote") || ast.SymEqStr(head, ",") {
+		if depth == 0 {
+			// Evaluate the unquoted expression
+			return Eval(expr.Cdr.Car, menv)
+		}
+		// Nested quasiquote - decrease depth
+		inner := evalQQ(expr.Cdr.Car, menv, depth-1)
+		return ast.List2(ast.NewSym("unquote"), inner)
+	}
+
+	// Check for unquote-splicing: ,@x or (unquote-splicing x)
+	if ast.SymEqStr(head, "unquote-splicing") || ast.SymEqStr(head, ",@") {
+		if depth == 0 {
+			// This should be handled in list context
+			return Eval(expr.Cdr.Car, menv)
+		}
+		inner := evalQQ(expr.Cdr.Car, menv, depth-1)
+		return ast.List2(ast.NewSym("unquote-splicing"), inner)
+	}
+
+	// Check for nested quasiquote
+	if ast.SymEqStr(head, "quasiquote") || ast.SymEqStr(head, "`") {
+		inner := evalQQ(expr.Cdr.Car, menv, depth+1)
+		return ast.List2(ast.NewSym("quasiquote"), inner)
+	}
+
+	// Regular list - process each element
+	return evalQQList(expr, menv, depth)
+}
+
+func evalQQList(list *ast.Value, menv *ast.Value, depth int) *ast.Value {
+	if ast.IsNil(list) {
+		return ast.Nil
+	}
+	if !ast.IsCell(list) {
+		return list
+	}
+
+	head := list.Car
+
+	// Check for unquote-splicing at this level
+	if ast.IsCell(head) {
+		spliceHead := head.Car
+		if ast.SymEqStr(spliceHead, "unquote-splicing") || ast.SymEqStr(spliceHead, ",@") {
+			if depth == 0 {
+				// Evaluate and splice
+				spliced := Eval(head.Cdr.Car, menv)
+				rest := evalQQList(list.Cdr, menv, depth)
+				return appendLists(spliced, rest)
+			}
+		}
+	}
+
+	// Process head and tail
+	newHead := evalQQ(head, menv, depth)
+	newTail := evalQQList(list.Cdr, menv, depth)
+	return ast.NewCell(newHead, newTail)
+}
+
+func appendLists(a, b *ast.Value) *ast.Value {
+	if ast.IsNil(a) {
+		return b
+	}
+	if !ast.IsCell(a) {
+		return b
+	}
+	items := ast.ListToSlice(a)
+	result := b
+	for i := len(items) - 1; i >= 0; i-- {
+		result = ast.NewCell(items[i], result)
+	}
+	return result
 }

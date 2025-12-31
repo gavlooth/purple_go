@@ -92,6 +92,10 @@ func (p *Parser) parseExpr() (*ast.Value, error) {
 		return p.parseList()
 	case '\'':
 		return p.parseQuote()
+	case '`':
+		return p.parseQuasiquote()
+	case ',':
+		return p.parseUnquote()
 	case ')':
 		return nil, fmt.Errorf("unexpected ')'")
 	case '"':
@@ -134,6 +138,43 @@ func (p *Parser) parseQuote() (*ast.Value, error) {
 		return nil, fmt.Errorf("expected expression after quote")
 	}
 	return ast.List2(ast.NewSym("quote"), expr), nil
+}
+
+func (p *Parser) parseQuasiquote() (*ast.Value, error) {
+	p.advance() // consume '`'
+	expr, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+	if expr == nil {
+		return nil, fmt.Errorf("expected expression after quasiquote")
+	}
+	return ast.List2(ast.NewSym("quasiquote"), expr), nil
+}
+
+func (p *Parser) parseUnquote() (*ast.Value, error) {
+	p.advance() // consume ','
+	// Check for unquote-splicing ,@
+	if p.peek() == '@' {
+		p.advance() // consume '@'
+		expr, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		if expr == nil {
+			return nil, fmt.Errorf("expected expression after unquote-splicing")
+		}
+		return ast.List2(ast.NewSym("unquote-splicing"), expr), nil
+	}
+	// Regular unquote
+	expr, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+	if expr == nil {
+		return nil, fmt.Errorf("expected expression after unquote")
+	}
+	return ast.List2(ast.NewSym("unquote"), expr), nil
 }
 
 func (p *Parser) parseString() (*ast.Value, error) {
@@ -192,7 +233,7 @@ func (p *Parser) parseAtom() (*ast.Value, error) {
 	// It's a symbol
 	for p.pos < len(p.input) {
 		ch := p.input[p.pos]
-		if unicode.IsSpace(rune(ch)) || ch == '(' || ch == ')' || ch == '\'' || ch == '"' || ch == ';' {
+		if unicode.IsSpace(rune(ch)) || ch == '(' || ch == ')' || ch == '\'' || ch == '"' || ch == ';' || ch == '`' || ch == ',' {
 			break
 		}
 		p.pos++

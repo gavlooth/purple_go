@@ -332,3 +332,74 @@ func TestFold(t *testing.T) {
 		t.Errorf("fold sum = %d, want 15", result.Int)
 	}
 }
+
+func TestQuasiquote(t *testing.T) {
+	// Basic quasiquote
+	result := evalString("`(a b c)")
+	if result == nil || !ast.IsCell(result) {
+		t.Errorf("quasiquote = %v, want list", result)
+		return
+	}
+	if result.Car.Str != "a" {
+		t.Errorf("quasiquote first = %s, want a", result.Car.Str)
+	}
+
+	// Unquote
+	result = evalString("(let ((x 42)) `(a ,x c))")
+	if result == nil || !ast.IsCell(result) {
+		t.Errorf("unquote = %v, want list", result)
+		return
+	}
+	// Second element should be 42
+	second := result.Cdr.Car
+	if !ast.IsInt(second) || second.Int != 42 {
+		t.Errorf("unquote second = %v, want 42", second)
+	}
+
+	// Unquote-splicing
+	result = evalString("(let ((xs '(1 2 3))) `(a ,@xs d))")
+	if result == nil || !ast.IsCell(result) {
+		t.Errorf("unquote-splicing = %v, want list", result)
+		return
+	}
+	// Should be (a 1 2 3 d)
+	if result.Car.Str != "a" {
+		t.Errorf("splice first = %s, want a", result.Car.Str)
+	}
+}
+
+func TestGensym(t *testing.T) {
+	result := evalString("(gensym)")
+	if result == nil || !ast.IsSym(result) {
+		t.Errorf("gensym = %v, want symbol", result)
+		return
+	}
+	// Should start with 'g'
+	if len(result.Str) == 0 || result.Str[0] != 'g' {
+		t.Errorf("gensym = %s, want g<n>", result.Str)
+	}
+}
+
+func TestSymEq(t *testing.T) {
+	result := evalString("(sym-eq? 'foo 'foo)")
+	if ast.IsNil(result) {
+		t.Error("sym-eq? 'foo 'foo should be true")
+	}
+
+	result = evalString("(sym-eq? 'foo 'bar)")
+	if !ast.IsNil(result) {
+		t.Error("sym-eq? 'foo 'bar should be false")
+	}
+}
+
+func TestEvalExpr(t *testing.T) {
+	// eval should evaluate quoted expressions
+	result := evalString("(eval '(+ 1 2))")
+	if result == nil || !ast.IsInt(result) {
+		t.Errorf("eval = %v, want int", result)
+		return
+	}
+	if result.Int != 3 {
+		t.Errorf("eval (+ 1 2) = %d, want 3", result.Int)
+	}
+}
