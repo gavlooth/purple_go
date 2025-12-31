@@ -21,6 +21,7 @@ const (
 	TRecLambda // Recursive lambda with self-reference
 	TError     // Error value
 	TChar      // Character value
+	TFloat     // Floating point value (float64)
 )
 
 // PrimFn is a primitive function signature
@@ -33,8 +34,11 @@ type HandlerFn func(exp *Value, menv *Value) *Value
 type Value struct {
 	Tag Tag
 
-	// TInt
+	// TInt, TChar
 	Int int64
+
+	// TFloat
+	Float float64
 
 	// TSym, TCode
 	Str string
@@ -121,6 +125,11 @@ func NewChar(c rune) *Value {
 	return &Value{Tag: TChar, Int: int64(c)}
 }
 
+// NewFloat creates a floating point value
+func NewFloat(f float64) *Value {
+	return &Value{Tag: TFloat, Float: f}
+}
+
 // NewMenv creates a meta-environment value
 func NewMenv(env, parent *Value, hApp, hLet, hIf, hLit, hVar HandlerFn) *Value {
 	return &Value{
@@ -178,6 +187,11 @@ func IsError(v *Value) bool {
 // IsChar checks if a value is a character
 func IsChar(v *Value) bool {
 	return v != nil && v.Tag == TChar
+}
+
+// IsFloat checks if a value is a floating point number
+func IsFloat(v *Value) bool {
+	return v != nil && v.Tag == TFloat
 }
 
 // IsPrim checks if a value is a primitive
@@ -277,6 +291,8 @@ func (v *Value) String() string {
 		return fmt.Sprintf("#<error: %s>", v.Str)
 	case TChar:
 		return charToString(rune(v.Int))
+	case TFloat:
+		return strconv.FormatFloat(v.Float, 'g', -1, 64)
 	case TMenv:
 		return "#<menv>"
 	default:
@@ -345,6 +361,8 @@ func TagName(t Tag) string {
 		return "ERROR"
 	case TChar:
 		return "CHAR"
+	case TFloat:
+		return "FLOAT"
 	default:
 		return fmt.Sprintf("UNKNOWN(%d)", t)
 	}

@@ -74,7 +74,7 @@ func valueToCode(v *ast.Value) string {
 	return v.String()
 }
 
-// PrimAdd implements + primitive
+// PrimAdd implements + primitive (works with int and float)
 func PrimAdd(args, menv *ast.Value) *ast.Value {
 	a, b, ok := getTwoArgs(args)
 	if !ok {
@@ -83,13 +83,30 @@ func PrimAdd(args, menv *ast.Value) *ast.Value {
 	if ast.IsCode(a) || ast.IsCode(b) {
 		return emitCCall("add", a, b)
 	}
+	// Float arithmetic
+	if ast.IsFloat(a) || ast.IsFloat(b) {
+		af := toFloat(a)
+		bf := toFloat(b)
+		return ast.NewFloat(af + bf)
+	}
 	if !ast.IsInt(a) || !ast.IsInt(b) {
 		return ast.Nil
 	}
 	return ast.NewInt(a.Int + b.Int)
 }
 
-// PrimSub implements - primitive
+// toFloat converts an int or float to float64
+func toFloat(v *ast.Value) float64 {
+	if ast.IsFloat(v) {
+		return v.Float
+	}
+	if ast.IsInt(v) {
+		return float64(v.Int)
+	}
+	return 0.0
+}
+
+// PrimSub implements - primitive (works with int and float)
 func PrimSub(args, menv *ast.Value) *ast.Value {
 	a, b, ok := getTwoArgs(args)
 	if !ok {
@@ -98,13 +115,16 @@ func PrimSub(args, menv *ast.Value) *ast.Value {
 	if ast.IsCode(a) || ast.IsCode(b) {
 		return emitCCall("sub", a, b)
 	}
+	if ast.IsFloat(a) || ast.IsFloat(b) {
+		return ast.NewFloat(toFloat(a) - toFloat(b))
+	}
 	if !ast.IsInt(a) || !ast.IsInt(b) {
 		return ast.Nil
 	}
 	return ast.NewInt(a.Int - b.Int)
 }
 
-// PrimMul implements * primitive
+// PrimMul implements * primitive (works with int and float)
 func PrimMul(args, menv *ast.Value) *ast.Value {
 	a, b, ok := getTwoArgs(args)
 	if !ok {
@@ -113,13 +133,16 @@ func PrimMul(args, menv *ast.Value) *ast.Value {
 	if ast.IsCode(a) || ast.IsCode(b) {
 		return emitCCall("mul", a, b)
 	}
+	if ast.IsFloat(a) || ast.IsFloat(b) {
+		return ast.NewFloat(toFloat(a) * toFloat(b))
+	}
 	if !ast.IsInt(a) || !ast.IsInt(b) {
 		return ast.Nil
 	}
 	return ast.NewInt(a.Int * b.Int)
 }
 
-// PrimDiv implements / primitive
+// PrimDiv implements / primitive (works with int and float)
 func PrimDiv(args, menv *ast.Value) *ast.Value {
 	a, b, ok := getTwoArgs(args)
 	if !ok {
@@ -127,6 +150,13 @@ func PrimDiv(args, menv *ast.Value) *ast.Value {
 	}
 	if ast.IsCode(a) || ast.IsCode(b) {
 		return emitCCall("div_op", a, b)
+	}
+	if ast.IsFloat(a) || ast.IsFloat(b) {
+		bf := toFloat(b)
+		if bf == 0.0 {
+			return ast.NewFloat(0.0)
+		}
+		return ast.NewFloat(toFloat(a) / bf)
 	}
 	if !ast.IsInt(a) || !ast.IsInt(b) {
 		return ast.Nil
@@ -627,6 +657,107 @@ func PrimCharLt(args, menv *ast.Value) *ast.Value {
 	return ast.Nil
 }
 
+// Float-specific primitives
+
+// PrimIsFloat implements float? primitive
+func PrimIsFloat(args, menv *ast.Value) *ast.Value {
+	a := getOneArg(args)
+	if a != nil && ast.IsFloat(a) {
+		return SymT
+	}
+	return ast.Nil
+}
+
+// PrimIntToFloat implements int->float primitive
+func PrimIntToFloat(args, menv *ast.Value) *ast.Value {
+	a := getOneArg(args)
+	if a == nil {
+		return ast.Nil
+	}
+	if ast.IsInt(a) {
+		return ast.NewFloat(float64(a.Int))
+	}
+	if ast.IsFloat(a) {
+		return a
+	}
+	return ast.Nil
+}
+
+// PrimFloatToInt implements float->int primitive (truncates)
+func PrimFloatToInt(args, menv *ast.Value) *ast.Value {
+	a := getOneArg(args)
+	if a == nil {
+		return ast.Nil
+	}
+	if ast.IsFloat(a) {
+		return ast.NewInt(int64(a.Float))
+	}
+	if ast.IsInt(a) {
+		return a
+	}
+	return ast.Nil
+}
+
+// PrimFloor implements floor primitive
+func PrimFloor(args, menv *ast.Value) *ast.Value {
+	a := getOneArg(args)
+	if a == nil {
+		return ast.Nil
+	}
+	if ast.IsFloat(a) {
+		return ast.NewFloat(float64(int64(a.Float)))
+	}
+	if ast.IsInt(a) {
+		return ast.NewFloat(float64(a.Int))
+	}
+	return ast.Nil
+}
+
+// PrimCeil implements ceil primitive
+func PrimCeil(args, menv *ast.Value) *ast.Value {
+	a := getOneArg(args)
+	if a == nil {
+		return ast.Nil
+	}
+	if ast.IsFloat(a) {
+		f := a.Float
+		if f == float64(int64(f)) {
+			return ast.NewFloat(f)
+		}
+		if f > 0 {
+			return ast.NewFloat(float64(int64(f) + 1))
+		}
+		return ast.NewFloat(float64(int64(f)))
+	}
+	if ast.IsInt(a) {
+		return ast.NewFloat(float64(a.Int))
+	}
+	return ast.Nil
+}
+
+// PrimAbs implements abs primitive (works with int and float)
+func PrimAbs(args, menv *ast.Value) *ast.Value {
+	a := getOneArg(args)
+	if a == nil {
+		return ast.Nil
+	}
+	if ast.IsFloat(a) {
+		f := a.Float
+		if f < 0 {
+			return ast.NewFloat(-f)
+		}
+		return a
+	}
+	if ast.IsInt(a) {
+		i := a.Int
+		if i < 0 {
+			return ast.NewInt(-i)
+		}
+		return a
+	}
+	return ast.Nil
+}
+
 // isStringList checks if a value is a list of characters
 func isStringList(v *ast.Value) bool {
 	if ast.IsNil(v) {
@@ -787,6 +918,13 @@ func DefaultEnv() *ast.Value {
 	env = EnvExtend(env, ast.NewSym("int->char"), ast.NewPrim(PrimIntToChar))
 	env = EnvExtend(env, ast.NewSym("char=?"), ast.NewPrim(PrimCharEq))
 	env = EnvExtend(env, ast.NewSym("char<?"), ast.NewPrim(PrimCharLt))
+	// Float operations
+	env = EnvExtend(env, ast.NewSym("float?"), ast.NewPrim(PrimIsFloat))
+	env = EnvExtend(env, ast.NewSym("int->float"), ast.NewPrim(PrimIntToFloat))
+	env = EnvExtend(env, ast.NewSym("float->int"), ast.NewPrim(PrimFloatToInt))
+	env = EnvExtend(env, ast.NewSym("floor"), ast.NewPrim(PrimFloor))
+	env = EnvExtend(env, ast.NewSym("ceil"), ast.NewPrim(PrimCeil))
+	env = EnvExtend(env, ast.NewSym("abs"), ast.NewPrim(PrimAbs))
 	// String operations
 	env = EnvExtend(env, ast.NewSym("string?"), ast.NewPrim(PrimIsString))
 	env = EnvExtend(env, ast.NewSym("string->list"), ast.NewPrim(PrimStringToList))

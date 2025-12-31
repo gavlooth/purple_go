@@ -28,6 +28,8 @@ func (d *DefaultCodeGen) LiftValue(v *ast.Value) *ast.Value {
 	switch v.Tag {
 	case ast.TInt:
 		return ast.NewCode(fmt.Sprintf("mk_int(%d)", v.Int))
+	case ast.TFloat:
+		return ast.NewCode(fmt.Sprintf("mk_float(%g)", v.Float))
 	case ast.TSym:
 		return ast.NewCode(fmt.Sprintf("mk_sym(\"%s\")", v.Str))
 	case ast.TCode:
@@ -50,6 +52,9 @@ func (d *DefaultCodeGen) ValueToCExpr(v *ast.Value) string {
 	}
 	if ast.IsInt(v) {
 		return fmt.Sprintf("mk_int(%d)", v.Int)
+	}
+	if ast.IsFloat(v) {
+		return fmt.Sprintf("mk_float(%g)", v.Float)
 	}
 	return "NULL"
 }
@@ -312,6 +317,9 @@ func Eval(expr, menv *ast.Value) *ast.Value {
 	case ast.TInt:
 		return menv.HLit(expr, menv)
 
+	case ast.TFloat:
+		return menv.HLit(expr, menv)
+
 	case ast.TChar:
 		return menv.HLit(expr, menv)
 
@@ -492,6 +500,18 @@ func Eval(expr, menv *ast.Value) *ast.Value {
 				valStr = val.String()
 			}
 			return ast.NewCode(fmt.Sprintf("scan_%s(%s); // ASAP Mark", typeSym.Str, valStr))
+		}
+
+		// FFI: (ffi "function_name" arg1 arg2 ...)
+		// Generates C code that calls an external function
+		if ast.SymEqStr(op, "ffi") {
+			return evalFFI(args, menv)
+		}
+
+		// FFI declaration: (ffi-declare "ret_type" "func_name" "arg1_type" ...)
+		// Registers an external function declaration
+		if ast.SymEqStr(op, "ffi-declare") {
+			return evalFFIDeclare(args, menv)
 		}
 
 		// Regular application
@@ -797,4 +817,270 @@ func appendLists(a, b *ast.Value) *ast.Value {
 		result = ast.NewCell(items[i], result)
 	}
 	return result
+}
+
+// FFI Support
+// ============
+
+// FFIDecl represents an external function declaration
+type FFIDecl struct {
+	Name       string
+	ReturnType string
+	ArgTypes   []string
+}
+
+// Global FFI registry
+var ffiDeclarations = make(map[string]*FFIDecl)
+
+// RegisterFFI registers an external function declaration
+func RegisterFFI(name, retType string, argTypes []string) {
+	ffiDeclarations[name] = &FFIDecl{
+		Name:       name,
+		ReturnType: retType,
+		ArgTypes:   argTypes,
+	}
+}
+
+// GetFFIDeclarations returns all registered FFI declarations
+func GetFFIDeclarations() map[string]*FFIDecl {
+	return ffiDeclarations
+}
+
+// ClearFFIDeclarations clears all FFI declarations (for testing)
+func ClearFFIDeclarations() {
+	ffiDeclarations = make(map[string]*FFIDecl)
+}
+
+// evalFFI handles (ffi "function_name" arg1 arg2 ...)
+// In interpretation mode, it cannot actually call C functions
+// In code generation mode, it generates C code to call the function
+func evalFFI(args *ast.Value, menv *ast.Value) *ast.Value {
+	if ast.IsNil(args) {
+		return ast.NewError("ffi requires function name")
+	}
+
+	// Get function name
+	fnNameVal := Eval(args.Car, menv)
+	fnName := ""
+	if ast.IsSym(fnNameVal) {
+		fnName = fnNameVal.Str
+	} else if ast.IsCell(fnNameVal) && ast.IsChar(fnNameVal.Car) {
+		// It's a string (list of chars), convert to string
+		var sb string
+		for v := fnNameVal; !ast.IsNil(v) && ast.IsCell(v); v = v.Cdr {
+			if ast.IsChar(v.Car) {
+				sb += string(rune(v.Car.Int))
+			}
+		}
+		fnName = sb
+	} else {
+		return ast.NewError("ffi function name must be a symbol or string")
+	}
+
+	// Evaluate arguments
+	var evaledArgs []*ast.Value
+	rest := args.Cdr
+	for !ast.IsNil(rest) && ast.IsCell(rest) {
+		arg := Eval(rest.Car, menv)
+		evaledArgs = append(evaledArgs, arg)
+		rest = rest.Cdr
+	}
+
+	// Check if any argument is Code (staging mode)
+	anyCode := false
+	for _, arg := range evaledArgs {
+		if ast.IsCode(arg) {
+			anyCode = true
+			break
+		}
+	}
+
+	// In staging/codegen mode, generate C code
+	if anyCode {
+		return generateFFICode(fnName, evaledArgs)
+	}
+
+	// In pure interpretation mode, we can only call certain built-in functions
+	return evalFFIInterpret(fnName, evaledArgs)
+}
+
+// generateFFICode generates C code for an FFI call
+func generateFFICode(fnName string, args []*ast.Value) *ast.Value {
+	var argStrs []string
+	for _, arg := range args {
+		if ast.IsCode(arg) {
+			argStrs = append(argStrs, arg.Str)
+		} else if ast.IsInt(arg) {
+			argStrs = append(argStrs, fmt.Sprintf("%d", arg.Int))
+		} else if ast.IsFloat(arg) {
+			argStrs = append(argStrs, fmt.Sprintf("%g", arg.Float))
+		} else if ast.IsNil(arg) {
+			argStrs = append(argStrs, "NULL")
+		} else if ast.IsChar(arg) {
+			argStrs = append(argStrs, fmt.Sprintf("'%c'", rune(arg.Int)))
+		} else {
+			argStrs = append(argStrs, "NULL")
+		}
+	}
+
+	// Generate the C function call
+	code := fmt.Sprintf("%s(%s)", fnName, joinStrings(argStrs, ", "))
+	return ast.NewCode(code)
+}
+
+// evalFFIInterpret handles FFI calls in pure interpretation mode
+// Only supports a limited set of built-in functions
+func evalFFIInterpret(fnName string, args []*ast.Value) *ast.Value {
+	switch fnName {
+	case "puts":
+		// (ffi "puts" str) - print string
+		if len(args) > 0 {
+			printValue(args[0])
+			fmt.Println()
+		}
+		return ast.NewInt(0)
+
+	case "putchar":
+		// (ffi "putchar" ch) - print character
+		if len(args) > 0 && ast.IsChar(args[0]) {
+			fmt.Printf("%c", rune(args[0].Int))
+		} else if len(args) > 0 && ast.IsInt(args[0]) {
+			fmt.Printf("%c", rune(args[0].Int))
+		}
+		return ast.NewInt(0)
+
+	case "getchar":
+		// (ffi "getchar") - read character
+		var ch byte
+		fmt.Scanf("%c", &ch)
+		return ast.NewChar(rune(ch))
+
+	case "exit":
+		// (ffi "exit" code) - exit with code (for interpretation, just return error)
+		code := int64(0)
+		if len(args) > 0 && ast.IsInt(args[0]) {
+			code = args[0].Int
+		}
+		return ast.NewError(fmt.Sprintf("exit:%d", code))
+
+	case "printf":
+		// Simple printf support
+		if len(args) > 0 {
+			printValue(args[0])
+			for _, arg := range args[1:] {
+				fmt.Print(" ")
+				printValue(arg)
+			}
+		}
+		return ast.NewInt(0)
+
+	default:
+		return ast.NewError(fmt.Sprintf("ffi: unknown function in interpreter: %s", fnName))
+	}
+}
+
+// printValue prints a value for FFI output
+func printValue(v *ast.Value) {
+	if v == nil || ast.IsNil(v) {
+		return
+	}
+	if ast.IsInt(v) {
+		fmt.Print(v.Int)
+	} else if ast.IsChar(v) {
+		fmt.Printf("%c", rune(v.Int))
+	} else if ast.IsSym(v) {
+		fmt.Print(v.Str)
+	} else if ast.IsCell(v) {
+		// Could be a string (list of chars)
+		for ; !ast.IsNil(v) && ast.IsCell(v); v = v.Cdr {
+			if ast.IsChar(v.Car) {
+				fmt.Printf("%c", rune(v.Car.Int))
+			}
+		}
+	}
+}
+
+// evalFFIDeclare handles (ffi-declare "ret_type" "func_name" "arg1_type" ...)
+func evalFFIDeclare(args *ast.Value, menv *ast.Value) *ast.Value {
+	if ast.IsNil(args) || ast.IsNil(args.Cdr) {
+		return ast.NewError("ffi-declare requires return type and function name")
+	}
+
+	// Get return type
+	retTypeVal := Eval(args.Car, menv)
+	retType := valueToString(retTypeVal)
+
+	// Get function name
+	fnNameVal := Eval(args.Cdr.Car, menv)
+	fnName := valueToString(fnNameVal)
+
+	// Get argument types
+	var argTypes []string
+	rest := args.Cdr.Cdr
+	for !ast.IsNil(rest) && ast.IsCell(rest) {
+		argTypeVal := Eval(rest.Car, menv)
+		argTypes = append(argTypes, valueToString(argTypeVal))
+		rest = rest.Cdr
+	}
+
+	// Register the declaration
+	RegisterFFI(fnName, retType, argTypes)
+
+	// Return the function name as a symbol (can be used with ffi)
+	return ast.NewSym(fnName)
+}
+
+// valueToString converts a value to a string for FFI declarations
+func valueToString(v *ast.Value) string {
+	if v == nil || ast.IsNil(v) {
+		return ""
+	}
+	if ast.IsSym(v) {
+		return v.Str
+	}
+	// Handle string (list of chars)
+	if ast.IsCell(v) && ast.IsChar(v.Car) {
+		var sb string
+		for ; !ast.IsNil(v) && ast.IsCell(v); v = v.Cdr {
+			if ast.IsChar(v.Car) {
+				sb += string(rune(v.Car.Int))
+			}
+		}
+		return sb
+	}
+	return v.String()
+}
+
+// joinStrings joins strings with a separator
+func joinStrings(strs []string, sep string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+	result := strs[0]
+	for i := 1; i < len(strs); i++ {
+		result += sep + strs[i]
+	}
+	return result
+}
+
+// GenerateFFIDeclarations generates C declarations for all registered FFI functions
+func GenerateFFIDeclarations() string {
+	var sb string
+	sb += "/* FFI Declarations */\n"
+	for _, decl := range ffiDeclarations {
+		sb += fmt.Sprintf("extern %s %s(", decl.ReturnType, decl.Name)
+		if len(decl.ArgTypes) == 0 {
+			sb += "void"
+		} else {
+			for i, argType := range decl.ArgTypes {
+				if i > 0 {
+					sb += ", "
+				}
+				sb += argType
+			}
+		}
+		sb += ");\n"
+	}
+	sb += "\n"
+	return sb
 }

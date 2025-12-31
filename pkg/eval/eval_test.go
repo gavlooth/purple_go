@@ -1,6 +1,7 @@
 package eval
 
 import (
+	"strings"
 	"testing"
 
 	"purple_go/pkg/ast"
@@ -455,6 +456,115 @@ func TestString(t *testing.T) {
 	result = evalString("(string-length (substring \"hello\" 1 3))")
 	if result == nil || !ast.IsInt(result) || result.Int != 2 {
 		t.Errorf("(substring \"hello\" 1 3) length = %v, want 2", result)
+	}
+}
+
+func TestFloat(t *testing.T) {
+	// Float literal parsing
+	result := evalString("3.14")
+	if result == nil || !ast.IsFloat(result) {
+		t.Errorf("3.14 = %v, want float", result)
+		return
+	}
+	if result.Float != 3.14 {
+		t.Errorf("3.14 = %g, want 3.14", result.Float)
+	}
+
+	// Negative float
+	result = evalString("-2.5")
+	if result == nil || !ast.IsFloat(result) || result.Float != -2.5 {
+		t.Errorf("-2.5 = %v, want -2.5", result)
+	}
+
+	// Scientific notation
+	result = evalString("1e-3")
+	if result == nil || !ast.IsFloat(result) || result.Float != 0.001 {
+		t.Errorf("1e-3 = %v, want 0.001", result)
+	}
+
+	// Float arithmetic
+	result = evalString("(+ 1.5 2.5)")
+	if result == nil || !ast.IsFloat(result) || result.Float != 4.0 {
+		t.Errorf("(+ 1.5 2.5) = %v, want 4.0", result)
+	}
+
+	// Mixed int/float arithmetic
+	result = evalString("(* 2 3.5)")
+	if result == nil || !ast.IsFloat(result) || result.Float != 7.0 {
+		t.Errorf("(* 2 3.5) = %v, want 7.0", result)
+	}
+
+	// Float division
+	result = evalString("(/ 7.0 2.0)")
+	if result == nil || !ast.IsFloat(result) || result.Float != 3.5 {
+		t.Errorf("(/ 7.0 2.0) = %v, want 3.5", result)
+	}
+
+	// float? predicate
+	result = evalString("(float? 3.14)")
+	if ast.IsNil(result) {
+		t.Error("(float? 3.14) should be true")
+	}
+
+	result = evalString("(float? 42)")
+	if !ast.IsNil(result) {
+		t.Error("(float? 42) should be false")
+	}
+
+	// int->float
+	result = evalString("(int->float 42)")
+	if result == nil || !ast.IsFloat(result) || result.Float != 42.0 {
+		t.Errorf("(int->float 42) = %v, want 42.0", result)
+	}
+
+	// float->int
+	result = evalString("(float->int 3.7)")
+	if result == nil || !ast.IsInt(result) || result.Int != 3 {
+		t.Errorf("(float->int 3.7) = %v, want 3", result)
+	}
+
+	// abs
+	result = evalString("(abs -3.5)")
+	if result == nil || !ast.IsFloat(result) || result.Float != 3.5 {
+		t.Errorf("(abs -3.5) = %v, want 3.5", result)
+	}
+}
+
+func TestFFI(t *testing.T) {
+	// FFI in codegen mode (with lifted values)
+	result := evalString("(let ((x (lift 42))) (ffi 'printf x))")
+	if result == nil || !ast.IsCode(result) {
+		t.Errorf("ffi codegen = %v, want code", result)
+		return
+	}
+	// The let generates a code block, check that printf(x) is in there
+	if !strings.Contains(result.Str, "printf(x)") {
+		t.Errorf("ffi codegen = %q, should contain printf(x)", result.Str)
+	}
+
+	// Direct FFI call with literal generates simpler code
+	result = evalString("(ffi 'sin (lift 3.14))")
+	if result == nil || !ast.IsCode(result) {
+		t.Errorf("ffi sin = %v, want code", result)
+		return
+	}
+
+	// FFI declaration
+	ClearFFIDeclarations()
+	evalString("(ffi-declare 'int 'custom_func 'int 'float)")
+	decls := GetFFIDeclarations()
+	if decls["custom_func"] == nil {
+		t.Error("ffi-declare should register custom_func")
+	} else {
+		if decls["custom_func"].ReturnType != "int" {
+			t.Errorf("return type = %s, want int", decls["custom_func"].ReturnType)
+		}
+	}
+
+	// Generate declarations
+	declStr := GenerateFFIDeclarations()
+	if !strings.Contains(declStr, "extern int custom_func") {
+		t.Errorf("generated decl = %q, should contain extern int custom_func", declStr)
 	}
 }
 

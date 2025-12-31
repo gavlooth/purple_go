@@ -90,6 +90,23 @@ Obj* mk_int(long i) {
     return x;
 }
 
+Obj* mk_float(double f) {
+    Obj* x = malloc(sizeof(Obj));
+    if (!x) return NULL;
+    x->mark = 1;
+    x->scc_id = -1;
+    x->is_pair = 0;
+    x->scan_tag = 0;
+    /* Store float in the same space as int (union) */
+    *((double*)&x->i) = f;
+    return x;
+}
+
+double get_float(Obj* x) {
+    if (!x) return 0.0;
+    return *((double*)&x->i);
+}
+
 Obj* mk_pair(Obj* a, Obj* b) {
     Obj* x = malloc(sizeof(Obj));
     if (!x) return NULL;

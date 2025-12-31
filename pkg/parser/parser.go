@@ -277,16 +277,53 @@ func (p *Parser) parseAtom() (*ast.Value, error) {
 	start := p.pos
 
 	// Check for negative number
-	if p.peek() == '-' && p.pos+1 < len(p.input) && isDigit(p.input[p.pos+1]) {
+	if p.peek() == '-' && p.pos+1 < len(p.input) && (isDigit(p.input[p.pos+1]) || p.input[p.pos+1] == '.') {
 		p.advance()
 	}
 
-	// Check if it's a number
-	if isDigit(p.peek()) {
+	// Check if it's a number (integer or float)
+	if isDigit(p.peek()) || (p.peek() == '.' && p.pos+1 < len(p.input) && isDigit(p.input[p.pos+1])) {
+		isFloat := false
+
+		// Parse integer part
 		for p.pos < len(p.input) && isDigit(p.input[p.pos]) {
 			p.pos++
 		}
+
+		// Check for decimal point
+		if p.pos < len(p.input) && p.input[p.pos] == '.' {
+			isFloat = true
+			p.pos++
+			// Parse fractional part
+			for p.pos < len(p.input) && isDigit(p.input[p.pos]) {
+				p.pos++
+			}
+		}
+
+		// Check for exponent (scientific notation)
+		if p.pos < len(p.input) && (p.input[p.pos] == 'e' || p.input[p.pos] == 'E') {
+			isFloat = true
+			p.pos++
+			// Optional sign
+			if p.pos < len(p.input) && (p.input[p.pos] == '+' || p.input[p.pos] == '-') {
+				p.pos++
+			}
+			// Exponent digits
+			for p.pos < len(p.input) && isDigit(p.input[p.pos]) {
+				p.pos++
+			}
+		}
+
 		numStr := p.input[start:p.pos]
+
+		if isFloat {
+			f, err := strconv.ParseFloat(numStr, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid float: %s", numStr)
+			}
+			return ast.NewFloat(f), nil
+		}
+
 		n, err := strconv.ParseInt(numStr, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid integer: %s", numStr)
