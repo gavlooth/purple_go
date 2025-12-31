@@ -175,8 +175,9 @@ static void tarjan_strongconnect(Obj* v, TarjanState* state,
                                   void (*on_scc)(Obj**, int)) {
     if (!v || !state) return;
 
-    /* Use mark field as temporary index storage */
+    /* Use scan_tag field to store Tarjan index for this node */
     int v_idx = state->current_index++;
+    v->scan_tag = (unsigned int)v_idx;  /* Store index in node */
     state->index[v_idx %% state->capacity] = v_idx;
     state->lowlink[v_idx %% state->capacity] = v_idx;
     state->stack[state->stack_top++] = v;
@@ -189,18 +190,21 @@ static void tarjan_strongconnect(Obj* v, TarjanState* state,
             Obj* w = children[i];
             if (!w) continue;
 
-            /* Check if w has been visited */
-            /* Simplified: assume linear scan is ok for small graphs */
-            int w_idx = -1;
-            for (int j = 0; j < state->stack_top; j++) {
-                if (state->stack[j] == w) {
-                    w_idx = j;
-                    break;
-                }
-            }
-
-            if (w_idx < 0) {
+            /* Check if w has been visited (scan_tag != 0 means visited) */
+            int w_idx = (int)w->scan_tag;
+            if (w_idx == 0) {
+                /* Not visited yet */
                 tarjan_strongconnect(w, state, on_scc);
+                /* Update lowlink */
+                int w_low = state->lowlink[w->scan_tag %% state->capacity];
+                if (w_low < state->lowlink[v_idx %% state->capacity]) {
+                    state->lowlink[v_idx %% state->capacity] = w_low;
+                }
+            } else if (state->on_stack[w_idx %% state->capacity]) {
+                /* w is on stack, update lowlink */
+                if (state->index[w_idx %% state->capacity] < state->lowlink[v_idx %% state->capacity]) {
+                    state->lowlink[v_idx %% state->capacity] = state->index[w_idx %% state->capacity];
+                }
             }
         }
     }
@@ -213,7 +217,8 @@ static void tarjan_strongconnect(Obj* v, TarjanState* state,
         Obj* w;
         do {
             w = state->stack[--state->stack_top];
-            state->on_stack[state->current_index %% state->capacity] = 0;
+            int w_idx = (int)w->scan_tag;
+            state->on_stack[w_idx %% state->capacity] = 0;
             if (scc_size < 256) {
                 scc_members[scc_size++] = w;
             }
