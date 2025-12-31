@@ -123,25 +123,68 @@ purple_go/
 │   ├── parser/
 │   │   └── parser.go          # S-expression parser
 │   ├── eval/
-│   │   ├── eval.go            # Stage-polymorphic evaluator
+│   │   ├── eval.go            # Stage-polymorphic evaluator + deftype
 │   │   ├── env.go             # Environment handling
 │   │   └── primitives.go      # Built-in primitives
 │   ├── analysis/
 │   │   ├── escape.go          # Escape analysis
-│   │   ├── shape.go           # Shape analysis
-│   │   └── liveness.go        # Liveness analysis
+│   │   ├── shape.go           # Shape analysis + CyclicFreeStrategy
+│   │   ├── liveness.go        # Liveness analysis
+│   │   └── ownership.go       # Constructor-level ownership tracking
 │   ├── codegen/
 │   │   ├── codegen.go         # C99 code generation
-│   │   ├── runtime.go         # Runtime header generation
-│   │   └── types.go           # Type registry
+│   │   ├── runtime.go         # Runtime header generation (integrated)
+│   │   ├── types.go           # Type registry + back-edge detection
+│   │   ├── arena.go           # Arena code generation
+│   │   └── weak_edge.go       # Weak edge detection
 │   └── memory/
 │       ├── asap.go            # ASAP CLEAN phase
-│       ├── scc.go             # SCC-based RC (Tarjan)
-│       ├── deferred.go        # Deferred RC
-│       └── arena.go           # Arena allocator
-└── examples/
-    └── demo.purple            # Example programs
+│       ├── scc.go             # SCC-based RC (Tarjan) - standalone
+│       ├── deferred.go        # Deferred RC - standalone
+│       └── arena.go           # Arena allocator - standalone
+└── test/
+    ├── deftype_test.go        # Type system tests
+    └── backedge_integration_test.go  # Back-edge detection tests
 ```
+
+### Integration Status
+
+| Component | Location | Status |
+|-----------|----------|--------|
+| Back-edge detection | `codegen/types.go` | **Integrated** - auto-detects weak fields |
+| Type-aware release | `codegen/runtime.go` | **Integrated** - skips weak fields |
+| Ownership tracking | `analysis/ownership.go` | **Integrated** - field-strength aware |
+| Shape routing | `analysis/shape.go` | **Integrated** - CycleStatus enum |
+| Arena runtime | `codegen/runtime.go` | **Integrated** - with externals support |
+| SCC runtime | `codegen/runtime.go` | **Integrated** - Tarjan's algorithm |
+| Deferred RC | `codegen/runtime.go` | **Integrated** - bounded processing |
+
+### Runtime Features
+
+The `pkg/codegen/runtime.go` now includes all memory management strategies:
+
+1. **Arena with externals**:
+   - `arena_create()`, `arena_destroy()`, `arena_reset()`
+   - `arena_register_external()` for tracking pointers that escape arena
+   - Separate memory pointer per block for robust management
+
+2. **SCC-based RC (ISMM 2024)**:
+   - Full Tarjan's algorithm for O(n) SCC detection
+   - `detect_and_freeze_sccs()` for automatic SCC detection
+   - `release_with_scc()` for SCC-aware release
+   - Single reference count per SCC for frozen cycles
+
+3. **Deferred RC**:
+   - `defer_decrement()` with O(1) coalescing
+   - `process_deferred()` for bounded O(k) work per safe point
+   - `safe_point()` for automatic processing at function boundaries
+   - `flush_deferred()` for cleanup at program exit
+
+4. **Perceus Reuse**:
+   - `try_reuse()`, `reuse_as_int()`, `reuse_as_pair()`
+   - Enables "Functional But In-Place" (FBIP) programming
+
+The standalone implementations in `pkg/memory/` are kept for reference and testing.
 
 ## Reference Counting Techniques
 

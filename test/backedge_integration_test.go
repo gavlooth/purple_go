@@ -225,6 +225,18 @@ func TestBackEdgeRuntimeGeneration(t *testing.T) {
 		{"ItemList type", "typedef struct ItemList"},
 		{"Release functions", "Type-Aware Release Functions"},
 		{"Field accessors", "Field Accessors"},
+		// New integrated features
+		{"Arena with externals", "arena_register_external"},
+		{"Arena reset", "arena_reset"},
+		{"SCC-based RC", "SCC-Based Reference Counting"},
+		{"Tarjan algorithm", "TarjanState"},
+		{"SCC detection", "detect_and_freeze_sccs"},
+		{"Release with SCC", "release_with_scc"},
+		{"Deferred RC", "Deferred Reference Counting"},
+		{"Defer decrement", "defer_decrement"},
+		{"Process deferred", "process_deferred"},
+		{"Safe point", "safe_point"},
+		{"Perceus reuse", "try_reuse"},
 	}
 
 	for _, check := range checks {

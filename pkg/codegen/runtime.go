@@ -379,71 +379,139 @@ void clear_marks_%s(Obj* x) {
 `)
 }
 
-// GenerateArenaRuntime generates arena allocation runtime
+// GenerateArenaRuntime generates arena allocation runtime with externals support
 func (g *RuntimeGenerator) GenerateArenaRuntime() {
 	g.emit(`/* Arena Allocator (Bulk Allocation/Deallocation) */
 /* For cyclic data that doesn't escape function scope */
+/* Enhanced with external pointer tracking */
 
 #define ARENA_BLOCK_SIZE 4096
 
 typedef struct ArenaBlock {
-    char data[ARENA_BLOCK_SIZE];
+    char* memory;
+    size_t size;
     size_t used;
     struct ArenaBlock* next;
 } ArenaBlock;
 
+/* External pointer tracking - for pointers that escape the arena */
+typedef struct ArenaExternal {
+    void* ptr;
+    void (*cleanup)(void*);
+    struct ArenaExternal* next;
+} ArenaExternal;
+
 typedef struct Arena {
-    ArenaBlock* head;
     ArenaBlock* current;
+    ArenaBlock* blocks;
+    size_t block_size;
+    ArenaExternal* externals;
 } Arena;
 
-static ArenaBlock* arena_new_block(void) {
-    ArenaBlock* block = malloc(sizeof(ArenaBlock));
-    if (!block) return NULL;
-    block->used = 0;
-    block->next = NULL;
-    return block;
-}
-
 Arena* arena_create(void) {
-    Arena* arena = malloc(sizeof(Arena));
-    if (!arena) return NULL;
-    arena->head = arena_new_block();
-    arena->current = arena->head;
-    return arena;
+    Arena* a = malloc(sizeof(Arena));
+    if (!a) return NULL;
+    a->current = NULL;
+    a->blocks = NULL;
+    a->block_size = ARENA_BLOCK_SIZE;
+    a->externals = NULL;
+    return a;
 }
 
-void arena_destroy(Arena* arena) {
-    if (!arena) return;
-    ArenaBlock* block = arena->head;
-    while (block) {
-        ArenaBlock* next = block->next;
-        free(block);
-        block = next;
-    }
-    free(arena);
-}
-
-static void* arena_alloc(Arena* arena, size_t size) {
-    if (!arena || !arena->current) return NULL;
+static void* arena_alloc(Arena* a, size_t size) {
+    if (!a) return NULL;
 
     /* Align to 8 bytes */
-    size = (size + 7) & ~7;
+    size = (size + 7) & ~(size_t)7;
 
-    if (arena->current->used + size > ARENA_BLOCK_SIZE) {
-        ArenaBlock* new_block = arena_new_block();
-        if (!new_block) return NULL;
-        arena->current->next = new_block;
-        arena->current = new_block;
+    if (!a->current || a->current->used + size > a->current->size) {
+        /* Need new block */
+        size_t block_size = a->block_size;
+        if (size > block_size) block_size = size;
+
+        ArenaBlock* b = malloc(sizeof(ArenaBlock));
+        if (!b) return NULL;
+        b->memory = malloc(block_size);
+        if (!b->memory) {
+            free(b);
+            return NULL;
+        }
+        b->size = block_size;
+        b->used = 0;
+        b->next = a->blocks;
+        a->blocks = b;
+        a->current = b;
     }
 
-    void* ptr = &arena->current->data[arena->current->used];
-    arena->current->used += size;
+    void* ptr = a->current->memory + a->current->used;
+    a->current->used += size;
     return ptr;
 }
 
-Obj* arena_mk_int(Arena* arena, long i) {
-    Obj* x = arena_alloc(arena, sizeof(Obj));
+/* Register an external pointer that must be cleaned up when arena is destroyed */
+void arena_register_external(Arena* a, void* ptr, void (*cleanup)(void*)) {
+    if (!a || !ptr) return;
+    ArenaExternal* e = malloc(sizeof(ArenaExternal));
+    if (!e) return;
+    e->ptr = ptr;
+    e->cleanup = cleanup;
+    e->next = a->externals;
+    a->externals = e;
+}
+
+void arena_destroy(Arena* a) {
+    if (!a) return;
+
+    /* Clean up external pointers first */
+    ArenaExternal* e = a->externals;
+    while (e) {
+        ArenaExternal* next = e->next;
+        if (e->cleanup) {
+            e->cleanup(e->ptr);
+        }
+        free(e);
+        e = next;
+    }
+
+    /* Free all blocks */
+    ArenaBlock* b = a->blocks;
+    while (b) {
+        ArenaBlock* next = b->next;
+        free(b->memory);
+        free(b);
+        b = next;
+    }
+
+    free(a);
+}
+
+/* Reset arena for reuse without destroying */
+void arena_reset(Arena* a) {
+    if (!a) return;
+
+    /* Clean up externals */
+    ArenaExternal* e = a->externals;
+    while (e) {
+        ArenaExternal* next = e->next;
+        if (e->cleanup) {
+            e->cleanup(e->ptr);
+        }
+        free(e);
+        e = next;
+    }
+    a->externals = NULL;
+
+    /* Reset all blocks */
+    ArenaBlock* b = a->blocks;
+    while (b) {
+        b->used = 0;
+        b = b->next;
+    }
+    a->current = a->blocks;
+}
+
+Obj* arena_mk_int(Arena* a, long i) {
+    Obj* x = arena_alloc(a, sizeof(Obj));
     if (!x) return NULL;
     x->mark = -2;  /* Special mark for arena-allocated */
     x->scc_id = -1;
@@ -453,15 +521,15 @@ Obj* arena_mk_int(Arena* arena, long i) {
     return x;
 }
 
-Obj* arena_mk_pair(Arena* arena, Obj* a, Obj* b) {
-    Obj* x = arena_alloc(arena, sizeof(Obj));
+Obj* arena_mk_pair(Arena* a, Obj* car, Obj* cdr) {
+    Obj* x = arena_alloc(a, sizeof(Obj));
     if (!x) return NULL;
     x->mark = -2;  /* Special mark for arena-allocated */
     x->scc_id = -1;
     x->is_pair = 1;
     x->scan_tag = 0;
-    x->a = a;
-    x->b = b;
+    x->a = car;
+    x->b = cdr;
     return x;
 }
 
@@ -507,6 +575,350 @@ Obj* reuse_as_pair(Obj* old, Obj* a, Obj* b) {
     obj->a = a;
     obj->b = b;
     return obj;
+}
+
+`)
+}
+
+// GenerateSCCRuntime generates SCC-based reference counting runtime (ISMM 2024)
+func (g *RuntimeGenerator) GenerateSCCRuntime() {
+	g.emit(`/* SCC-Based Reference Counting (ISMM 2024) */
+/* For frozen (deeply immutable) cyclic structures */
+/* Uses Tarjan's algorithm for O(n) SCC detection */
+
+typedef struct SCC {
+    int id;
+    Obj** members;
+    int member_count;
+    int member_capacity;
+    int ref_count;      /* Single RC for entire SCC */
+    int frozen;         /* 1 if immutable */
+    struct SCC* next;
+} SCC;
+
+typedef struct SCCRegistry {
+    SCC* sccs;
+    int next_id;
+} SCCRegistry;
+
+SCCRegistry SCC_REGISTRY = {NULL, 0};
+
+/* Tarjan's Algorithm state */
+typedef struct TarjanState {
+    int* index;
+    int* lowlink;
+    int* on_stack;
+    Obj** stack;
+    int stack_top;
+    int current_index;
+    int capacity;
+} TarjanState;
+
+static TarjanState* tarjan_init(int capacity) {
+    TarjanState* s = malloc(sizeof(TarjanState));
+    if (!s) return NULL;
+    s->index = calloc(capacity, sizeof(int));
+    s->lowlink = calloc(capacity, sizeof(int));
+    s->on_stack = calloc(capacity, sizeof(int));
+    s->stack = malloc(capacity * sizeof(Obj*));
+    s->stack_top = 0;
+    s->current_index = 1;
+    s->capacity = capacity;
+    if (!s->index || !s->lowlink || !s->on_stack || !s->stack) {
+        free(s->index);
+        free(s->lowlink);
+        free(s->on_stack);
+        free(s->stack);
+        free(s);
+        return NULL;
+    }
+    return s;
+}
+
+static void tarjan_free(TarjanState* s) {
+    if (!s) return;
+    free(s->index);
+    free(s->lowlink);
+    free(s->on_stack);
+    free(s->stack);
+    free(s);
+}
+
+SCC* create_scc(void) {
+    SCC* scc = malloc(sizeof(SCC));
+    if (!scc) return NULL;
+    scc->id = SCC_REGISTRY.next_id++;
+    scc->members = malloc(16 * sizeof(Obj*));
+    scc->member_count = 0;
+    scc->member_capacity = 16;
+    scc->ref_count = 1;
+    scc->frozen = 0;
+    scc->next = SCC_REGISTRY.sccs;
+    SCC_REGISTRY.sccs = scc;
+    return scc;
+}
+
+void scc_add_member(SCC* scc, Obj* obj) {
+    if (!scc || !obj) return;
+    if (scc->member_count >= scc->member_capacity) {
+        int new_cap = scc->member_capacity * 2;
+        Obj** new_members = realloc(scc->members, new_cap * sizeof(Obj*));
+        if (!new_members) return;
+        scc->members = new_members;
+        scc->member_capacity = new_cap;
+    }
+    scc->members[scc->member_count++] = obj;
+    obj->scc_id = scc->id;
+}
+
+void freeze_scc(SCC* scc) {
+    if (scc) scc->frozen = 1;
+}
+
+SCC* find_scc(int id) {
+    SCC* scc = SCC_REGISTRY.sccs;
+    while (scc) {
+        if (scc->id == id) return scc;
+        scc = scc->next;
+    }
+    return NULL;
+}
+
+void release_scc(SCC* scc) {
+    if (!scc) return;
+    scc->ref_count--;
+    if (scc->ref_count <= 0 && scc->frozen) {
+        /* Free all members */
+        for (int i = 0; i < scc->member_count; i++) {
+            Obj* obj = scc->members[i];
+            if (obj) {
+                invalidate_weak_refs_for(obj);
+                free(obj);
+            }
+        }
+        free(scc->members);
+
+        /* Remove from registry */
+        SCC** pp = &SCC_REGISTRY.sccs;
+        while (*pp) {
+            if (*pp == scc) {
+                *pp = scc->next;
+                break;
+            }
+            pp = &(*pp)->next;
+        }
+        free(scc);
+    }
+}
+
+/* Release object considering SCC membership */
+void release_with_scc(Obj* obj) {
+    if (!obj) return;
+    if (obj->scc_id >= 0) {
+        SCC* scc = find_scc(obj->scc_id);
+        if (scc) {
+            release_scc(scc);
+            return;
+        }
+    }
+    dec_ref(obj);
+}
+
+/* Tarjan's strongconnect for SCC detection */
+static void tarjan_strongconnect(Obj* v, TarjanState* state,
+                                  void (*on_scc)(Obj**, int)) {
+    if (!v || !state) return;
+
+    /* Use scan_tag field to store Tarjan index for this node */
+    int v_idx = state->current_index++;
+    v->scan_tag = (unsigned int)v_idx;
+    state->index[v_idx %% state->capacity] = v_idx;
+    state->lowlink[v_idx %% state->capacity] = v_idx;
+    state->stack[state->stack_top++] = v;
+    state->on_stack[v_idx %% state->capacity] = 1;
+
+    /* Visit children */
+    if (v->is_pair) {
+        Obj* children[] = {v->a, v->b};
+        for (int i = 0; i < 2; i++) {
+            Obj* w = children[i];
+            if (!w) continue;
+
+            int w_idx = (int)w->scan_tag;
+            if (w_idx == 0) {
+                /* Not visited yet */
+                tarjan_strongconnect(w, state, on_scc);
+                int w_low = state->lowlink[w->scan_tag %% state->capacity];
+                if (w_low < state->lowlink[v_idx %% state->capacity]) {
+                    state->lowlink[v_idx %% state->capacity] = w_low;
+                }
+            } else if (state->on_stack[w_idx %% state->capacity]) {
+                /* w is on stack */
+                if (state->index[w_idx %% state->capacity] < state->lowlink[v_idx %% state->capacity]) {
+                    state->lowlink[v_idx %% state->capacity] = state->index[w_idx %% state->capacity];
+                }
+            }
+        }
+    }
+
+    /* Check if v is root of SCC */
+    if (state->lowlink[v_idx %% state->capacity] == state->index[v_idx %% state->capacity]) {
+        Obj* scc_members[256];
+        int scc_size = 0;
+        Obj* w;
+        do {
+            w = state->stack[--state->stack_top];
+            int w_idx = (int)w->scan_tag;
+            state->on_stack[w_idx %% state->capacity] = 0;
+            if (scc_size < 256) {
+                scc_members[scc_size++] = w;
+            }
+        } while (w != v && state->stack_top > 0);
+
+        if (scc_size > 1 && on_scc) {
+            on_scc(scc_members, scc_size);
+        }
+    }
+}
+
+static void on_scc_found(Obj** members, int count) {
+    SCC* scc = create_scc();
+    if (!scc) return;
+    for (int i = 0; i < count; i++) {
+        scc_add_member(scc, members[i]);
+    }
+}
+
+/* Detect and freeze SCCs starting from a root object */
+void detect_and_freeze_sccs(Obj* root) {
+    TarjanState* state = tarjan_init(1024);
+    if (!state) return;
+    tarjan_strongconnect(root, state, on_scc_found);
+
+    /* Freeze all detected SCCs */
+    SCC* scc = SCC_REGISTRY.sccs;
+    while (scc) {
+        if (!scc->frozen) {
+            freeze_scc(scc);
+        }
+        scc = scc->next;
+    }
+
+    tarjan_free(state);
+}
+
+`)
+}
+
+// GenerateDeferredRuntime generates deferred reference counting runtime
+func (g *RuntimeGenerator) GenerateDeferredRuntime() {
+	g.emit(`/* Deferred Reference Counting */
+/* For mutable cyclic structures - bounded O(k) processing per safe point */
+/* Based on Deutsch & Bobrow (1976) and CactusRef-style local detection */
+
+typedef struct DeferredDec {
+    Obj* obj;
+    int count;
+    struct DeferredDec* next;
+} DeferredDec;
+
+typedef struct DeferredContext {
+    DeferredDec* pending;
+    int pending_count;
+    int batch_size;     /* Max decrements per safe point */
+    int total_deferred;
+} DeferredContext;
+
+DeferredContext DEFERRED_CTX = {NULL, 0, 32, 0};
+
+/* O(1) deferral with coalescing */
+void defer_decrement(Obj* obj) {
+    if (!obj) return;
+    DEFERRED_CTX.total_deferred++;
+
+    /* Check if already in pending list - coalesce */
+    DeferredDec* d = DEFERRED_CTX.pending;
+    while (d) {
+        if (d->obj == obj) {
+            d->count++;
+            return;
+        }
+        d = d->next;
+    }
+
+    /* Add new entry */
+    DeferredDec* entry = malloc(sizeof(DeferredDec));
+    if (!entry) {
+        /* Fallback: immediate decrement */
+        dec_ref(obj);
+        return;
+    }
+    entry->obj = obj;
+    entry->count = 1;
+    entry->next = DEFERRED_CTX.pending;
+    DEFERRED_CTX.pending = entry;
+    DEFERRED_CTX.pending_count++;
+}
+
+/* Process up to batch_size decrements - bounded work */
+void process_deferred(void) {
+    int processed = 0;
+    while (DEFERRED_CTX.pending && processed < DEFERRED_CTX.batch_size) {
+        DeferredDec* d = DEFERRED_CTX.pending;
+        DEFERRED_CTX.pending = d->next;
+        DEFERRED_CTX.pending_count--;
+
+        /* Apply decrements */
+        while (d->count > 0) {
+            dec_ref(d->obj);
+            d->count--;
+            processed++;
+            if (processed >= DEFERRED_CTX.batch_size) break;
+        }
+
+        if (d->count > 0) {
+            /* Put back for next round */
+            d->next = DEFERRED_CTX.pending;
+            DEFERRED_CTX.pending = d;
+            DEFERRED_CTX.pending_count++;
+        } else {
+            free(d);
+        }
+    }
+}
+
+/* Check if we should process deferred decrements */
+int should_process_deferred(void) {
+    return DEFERRED_CTX.pending_count > DEFERRED_CTX.batch_size * 2;
+}
+
+/* Flush all pending decrements */
+void flush_deferred(void) {
+    while (DEFERRED_CTX.pending) {
+        DeferredDec* d = DEFERRED_CTX.pending;
+        DEFERRED_CTX.pending = d->next;
+
+        while (d->count > 0) {
+            dec_ref(d->obj);
+            d->count--;
+        }
+        free(d);
+    }
+    DEFERRED_CTX.pending_count = 0;
+}
+
+/* Safe point: check and maybe process deferred - call at function boundaries */
+void safe_point(void) {
+    if (should_process_deferred()) {
+        process_deferred();
+    }
+}
+
+/* Set batch size for tuning */
+void set_deferred_batch_size(int size) {
+    if (size > 0) {
+        DEFERRED_CTX.batch_size = size;
+    }
 }
 
 `)
@@ -723,6 +1135,8 @@ func (g *RuntimeGenerator) GenerateAll() {
 	g.GenerateConstructors()
 	g.GenerateMemoryManagement()
 	g.GenerateArenaRuntime()
+	g.GenerateSCCRuntime()
+	g.GenerateDeferredRuntime()
 	g.GenerateArithmetic()
 	g.GenerateComparison()
 	g.GeneratePerceusRuntime()
