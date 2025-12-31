@@ -25,13 +25,17 @@ func (g *RuntimeGenerator) emit(format string, args ...interface{}) {
 func (g *RuntimeGenerator) GenerateHeader() {
 	g.emit(`/* Purple + ASAP C Compiler Output */
 /* Primary Strategy: ASAP + ISMM 2024 (Deeply Immutable Cycles) */
-/* Generated ANSI C99 Code */
+/* Generated ANSI C99 + POSIX Code */
+
+/* Enable POSIX.1-2001 for pthread_rwlock_t and related functions */
+#define _POSIX_C_SOURCE 200112L
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <limits.h>
 #include <stdint.h>
 #include <string.h>
+#include <pthread.h>
 
 /* Forward declarations */
 void invalidate_weak_refs_for(void* target);
@@ -1352,6 +1356,506 @@ func (g *RuntimeGenerator) GenerateFieldAccessors() {
 	}
 }
 
+// GenerateRegionRuntime generates region reference functions
+func (g *RuntimeGenerator) GenerateRegionRuntime() {
+	g.emit(`
+/* ========== Region References (v0.5.0) ========== */
+/* Vale/Ada/SPARK-style scope hierarchy validation */
+/* O(1) CanReference check via depth comparison */
+
+typedef uint64_t RegionID;
+typedef uint32_t RegionDepth;
+
+typedef struct Region Region;
+typedef struct RegionObj RegionObj;
+typedef struct RegionRef RegionRef;
+typedef struct RegionContext RegionContext;
+
+struct Region {
+    RegionID id;
+    RegionDepth depth;
+    Region* parent;
+    Region** children;
+    int child_count;
+    int child_capacity;
+    RegionObj** objects;
+    int object_count;
+    int object_capacity;
+    int closed;
+};
+
+struct RegionObj {
+    Region* region;
+    void* data;
+    void (*destructor)(void*);
+};
+
+struct RegionRef {
+    RegionObj* target;
+    Region* source_region;
+};
+
+struct RegionContext {
+    Region* root;
+    Region* current;
+    uint64_t next_id;
+};
+
+/* Global context (can also use explicit context) */
+static RegionContext* g_region_ctx = NULL;
+
+static Region* region_new(Region* parent, uint64_t* next_id) {
+    Region* r = calloc(1, sizeof(Region));
+    if (!r) return NULL;
+    r->id = (*next_id)++;
+    r->depth = parent ? parent->depth + 1 : 0;
+    r->parent = parent;
+    r->closed = 0;
+    return r;
+}
+
+static RegionContext* region_context_new(void) {
+    RegionContext* ctx = calloc(1, sizeof(RegionContext));
+    if (!ctx) return NULL;
+    ctx->next_id = 1;
+    ctx->root = region_new(NULL, &ctx->next_id);
+    ctx->current = ctx->root;
+    return ctx;
+}
+
+static void region_init(void) {
+    if (!g_region_ctx) {
+        g_region_ctx = region_context_new();
+    }
+}
+
+static Region* region_enter(void) {
+    region_init();
+    Region* child = region_new(g_region_ctx->current, &g_region_ctx->next_id);
+    if (!child) return NULL;
+
+    Region* parent = g_region_ctx->current;
+    if (parent->child_count >= parent->child_capacity) {
+        int new_cap = parent->child_capacity == 0 ? 4 : parent->child_capacity * 2;
+        Region** new_children = realloc(parent->children, new_cap * sizeof(Region*));
+        if (!new_children) { free(child); return NULL; }
+        parent->children = new_children;
+        parent->child_capacity = new_cap;
+    }
+    parent->children[parent->child_count++] = child;
+    g_region_ctx->current = child;
+    return child;
+}
+
+static int region_exit(void) {
+    if (!g_region_ctx || !g_region_ctx->current) return -1;
+    if (g_region_ctx->current == g_region_ctx->root) return -1;  /* Cannot exit root */
+
+    Region* exiting = g_region_ctx->current;
+    exiting->closed = 1;
+
+    /* Invalidate all objects in this region */
+    for (int i = 0; i < exiting->object_count; i++) {
+        RegionObj* obj = exiting->objects[i];
+        if (obj) {
+            if (obj->destructor && obj->data) {
+                obj->destructor(obj->data);
+            }
+            obj->region = NULL;  /* Mark as invalid */
+        }
+    }
+    g_region_ctx->current = exiting->parent;
+    return 0;
+}
+
+static RegionObj* region_alloc(void* data, void (*destructor)(void*)) {
+    region_init();
+    RegionObj* obj = calloc(1, sizeof(RegionObj));
+    if (!obj) return NULL;
+    obj->region = g_region_ctx->current;
+    obj->data = data;
+    obj->destructor = destructor;
+
+    Region* r = g_region_ctx->current;
+    if (r->object_count >= r->object_capacity) {
+        int new_cap = r->object_capacity == 0 ? 8 : r->object_capacity * 2;
+        RegionObj** new_objs = realloc(r->objects, new_cap * sizeof(RegionObj*));
+        if (!new_objs) { free(obj); return NULL; }
+        r->objects = new_objs;
+        r->object_capacity = new_cap;
+    }
+    r->objects[r->object_count++] = obj;
+    return obj;
+}
+
+/* O(1) check: inner can reference outer (depth >= target depth) */
+static int region_can_reference(RegionObj* source, RegionObj* target) {
+    if (!source || !target) return 0;
+    if (!source->region || !target->region) return 0;  /* Invalid objects */
+    return source->region->depth >= target->region->depth;
+}
+
+static RegionRef* region_create_ref(RegionObj* source, RegionObj* target) {
+    if (!region_can_reference(source, target)) {
+        fprintf(stderr, "region: scope violation - inner cannot hold ref to outer\n");
+        return NULL;
+    }
+    RegionRef* ref = calloc(1, sizeof(RegionRef));
+    if (!ref) return NULL;
+    ref->target = target;
+    ref->source_region = source->region;
+    return ref;
+}
+
+static int region_ref_is_valid(RegionRef* ref) {
+    return ref && ref->target && ref->target->region != NULL;
+}
+
+static void* region_deref(RegionRef* ref) {
+    if (!region_ref_is_valid(ref)) {
+        fprintf(stderr, "region: use-after-free or scope violation\n");
+        return NULL;
+    }
+    return ref->target->data;
+}
+
+`)
+}
+
+// GenerateGenRefRuntime generates generational reference functions
+func (g *RuntimeGenerator) GenerateGenRefRuntime() {
+	g.emit(`
+/* ========== Random Generational References (v0.5.0) ========== */
+/* Vale-style use-after-free detection */
+/* Thread-safe via pthread_rwlock (C99 + POSIX) */
+
+#include <time.h>
+
+typedef uint64_t Generation;
+
+typedef struct GenObj GenObj;
+typedef struct GenRef GenRef;
+typedef struct GenClosure GenClosure;
+typedef struct GenRefContext GenRefContext;
+
+struct GenObj {
+    Generation generation;
+    void* data;
+    void (*destructor)(void*);
+    int freed;
+    pthread_rwlock_t rwlock;
+};
+
+struct GenRef {
+    GenObj* target;
+    Generation remembered_gen;
+    const char* source_desc;
+};
+
+/* Closure with capture validation */
+struct GenClosure {
+    GenRef** captures;
+    int capture_count;
+    void* (*func)(void* ctx);
+    void* ctx;
+};
+
+struct GenRefContext {
+    GenObj** objects;
+    int object_count;
+    int object_capacity;
+    pthread_mutex_t mutex;
+};
+
+/* Fast xorshift64 PRNG for generation IDs */
+static Generation genref_random(void) {
+    static uint64_t state = 0;
+    static pthread_mutex_t prng_mutex = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_lock(&prng_mutex);
+    if (state == 0) {
+        state = (uint64_t)time(NULL) ^ 0x9e3779b97f4a7c15ULL;
+    }
+    state ^= state << 13;
+    state ^= state >> 7;
+    state ^= state << 17;
+    Generation result = state ? state : 1;  /* Never return 0 */
+    pthread_mutex_unlock(&prng_mutex);
+    return result;
+}
+
+static GenRefContext* genref_context_new(void) {
+    GenRefContext* ctx = calloc(1, sizeof(GenRefContext));
+    if (ctx) {
+        pthread_mutex_init(&ctx->mutex, NULL);
+    }
+    return ctx;
+}
+
+static GenObj* genref_alloc(GenRefContext* ctx, void* data, void (*destructor)(void*)) {
+    GenObj* obj = calloc(1, sizeof(GenObj));
+    if (!obj) return NULL;
+    obj->generation = genref_random();
+    obj->data = data;
+    obj->destructor = destructor;
+    obj->freed = 0;
+    pthread_rwlock_init(&obj->rwlock, NULL);
+
+    if (ctx) {
+        pthread_mutex_lock(&ctx->mutex);
+        if (ctx->object_count >= ctx->object_capacity) {
+            int new_cap = ctx->object_capacity == 0 ? 16 : ctx->object_capacity * 2;
+            GenObj** new_objs = realloc(ctx->objects, new_cap * sizeof(GenObj*));
+            if (new_objs) {
+                ctx->objects = new_objs;
+                ctx->object_capacity = new_cap;
+            }
+        }
+        if (ctx->object_count < ctx->object_capacity) {
+            ctx->objects[ctx->object_count++] = obj;
+        }
+        pthread_mutex_unlock(&ctx->mutex);
+    }
+    return obj;
+}
+
+static void genref_free(GenObj* obj) {
+    if (!obj) return;
+    pthread_rwlock_wrlock(&obj->rwlock);
+    if (obj->freed) {
+        pthread_rwlock_unlock(&obj->rwlock);
+        return;
+    }
+    obj->generation = 0;  /* Invalidate ALL references instantly */
+    obj->freed = 1;
+    if (obj->destructor && obj->data) {
+        obj->destructor(obj->data);
+    }
+    obj->data = NULL;
+    pthread_rwlock_unlock(&obj->rwlock);
+    pthread_rwlock_destroy(&obj->rwlock);
+}
+
+static GenRef* genref_create(GenObj* obj, const char* source_desc) {
+    if (!obj) return NULL;
+    pthread_rwlock_rdlock(&obj->rwlock);
+    if (obj->freed || obj->generation == 0) {
+        pthread_rwlock_unlock(&obj->rwlock);
+        return NULL;
+    }
+    GenRef* ref = calloc(1, sizeof(GenRef));
+    if (!ref) {
+        pthread_rwlock_unlock(&obj->rwlock);
+        return NULL;
+    }
+    ref->target = obj;
+    ref->remembered_gen = obj->generation;
+    ref->source_desc = source_desc;
+    pthread_rwlock_unlock(&obj->rwlock);
+    return ref;
+}
+
+/* O(1) validity check - just compare generations (with read lock) */
+static int genref_is_valid(GenRef* ref) {
+    if (!ref || !ref->target) return 0;
+    pthread_rwlock_rdlock(&ref->target->rwlock);
+    int valid = ref->remembered_gen == ref->target->generation &&
+                ref->target->generation != 0;
+    pthread_rwlock_unlock(&ref->target->rwlock);
+    return valid;
+}
+
+static void* genref_deref(GenRef* ref) {
+    if (!ref || !ref->target) {
+        fprintf(stderr, "genref: null reference\n");
+        return NULL;
+    }
+    pthread_rwlock_rdlock(&ref->target->rwlock);
+    if (ref->remembered_gen != ref->target->generation) {
+        pthread_rwlock_unlock(&ref->target->rwlock);
+        fprintf(stderr, "genref: use-after-free detected [created at: %%s]\n",
+                ref->source_desc ? ref->source_desc : "unknown");
+        return NULL;
+    }
+    void* data = ref->target->data;
+    pthread_rwlock_unlock(&ref->target->rwlock);
+    return data;
+}
+
+/* Closure support for safe lambda captures */
+static GenClosure* genclosure_new(GenRef** captures, int count, void* (*func)(void*), void* ctx) {
+    GenClosure* c = calloc(1, sizeof(GenClosure));
+    if (!c) return NULL;
+    c->captures = captures;
+    c->capture_count = count;
+    c->func = func;
+    c->ctx = ctx;
+    return c;
+}
+
+static int genclosure_validate(GenClosure* c) {
+    if (!c) return 0;
+    for (int i = 0; i < c->capture_count; i++) {
+        if (!genref_is_valid(c->captures[i])) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static void* genclosure_call(GenClosure* c) {
+    if (!genclosure_validate(c)) {
+        fprintf(stderr, "genclosure: invalid capture detected\n");
+        return NULL;
+    }
+    return c->func ? c->func(c->ctx) : NULL;
+}
+
+`)
+}
+
+// GenerateConstraintRuntime generates constraint reference functions
+func (g *RuntimeGenerator) GenerateConstraintRuntime() {
+	g.emit(`
+/* ========== Constraint References (v0.5.0) ========== */
+/* Assertion-based safety for complex patterns */
+/* Thread-safe via pthread mutex (C99 + POSIX) */
+
+/* Enable debug mode with -DCONSTRAINT_DEBUG */
+#ifndef CONSTRAINT_DEBUG
+#define CONSTRAINT_DEBUG 0
+#endif
+
+#define MAX_CONSTRAINT_SOURCES 16
+
+typedef struct ConstraintObj {
+    void* data;
+    void (*destructor)(void*);
+    const char* owner;
+    int constraint_count;
+    int freed;
+    pthread_mutex_t mutex;
+#if CONSTRAINT_DEBUG
+    const char* sources[MAX_CONSTRAINT_SOURCES];
+    int source_count;
+#endif
+} ConstraintObj;
+
+typedef struct ConstraintRef {
+    ConstraintObj* target;
+    const char* source;
+    int released;
+    pthread_mutex_t mutex;
+} ConstraintRef;
+
+static ConstraintObj* constraint_alloc(void* data, void (*destructor)(void*), const char* owner) {
+    ConstraintObj* obj = calloc(1, sizeof(ConstraintObj));
+    if (!obj) return NULL;
+    obj->data = data;
+    obj->destructor = destructor;
+    obj->owner = owner;
+    obj->constraint_count = 0;
+    obj->freed = 0;
+    pthread_mutex_init(&obj->mutex, NULL);
+#if CONSTRAINT_DEBUG
+    obj->source_count = 0;
+#endif
+    return obj;
+}
+
+static ConstraintRef* constraint_add(ConstraintObj* obj, const char* source) {
+    if (!obj) return NULL;
+    pthread_mutex_lock(&obj->mutex);
+    if (obj->freed) {
+        pthread_mutex_unlock(&obj->mutex);
+        return NULL;
+    }
+    ConstraintRef* ref = calloc(1, sizeof(ConstraintRef));
+    if (!ref) {
+        pthread_mutex_unlock(&obj->mutex);
+        return NULL;
+    }
+    ref->target = obj;
+    ref->source = source;
+    ref->released = 0;
+    pthread_mutex_init(&ref->mutex, NULL);
+    obj->constraint_count++;
+#if CONSTRAINT_DEBUG
+    if (obj->source_count < MAX_CONSTRAINT_SOURCES) {
+        obj->sources[obj->source_count++] = source;
+    }
+#endif
+    pthread_mutex_unlock(&obj->mutex);
+    return ref;
+}
+
+/* O(1) release with mutex protection */
+static int constraint_release(ConstraintRef* ref) {
+    if (!ref || !ref->target) return -1;
+    pthread_mutex_lock(&ref->mutex);
+    if (ref->released) {
+        pthread_mutex_unlock(&ref->mutex);
+        return -1;  /* Already released */
+    }
+    ref->released = 1;
+    pthread_mutex_unlock(&ref->mutex);
+
+    pthread_mutex_lock(&ref->target->mutex);
+    ref->target->constraint_count--;
+    pthread_mutex_unlock(&ref->target->mutex);
+    return 0;
+}
+
+static int constraint_free(ConstraintObj* obj) {
+    if (!obj) return -1;
+    pthread_mutex_lock(&obj->mutex);
+    if (obj->freed) {
+        pthread_mutex_unlock(&obj->mutex);
+        fprintf(stderr, "constraint: double free [owner: %%s]\n", obj->owner ? obj->owner : "unknown");
+        return -1;
+    }
+    if (obj->constraint_count > 0) {
+        pthread_mutex_unlock(&obj->mutex);
+        fprintf(stderr, "constraint violation: cannot free [owner: %%s] with %%d active constraints\n",
+                obj->owner ? obj->owner : "unknown", obj->constraint_count);
+#ifdef CONSTRAINT_ASSERT
+        abort();
+#endif
+        return -1;
+    }
+    obj->freed = 1;
+    if (obj->destructor && obj->data) {
+        obj->destructor(obj->data);
+    }
+    obj->data = NULL;
+    pthread_mutex_unlock(&obj->mutex);
+    pthread_mutex_destroy(&obj->mutex);
+    return 0;
+}
+
+static int constraint_is_valid(ConstraintRef* ref) {
+    if (!ref || !ref->target) return 0;
+    pthread_mutex_lock(&ref->mutex);
+    int rel = ref->released;
+    pthread_mutex_unlock(&ref->mutex);
+    if (rel) return 0;
+
+    pthread_mutex_lock(&ref->target->mutex);
+    int freed = ref->target->freed;
+    pthread_mutex_unlock(&ref->target->mutex);
+    return !freed;
+}
+
+static void* constraint_deref(ConstraintRef* ref) {
+    if (!constraint_is_valid(ref)) {
+        fprintf(stderr, "constraint: invalid dereference\n");
+        return NULL;
+    }
+    return ref->target->data;
+}
+
+`)
+}
+
 // GenerateAll generates the complete runtime
 func (g *RuntimeGenerator) GenerateAll() {
 	g.GenerateHeader()
@@ -1362,6 +1866,9 @@ func (g *RuntimeGenerator) GenerateAll() {
 	g.GenerateSCCRuntime()
 	g.GenerateDeferredRuntime()
 	g.GenerateSymmetricRuntime()
+	g.GenerateRegionRuntime()
+	g.GenerateGenRefRuntime()
+	g.GenerateConstraintRuntime()
 	g.GenerateArithmetic()
 	g.GenerateComparison()
 	g.GeneratePerceusRuntime()

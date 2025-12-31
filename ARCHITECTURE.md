@@ -128,6 +128,209 @@ On top of strategy selection, the **RC Optimization** layer eliminates redundant
 
 Typical elimination rate: **~75%** of RC operations.
 
+## Tiered Safety Strategies (v0.5.0)
+
+Beyond memory management, the compiler provides **tiered safety strategies** to catch different error patterns with appropriate overhead:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    DETECTION PHASE                               │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+    ┌─────────────────────────┼─────────────────────────┐
+    ▼                         ▼                         ▼
+ SIMPLE                   MODERATE                  COMPLEX
+ (Tree/DAG)              (Cross-scope)             (Closures/Graphs)
+    │                         │                         │
+    ▼                         ▼                         ▼
+ Pure ASAP               Region refs              Random Gen refs
+ (zero cost)             (+8 bytes, O(1))         (+16 bytes, 1 cmp)
+                                                        │
+                                                        ▼
+                                                  Constraint refs
+                                                  (debug: assert)
+```
+
+### Region References (Cross-Scope Safety)
+
+Vale/Ada/SPARK-style scope hierarchy validation:
+
+| Property | Description |
+|----------|-------------|
+| Invariant | Pointer cannot point to more deeply scoped region |
+| Check | O(1) depth comparison at link time |
+| Overhead | +8 bytes per object (region ID) |
+| Catches | Cross-scope dangling references |
+
+### Random Generational References (Closure Safety)
+
+Vale-style use-after-free detection:
+
+| Property | Description |
+|----------|-------------|
+| Mechanism | Each object has random 64-bit generation |
+| Check | O(1) comparison at dereference |
+| Overhead | +16 bytes (8 per object, 8 per pointer) |
+| On free | Generation = 0 (invalidates all refs) |
+| Catches | Stale closure captures, callbacks |
+
+### Constraint References (Debug Mode)
+
+Assertion-based safety for complex ownership:
+
+| Property | Description |
+|----------|-------------|
+| Mechanism | Owner + non-owning "constraint" refs |
+| Check | Assert count=0 at free time |
+| Overhead | +8 bytes (constraint count) |
+| Catches | Observer pattern bugs, callback leaks |
+
+### Strategy Selection by Pattern
+
+| Detection | Problem | Strategy | Overhead |
+|-----------|---------|----------|----------|
+| Cross-scope link | Dangling ptr | Region refs | O(1) check |
+| Closure capture | UAF | Gen refs | 1 cmp/deref |
+| Observer pattern | Complex ownership | Constraint | Assert |
+| Unknown shape | Conservative | Symmetric RC | Scope tracking |
+
+### Performance Characteristics (Benchmarked)
+
+**Safety Check Overhead:**
+
+| Operation | Time | vs Raw Pointer |
+|-----------|------|----------------|
+| Raw pointer deref | 0.13 ns | baseline |
+| Region CanReference | 0.32 ns | 2.4× |
+| Constraint IsValid | 9.4 ns | 71× |
+| GenRef IsValid | 11.2 ns | 85× |
+| GenRef Deref | 11.5 ns | 87× |
+
+**Allocation Costs:**
+
+| Strategy | Alloc Time | Memory |
+|----------|------------|--------|
+| Raw alloc | 0.13 ns | 0 B |
+| Region Alloc | 64 ns | 101 B |
+| GenRef Alloc | 94 ns | 118 B |
+| Constraint Alloc | 80 ns | 137 B |
+
+**Realistic Workloads:**
+
+| Workload | Time | Allocations |
+|----------|------|-------------|
+| Closure-heavy | 168 ns | 2 |
+| Observer pattern | 296 ns | 6 |
+| Scoped access | 289 ns | 11 |
+| Mixed strategies | 624 ns | 8 |
+
+**Key insight**: Region checks are nearly free (0.32 ns), making them suitable for
+liberal use in cross-scope validation. GenRef/Constraint checks add ~10 ns overhead,
+acceptable for closures and debug assertions.
+
+### Go/C Implementation Alignment
+
+Both Go (`pkg/memory/`) and C (`pkg/codegen/runtime.go`) implementations provide:
+
+| Feature | Go API | C API |
+|---------|--------|-------|
+| Region context | `NewRegionContext()` | `region_context_new()` |
+| Enter scope | `ctx.EnterRegion()` | `region_enter()` |
+| Exit scope | `ctx.ExitRegion()` | `region_exit()` |
+| Allocate | `ctx.Alloc(data)` | `region_alloc(data, dtor)` |
+| Check ref | `CanReference(src, tgt)` | `region_can_reference(src, tgt)` |
+| GenRef alloc | `ctx.Alloc(data)` | `genref_alloc(ctx, data, dtor)` |
+| Create ref | `obj.CreateRef(src)` | `genref_create(obj, src)` |
+| Validity | `ref.IsValid()` | `genref_is_valid(ref)` |
+| Constraint add | `obj.AddConstraint(src)` | `constraint_add(obj, src)` |
+| Release | `ref.Release()` | `constraint_release(ref)` |
+
+**C optimizations** (matching Go):
+- Atomic operations for constraint count and freed flags
+- Optional debug tracking with `-DCONSTRAINT_DEBUG`
+- O(1) release via atomic decrement
+
+### Thread Safety Design
+
+Each safety strategy has a deliberate thread safety model:
+
+| Strategy | Thread-Safe | Mechanism | Rationale |
+|----------|-------------|-----------|-----------|
+| **Region** | Per-thread | None needed | Lexical scoping (like call stack) |
+| **GenRef** | ✓ Yes | `sync.RWMutex` | Shared objects across threads |
+| **Constraint** | ✓ Yes | `sync/atomic` | Shared objects, lock-free |
+
+**Region - Per-Thread by Design**
+
+Region contexts follow lexical scoping, similar to a call stack:
+
+```
+Thread 1's RegionContext:     Thread 2's RegionContext:
+┌─────────────────────┐      ┌─────────────────────┐
+│ Root Region         │      │ Root Region         │
+│  └── Function A     │      │  └── Function X     │
+│       └── Block B   │      │       └── Block Y   │
+└─────────────────────┘      └─────────────────────┘
+```
+
+Each thread should have its **own RegionContext** - scopes don't cross thread
+boundaries. Adding mutexes would add unnecessary overhead for the common
+single-threaded case without semantic benefit.
+
+**GenRef - RWMutex Protected**
+
+```go
+type GenObj struct {
+    Generation Generation
+    mu         sync.RWMutex  // Protects generation checks
+}
+
+func (ref *GenRef) IsValid() bool {
+    ref.Target.mu.RLock()
+    defer ref.Target.mu.RUnlock()
+    return ref.RememberedGen == ref.Target.Generation
+}
+```
+
+Multiple threads may share references to the same object. One thread might
+free an object while another checks validity - the RWMutex ensures safe
+concurrent access.
+
+**Constraint - Lock-Free Atomics**
+
+```go
+type ConstraintObj struct {
+    ConstraintCount int32  // Atomic via sync/atomic
+}
+
+func (ref *ConstraintRef) Release() error {
+    // Atomic CAS prevents double-release
+    if !atomic.CompareAndSwapInt32(&ref.released, 0, 1) {
+        return fmt.Errorf("already released")
+    }
+    atomic.AddInt32(&ref.Target.ConstraintCount, -1)
+    return nil
+}
+```
+
+Uses lock-free atomic operations for maximum performance. The CAS
+(compare-and-swap) pattern prevents double-release without locks.
+
+**C Runtime Thread Safety (C99 + POSIX)**
+
+The generated C runtime mirrors Go's design using **pthreads** (no C11 atomics):
+- **Region**: Per-thread by design (lexical scoping, like call stack)
+- **GenRef**: `pthread_rwlock_t` for read-heavy concurrent access
+- **Constraint**: `pthread_mutex_t` for mutual exclusion
+
+Compile with: `gcc -std=c99 -pthread` or `clang -std=c99 -pthread`
+
+### References
+
+- Vale Grimoire: https://verdagon.dev/grimoire/grimoire
+- Random Generational References: https://verdagon.dev/blog/generational-references
+- Ada/SPARK accessibility rules
+
 ## Implemented Algorithms
 
 ### Escape Analysis
@@ -218,7 +421,12 @@ purple_go/
 │       ├── asap.go            # ASAP CLEAN phase
 │       ├── scc.go             # SCC-based RC (Tarjan) - standalone
 │       ├── deferred.go        # Deferred RC - standalone
-│       └── arena.go           # Arena allocator - standalone
+│       ├── arena.go           # Arena allocator - standalone
+│       ├── symmetric.go       # Symmetric RC for cycles
+│       ├── region.go          # Region references (scope safety)
+│       ├── genref.go          # Generational references (UAF safety)
+│       ├── constraint.go      # Constraint references (debug safety)
+│       └── benchmark_test.go  # Performance benchmarks
 └── test/
     ├── deftype_test.go        # Type system tests
     └── backedge_integration_test.go  # Back-edge detection tests
@@ -235,6 +443,10 @@ purple_go/
 | Arena runtime | `codegen/runtime.go` | **Integrated** - with externals support |
 | SCC runtime | `codegen/runtime.go` | **Integrated** - Tarjan's algorithm |
 | Deferred RC | `codegen/runtime.go` | **Integrated** - bounded processing |
+| Symmetric RC | `codegen/runtime.go` | **Integrated** - scope-as-object |
+| Region refs | `codegen/runtime.go` | **Integrated** - O(1) scope validation |
+| GenRef | `codegen/runtime.go` | **Integrated** - UAF detection |
+| Constraint refs | `codegen/runtime.go` | **Integrated** - atomic ops, debug mode |
 
 ### Runtime Features
 
@@ -260,6 +472,24 @@ The `pkg/codegen/runtime.go` now includes all memory management strategies:
 4. **Perceus Reuse**:
    - `try_reuse()`, `reuse_as_int()`, `reuse_as_pair()`
    - Enables "Functional But In-Place" (FBIP) programming
+
+5. **Region References (v0.5.0)**:
+   - `region_enter()`, `region_exit()`, `region_alloc()`
+   - `region_can_reference()` - O(1) depth check
+   - `region_create_ref()`, `region_deref()`
+   - Vale/Ada/SPARK-style scope hierarchy validation
+
+6. **Generational References (v0.5.0)**:
+   - `genref_alloc()`, `genref_free()`, `genref_create()`
+   - `genref_is_valid()`, `genref_deref()` - O(1) generation check
+   - `genclosure_new()`, `genclosure_validate()`, `genclosure_call()`
+   - xorshift64 PRNG for fast random generation IDs
+
+7. **Constraint References (v0.5.0)**:
+   - `constraint_alloc()`, `constraint_add()`, `constraint_release()`
+   - `constraint_free()`, `constraint_is_valid()`, `constraint_deref()`
+   - Atomic operations (`_Atomic int`) for thread safety
+   - Optional debug tracking with `-DCONSTRAINT_DEBUG`
 
 The standalone implementations in `pkg/memory/` are kept for reference and testing.
 

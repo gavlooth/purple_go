@@ -4,6 +4,79 @@ All notable changes to Purple Go are documented in this file.
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-12-31
+
+### Added
+- **Region References** (`pkg/memory/region.go`)
+  - Vale/Ada/SPARK-style scope hierarchy validation
+  - Key invariant: pointer cannot point to more deeply scoped region
+  - Prevents cross-scope dangling references at link time
+  - O(1) depth check on reference creation
+  - Functions: `EnterRegion()`, `ExitRegion()`, `CreateRef()`, `CanReference()`
+  - 10 tests covering scope hierarchy, nested regions, reference validation
+
+- **Random Generational References** (`pkg/memory/genref.go`)
+  - Vale-style use-after-free detection
+  - Each object has random 64-bit generation number
+  - Each reference remembers generation at creation time
+  - On deref: if gen mismatch → UAF detected (O(1) check)
+  - On free: gen = 0 (invalidates all existing references)
+  - Closure capture validation before execution
+  - Functions: `Alloc()`, `CreateRef()`, `Deref()`, `IsValid()`, `GenClosure`
+  - 13 tests covering UAF detection, closures, validation
+
+- **Constraint References** (`pkg/memory/constraint.go`)
+  - Assertion-based safety for complex patterns (graphs, observers, callbacks)
+  - Single owner + multiple non-owning "constraint" references
+  - On free: ASSERT constraint count is zero
+  - Catches dangling references at development time
+  - Functions: `AddConstraint()`, `Release()`, `Free()`, `GetStats()`
+  - 17 tests covering observer pattern, violations, statistics
+
+- **Tiered Safety Strategy**
+  - Simple (90%): Pure ASAP + ad-hoc validation (zero cost)
+  - Cross-scope (7%): Region refs (+8 bytes, O(1) check)
+  - Closures/callbacks (3%): Random gen refs (+16 bytes, 1 cmp)
+  - Debug mode: + Constraint refs (assert on free)
+
+- **Comprehensive Benchmarks** (`pkg/memory/benchmark_test.go`)
+  - Region, GenRef, Constraint, and Symmetric RC benchmarks
+  - Baseline comparisons (raw pointer vs safety strategies)
+  - Realistic workload benchmarks (closure-heavy, observer pattern)
+
+### Changed
+- Runtime generator includes Region, GenRef, and Constraint functions
+- `GenerateAll()` now calls new safety strategy generators
+
+### Optimized
+- **Constraint Release: 13,937× faster** (130 μs → 9.3 ns)
+  - Removed O(n) linear search through ConstraintSources
+  - Atomic operations for released flag (CAS)
+  - Optional debug tracking (`NewConstraintContextDebug()`)
+  - Map with unique ID for O(1) deletion in debug mode
+
+### Performance Results
+
+| Operation | Time | vs Raw Pointer |
+|-----------|------|----------------|
+| Raw pointer deref | 0.13 ns | baseline |
+| Region CanReference | 0.32 ns | 2.4× |
+| Constraint IsValid | 9.4 ns | 71× |
+| GenRef IsValid | 11.2 ns | 85× |
+| GenRef Deref | 11.5 ns | 87× |
+
+| Workload | Time | Allocations |
+|----------|------|-------------|
+| Closure-heavy | 168 ns | 2 |
+| Observer pattern | 296 ns | 6 |
+| Scoped access | 289 ns | 11 |
+| Mixed strategies | 624 ns | 8 |
+
+### References
+- Vale Grimoire: https://verdagon.dev/grimoire/grimoire
+- Random Generational References: https://verdagon.dev/blog/generational-references
+- Ada/SPARK scope rules for pointer safety
+
 ## [0.4.0] - 2025-12-31
 
 ### Added

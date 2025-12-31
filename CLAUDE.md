@@ -9,8 +9,15 @@ It does NOT use runtime garbage collection.
 The compiler analyzes the program and **statically inserts `free()` calls** at the optimal
 points during code generation. All deallocation decisions are made at compile time.
 There is alreay an implementation in ~/code/purple_c_scratch   rewrite it in go Use libraries to avoid exesive custom code
-The goal is to emit ansii c99 code
-You can use other algorithms alog ASAP as long as they don't do "stop the world". So mark/swipe and traditional garbage collection is out of the question
+
+### Target: C99 + POSIX
+
+The goal is to emit **ANSI C99 + POSIX** code:
+- **C99** for the core language (no C11 features like `<stdatomic.h>`)
+- **POSIX pthreads** for thread synchronization (`pthread_mutex_t`, `pthread_rwlock_t`)
+- Compile with: `gcc -std=c99 -pthread` or `clang -std=c99 -pthread`
+
+You can use other algorithms along ASAP as long as they don't do "stop the world". So mark/sweep and traditional garbage collection is out of the question
 as well as "cyclic collection" algorithms that stop the world (either all or most of them are)
 ```
 WRONG: Runtime GC that scans heap and collects garbage
