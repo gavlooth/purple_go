@@ -100,6 +100,8 @@ func (p *Parser) parseExpr() (*ast.Value, error) {
 		return nil, fmt.Errorf("unexpected ')'")
 	case '"':
 		return p.parseString()
+	case '#':
+		return p.parseHash()
 	default:
 		return p.parseAtom()
 	}
@@ -177,33 +179,95 @@ func (p *Parser) parseUnquote() (*ast.Value, error) {
 	return ast.List2(ast.NewSym("unquote"), expr), nil
 }
 
+func (p *Parser) parseHash() (*ast.Value, error) {
+	p.advance() // consume '#'
+	if p.pos >= len(p.input) {
+		return nil, fmt.Errorf("unexpected end after '#'")
+	}
+
+	ch := p.peek()
+	if ch == '\\' {
+		return p.parseChar()
+	}
+
+	// Could add more hash-prefixed syntax here (e.g., #t, #f for booleans)
+	return nil, fmt.Errorf("unexpected character after '#': %c", ch)
+}
+
+func (p *Parser) parseChar() (*ast.Value, error) {
+	p.advance() // consume '\\'
+	if p.pos >= len(p.input) {
+		return nil, fmt.Errorf("unexpected end in character literal")
+	}
+
+	// Check for named characters
+	start := p.pos
+	for p.pos < len(p.input) {
+		ch := p.input[p.pos]
+		if unicode.IsSpace(rune(ch)) || ch == '(' || ch == ')' || ch == '\'' || ch == '"' || ch == ';' || ch == '`' || ch == ',' {
+			break
+		}
+		p.pos++
+	}
+
+	name := p.input[start:p.pos]
+	if len(name) == 0 {
+		return nil, fmt.Errorf("empty character literal")
+	}
+
+	// Handle named characters
+	switch strings.ToLower(name) {
+	case "newline":
+		return ast.NewChar('\n'), nil
+	case "space":
+		return ast.NewChar(' '), nil
+	case "tab":
+		return ast.NewChar('\t'), nil
+	case "return":
+		return ast.NewChar('\r'), nil
+	case "backspace":
+		return ast.NewChar('\b'), nil
+	case "null", "nul":
+		return ast.NewChar(0), nil
+	}
+
+	// Single character
+	if len(name) == 1 {
+		return ast.NewChar(rune(name[0])), nil
+	}
+
+	return nil, fmt.Errorf("unknown character name: %s", name)
+}
+
 func (p *Parser) parseString() (*ast.Value, error) {
 	p.advance() // consume opening '"'
-	var sb strings.Builder
+	var chars []*ast.Value
 
 	for p.pos < len(p.input) {
 		ch := p.advance()
 		if ch == '"' {
-			return ast.NewSym(sb.String()), nil
+			// Return quoted list of characters so it's not evaluated as a function call
+			charList := ast.SliceToList(chars)
+			return ast.List2(ast.NewSym("quote"), charList), nil
 		}
 		if ch == '\\' && p.pos < len(p.input) {
 			next := p.advance()
 			switch next {
 			case 'n':
-				sb.WriteByte('\n')
+				chars = append(chars, ast.NewChar('\n'))
 			case 't':
-				sb.WriteByte('\t')
+				chars = append(chars, ast.NewChar('\t'))
 			case 'r':
-				sb.WriteByte('\r')
+				chars = append(chars, ast.NewChar('\r'))
 			case '\\':
-				sb.WriteByte('\\')
+				chars = append(chars, ast.NewChar('\\'))
 			case '"':
-				sb.WriteByte('"')
+				chars = append(chars, ast.NewChar('"'))
 			default:
-				sb.WriteByte(next)
+				chars = append(chars, ast.NewChar(rune(next)))
 			}
 		} else {
-			sb.WriteByte(ch)
+			chars = append(chars, ast.NewChar(rune(ch)))
 		}
 	}
 	return nil, fmt.Errorf("unclosed string")

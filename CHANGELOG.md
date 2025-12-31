@@ -4,6 +4,34 @@ All notable changes to Purple Go are documented in this file.
 
 ## [Unreleased]
 
+## [0.3.0] - 2025-12-31
+
+### Added
+- **Character Literals** (`pkg/ast/value.go`, `pkg/parser/parser.go`)
+  - `TChar` tag for character values
+  - Syntax: `#\a`, `#\newline`, `#\space`, `#\tab`, `#\return`
+  - Primitives: `char?`, `char->int`, `int->char`, `char=?`, `char<?`
+
+- **Strings as Character Lists** (`pkg/parser/parser.go`, `pkg/eval/primitives.go`)
+  - `"hello"` parses to quoted list of `TChar` values
+  - Primitives: `string?`, `string->list`, `list->string`
+  - `string-length`, `string-append`, `string-ref`, `substring`
+
+- **Quasiquote System** (`pkg/eval/eval.go`, `pkg/parser/parser.go`)
+  - Backtick quasiquote: `` `(a b c) ``
+  - Unquote: `,x` evaluates x inside quasiquote
+  - Unquote-splicing: `,@xs` splices list into quasiquote
+  - Nested quasiquote support with depth tracking
+
+- **Run Form** (`pkg/eval/eval.go`)
+  - `(run code)` executes code at base level
+
+- **Introspection** (`pkg/eval/eval.go`)
+  - `eval` - evaluate quoted expressions
+  - `gensym` - generate unique symbols
+  - `sym-eq?` - symbol equality test
+  - `trace` - trace values during evaluation
+
 ## [0.2.0] - 2025-12-31
 
 ### Added

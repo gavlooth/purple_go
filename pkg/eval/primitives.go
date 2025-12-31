@@ -2,6 +2,7 @@ package eval
 
 import (
 	"fmt"
+	"strings"
 
 	"purple_go/pkg/ast"
 )
@@ -575,6 +576,172 @@ func PrimPrint(args, menv *ast.Value) *ast.Value {
 	return ast.Nil
 }
 
+// PrimIsChar implements char? primitive
+func PrimIsChar(args, menv *ast.Value) *ast.Value {
+	a := getOneArg(args)
+	if a != nil && ast.IsChar(a) {
+		return SymT
+	}
+	return ast.Nil
+}
+
+// PrimCharToInt implements char->int primitive
+func PrimCharToInt(args, menv *ast.Value) *ast.Value {
+	a := getOneArg(args)
+	if a == nil || !ast.IsChar(a) {
+		return ast.Nil
+	}
+	return ast.NewInt(a.Int)
+}
+
+// PrimIntToChar implements int->char primitive
+func PrimIntToChar(args, menv *ast.Value) *ast.Value {
+	a := getOneArg(args)
+	if a == nil || !ast.IsInt(a) {
+		return ast.Nil
+	}
+	return ast.NewChar(rune(a.Int))
+}
+
+// PrimCharEq implements char=? primitive
+func PrimCharEq(args, menv *ast.Value) *ast.Value {
+	a, b, ok := getTwoArgs(args)
+	if !ok {
+		return ast.Nil
+	}
+	if ast.IsChar(a) && ast.IsChar(b) && a.Int == b.Int {
+		return SymT
+	}
+	return ast.Nil
+}
+
+// PrimCharLt implements char<? primitive
+func PrimCharLt(args, menv *ast.Value) *ast.Value {
+	a, b, ok := getTwoArgs(args)
+	if !ok {
+		return ast.Nil
+	}
+	if ast.IsChar(a) && ast.IsChar(b) && a.Int < b.Int {
+		return SymT
+	}
+	return ast.Nil
+}
+
+// isStringList checks if a value is a list of characters
+func isStringList(v *ast.Value) bool {
+	if ast.IsNil(v) {
+		return true // empty string
+	}
+	for !ast.IsNil(v) && ast.IsCell(v) {
+		if !ast.IsChar(v.Car) {
+			return false
+		}
+		v = v.Cdr
+	}
+	return ast.IsNil(v)
+}
+
+// PrimIsString implements string? primitive
+func PrimIsString(args, menv *ast.Value) *ast.Value {
+	a := getOneArg(args)
+	if a != nil && isStringList(a) {
+		return SymT
+	}
+	return ast.Nil
+}
+
+// PrimStringToList implements string->list primitive (identity for char lists)
+func PrimStringToList(args, menv *ast.Value) *ast.Value {
+	return getOneArg(args)
+}
+
+// PrimListToString implements list->string primitive
+// Converts list of chars to a displayable string symbol
+func PrimListToString(args, menv *ast.Value) *ast.Value {
+	a := getOneArg(args)
+	if a == nil {
+		return ast.NewSym("")
+	}
+	var sb strings.Builder
+	for !ast.IsNil(a) && ast.IsCell(a) {
+		if ast.IsChar(a.Car) {
+			sb.WriteRune(rune(a.Car.Int))
+		}
+		a = a.Cdr
+	}
+	return ast.NewSym(sb.String())
+}
+
+// PrimStringLength implements string-length primitive
+func PrimStringLength(args, menv *ast.Value) *ast.Value {
+	a := getOneArg(args)
+	return ast.NewInt(int64(ast.ListLen(a)))
+}
+
+// PrimStringAppend implements string-append primitive
+func PrimStringAppend(args, menv *ast.Value) *ast.Value {
+	a, b, ok := getTwoArgs(args)
+	if !ok {
+		return ast.Nil
+	}
+	if ast.IsNil(a) {
+		return b
+	}
+	if !ast.IsCell(a) {
+		return b
+	}
+	// Append a to b
+	items := ast.ListToSlice(a)
+	result := b
+	for i := len(items) - 1; i >= 0; i-- {
+		result = ast.NewCell(items[i], result)
+	}
+	return result
+}
+
+// PrimStringRef implements string-ref primitive (get char at index)
+func PrimStringRef(args, menv *ast.Value) *ast.Value {
+	str, idx, ok := getTwoArgs(args)
+	if !ok || !ast.IsInt(idx) {
+		return ast.Nil
+	}
+	i := int(idx.Int)
+	for j := 0; !ast.IsNil(str) && ast.IsCell(str); j++ {
+		if j == i {
+			return str.Car
+		}
+		str = str.Cdr
+	}
+	return ast.Nil
+}
+
+// PrimSubstring implements substring primitive
+func PrimSubstring(args, menv *ast.Value) *ast.Value {
+	str := getOneArg(args)
+	start := getOneArg(args.Cdr)
+	end := getOneArg(args.Cdr.Cdr)
+	if str == nil || !ast.IsInt(start) {
+		return ast.Nil
+	}
+
+	startIdx := int(start.Int)
+	endIdx := -1
+	if ast.IsInt(end) {
+		endIdx = int(end.Int)
+	}
+
+	var result []*ast.Value
+	i := 0
+	for !ast.IsNil(str) && ast.IsCell(str) {
+		if i >= startIdx && (endIdx < 0 || i < endIdx) {
+			result = append(result, str.Car)
+		}
+		i++
+		str = str.Cdr
+	}
+	return ast.SliceToList(result)
+}
+
 // DefaultEnv creates the default environment with primitives
 func DefaultEnv() *ast.Value {
 	env := ast.Nil
@@ -614,6 +781,20 @@ func DefaultEnv() *ast.Value {
 	env = EnvExtend(env, ast.NewSym("flip"), ast.NewPrim(PrimFlip))
 	// Utility
 	env = EnvExtend(env, ast.NewSym("print"), ast.NewPrim(PrimPrint))
+	// Character operations
+	env = EnvExtend(env, ast.NewSym("char?"), ast.NewPrim(PrimIsChar))
+	env = EnvExtend(env, ast.NewSym("char->int"), ast.NewPrim(PrimCharToInt))
+	env = EnvExtend(env, ast.NewSym("int->char"), ast.NewPrim(PrimIntToChar))
+	env = EnvExtend(env, ast.NewSym("char=?"), ast.NewPrim(PrimCharEq))
+	env = EnvExtend(env, ast.NewSym("char<?"), ast.NewPrim(PrimCharLt))
+	// String operations
+	env = EnvExtend(env, ast.NewSym("string?"), ast.NewPrim(PrimIsString))
+	env = EnvExtend(env, ast.NewSym("string->list"), ast.NewPrim(PrimStringToList))
+	env = EnvExtend(env, ast.NewSym("list->string"), ast.NewPrim(PrimListToString))
+	env = EnvExtend(env, ast.NewSym("string-length"), ast.NewPrim(PrimStringLength))
+	env = EnvExtend(env, ast.NewSym("string-append"), ast.NewPrim(PrimStringAppend))
+	env = EnvExtend(env, ast.NewSym("string-ref"), ast.NewPrim(PrimStringRef))
+	env = EnvExtend(env, ast.NewSym("substring"), ast.NewPrim(PrimSubstring))
 	// Constants
 	env = EnvExtend(env, ast.NewSym("t"), SymT)
 	env = EnvExtend(env, ast.NewSym("nil"), ast.Nil)

@@ -18,8 +18,8 @@ Comparison between our Go implementation and the original Purple at `/home/heefo
 | Symbols | ✅ | `TSym` |
 | Pairs/Cons cells | ✅ | `TCell` |
 | Nil | ✅ | `TNil` |
-| Characters (`#\a`, `#\newline`) | ❌ | Original supports char literals |
-| Strings (as char lists) | ❌ | Original represents strings as cons lists |
+| Characters (`#\a`, `#\newline`) | ✅ | `TChar` with named chars |
+| Strings (as char lists) | ✅ | Quoted lists of `TChar` |
 | Closures | ✅ | `TLambda` |
 | Code values | ✅ | `TCode` |
 | Error values | ✅ | `TError` with message |
@@ -126,16 +126,17 @@ Comparison between our Go implementation and the original Purple at `/home/heefo
 
 ---
 
-## Introspection (❌ All Missing)
+## Introspection
 
-| Feature | Description |
-|---------|-------------|
-| `ctr-tag` | Extract constructor name |
-| `ctr-arg` | Extract constructor argument by index |
-| `reify-env` | Return current environment as value |
-| `gensym` | Generate unique symbol |
-| `eval` | Evaluate code at runtime |
-| `sym-eq?` | Symbol equality check |
+| Feature | Status | Description |
+|---------|--------|-------------|
+| `ctr-tag` | ❌ | Extract constructor name |
+| `ctr-arg` | ❌ | Extract constructor argument by index |
+| `reify-env` | ❌ | Return current environment as value |
+| `gensym` | ✅ | Generate unique symbol |
+| `eval` | ✅ | Evaluate code at runtime |
+| `sym-eq?` | ✅ | Symbol equality check |
+| `trace` | ✅ | Trace value during evaluation |
 
 ---
 
@@ -163,16 +164,16 @@ Comparison between our Go implementation and the original Purple at `/home/heefo
 
 ---
 
-## Macro System (❌ All Missing)
+## Macro System
 
-| Feature | Description |
-|---------|-------------|
-| Quasiquote `` ` `` | Quote with evaluation |
-| Unquote `,` | Evaluate in quasiquote |
-| Unquote-splicing `,@` | Splice list |
-| `defmacro` | Define macro |
-| `mcall` | Call macro |
-| `macroexpand` | Expand without eval |
+| Feature | Status | Description |
+|---------|--------|-------------|
+| Quasiquote `` ` `` | ✅ | Quote with evaluation |
+| Unquote `,` | ✅ | Evaluate in quasiquote |
+| Unquote-splicing `,@` | ✅ | Splice list |
+| `defmacro` | ❌ | Define macro |
+| `mcall` | ❌ | Call macro |
+| `macroexpand` | ❌ | Expand without eval |
 
 ---
 

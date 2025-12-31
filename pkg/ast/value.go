@@ -20,6 +20,7 @@ const (
 	TLambda
 	TRecLambda // Recursive lambda with self-reference
 	TError     // Error value
+	TChar      // Character value
 )
 
 // PrimFn is a primitive function signature
@@ -115,6 +116,11 @@ func NewError(msg string) *Value {
 	return &Value{Tag: TError, Str: msg}
 }
 
+// NewChar creates a character value
+func NewChar(c rune) *Value {
+	return &Value{Tag: TChar, Int: int64(c)}
+}
+
 // NewMenv creates a meta-environment value
 func NewMenv(env, parent *Value, hApp, hLet, hIf, hLit, hVar HandlerFn) *Value {
 	return &Value{
@@ -167,6 +173,11 @@ func IsRecLambda(v *Value) bool {
 // IsError checks if a value is an error
 func IsError(v *Value) bool {
 	return v != nil && v.Tag == TError
+}
+
+// IsChar checks if a value is a character
+func IsChar(v *Value) bool {
+	return v != nil && v.Tag == TChar
 }
 
 // IsPrim checks if a value is a primitive
@@ -264,6 +275,8 @@ func (v *Value) String() string {
 		return "#<rec-lambda>"
 	case TError:
 		return fmt.Sprintf("#<error: %s>", v.Str)
+	case TChar:
+		return charToString(rune(v.Int))
 	case TMenv:
 		return "#<menv>"
 	default:
@@ -292,6 +305,21 @@ func listToString(v *Value) string {
 	return sb.String()
 }
 
+func charToString(c rune) string {
+	switch c {
+	case '\n':
+		return "#\\newline"
+	case '\t':
+		return "#\\tab"
+	case '\r':
+		return "#\\return"
+	case ' ':
+		return "#\\space"
+	default:
+		return fmt.Sprintf("#\\%c", c)
+	}
+}
+
 // TagName returns the name of a tag
 func TagName(t Tag) string {
 	switch t {
@@ -315,6 +343,8 @@ func TagName(t Tag) string {
 		return "RECLAMBDA"
 	case TError:
 		return "ERROR"
+	case TChar:
+		return "CHAR"
 	default:
 		return fmt.Sprintf("UNKNOWN(%d)", t)
 	}

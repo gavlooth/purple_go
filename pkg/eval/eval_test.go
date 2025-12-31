@@ -403,3 +403,120 @@ func TestEvalExpr(t *testing.T) {
 		t.Errorf("eval (+ 1 2) = %d, want 3", result.Int)
 	}
 }
+
+func TestString(t *testing.T) {
+	// String literal parsing (returns list of chars)
+	result := evalString("\"hello\"")
+	if result == nil || !ast.IsCell(result) {
+		t.Errorf("\"hello\" = %v, want list of chars", result)
+		return
+	}
+	// First char should be 'h'
+	if !ast.IsChar(result.Car) || result.Car.Int != 'h' {
+		t.Errorf("first char = %v, want #\\h", result.Car)
+	}
+
+	// string? predicate
+	result = evalString("(string? \"abc\")")
+	if ast.IsNil(result) {
+		t.Error("(string? \"abc\") should be true")
+	}
+
+	result = evalString("(string? '(1 2 3))")
+	if !ast.IsNil(result) {
+		t.Error("(string? '(1 2 3)) should be false")
+	}
+
+	// string-length
+	result = evalString("(string-length \"hello\")")
+	if result == nil || !ast.IsInt(result) || result.Int != 5 {
+		t.Errorf("(string-length \"hello\") = %v, want 5", result)
+	}
+
+	// string-ref
+	result = evalString("(string-ref \"hello\" 1)")
+	if result == nil || !ast.IsChar(result) || result.Int != 'e' {
+		t.Errorf("(string-ref \"hello\" 1) = %v, want #\\e", result)
+	}
+
+	// string-append
+	result = evalString("(string-length (string-append \"ab\" \"cd\"))")
+	if result == nil || !ast.IsInt(result) || result.Int != 4 {
+		t.Errorf("string-append length = %v, want 4", result)
+	}
+
+	// list->string
+	result = evalString("(list->string \"hi\")")
+	if result == nil || !ast.IsSym(result) || result.Str != "hi" {
+		t.Errorf("(list->string \"hi\") = %v, want symbol hi", result)
+	}
+
+	// substring
+	result = evalString("(string-length (substring \"hello\" 1 3))")
+	if result == nil || !ast.IsInt(result) || result.Int != 2 {
+		t.Errorf("(substring \"hello\" 1 3) length = %v, want 2", result)
+	}
+}
+
+func TestChar(t *testing.T) {
+	// Character literal parsing
+	result := evalString("#\\a")
+	if result == nil || !ast.IsChar(result) {
+		t.Errorf("#\\a = %v, want char", result)
+		return
+	}
+	if result.Int != 'a' {
+		t.Errorf("#\\a = %d, want %d", result.Int, 'a')
+	}
+
+	// Named characters
+	result = evalString("#\\newline")
+	if result == nil || !ast.IsChar(result) || result.Int != '\n' {
+		t.Errorf("#\\newline = %v, want newline char", result)
+	}
+
+	result = evalString("#\\space")
+	if result == nil || !ast.IsChar(result) || result.Int != ' ' {
+		t.Errorf("#\\space = %v, want space char", result)
+	}
+
+	// char? predicate
+	result = evalString("(char? #\\x)")
+	if ast.IsNil(result) {
+		t.Error("(char? #\\x) should be true")
+	}
+
+	result = evalString("(char? 42)")
+	if !ast.IsNil(result) {
+		t.Error("(char? 42) should be false")
+	}
+
+	// char->int
+	result = evalString("(char->int #\\A)")
+	if result == nil || !ast.IsInt(result) || result.Int != 65 {
+		t.Errorf("(char->int #\\A) = %v, want 65", result)
+	}
+
+	// int->char
+	result = evalString("(int->char 66)")
+	if result == nil || !ast.IsChar(result) || result.Int != 'B' {
+		t.Errorf("(int->char 66) = %v, want #\\B", result)
+	}
+
+	// char=?
+	result = evalString("(char=? #\\a #\\a)")
+	if ast.IsNil(result) {
+		t.Error("(char=? #\\a #\\a) should be true")
+	}
+
+	result = evalString("(char=? #\\a #\\b)")
+	if !ast.IsNil(result) {
+		t.Error("(char=? #\\a #\\b) should be false")
+	}
+
+	// char<?
+	result = evalString("(char<? #\\a #\\b)")
+	if ast.IsNil(result) {
+		t.Error("(char<? #\\a #\\b) should be true")
+	}
+}

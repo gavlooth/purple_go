@@ -312,6 +312,9 @@ func Eval(expr, menv *ast.Value) *ast.Value {
 	case ast.TInt:
 		return menv.HLit(expr, menv)
 
+	case ast.TChar:
+		return menv.HLit(expr, menv)
+
 	case ast.TCode:
 		return expr
 
