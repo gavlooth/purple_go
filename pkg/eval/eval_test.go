@@ -1327,3 +1327,32 @@ func TestReifyEnv(t *testing.T) {
 		t.Errorf("(reify-env) = %v, want non-empty list", result)
 	}
 }
+
+func TestSelectRecvBinding(t *testing.T) {
+	// Test that select recv can bind the received value to a variable
+	// (recv ch var => body) should bind received value to var
+	result := evalString(`
+		(let ((ch (make-chan 1)))
+			(do
+				(chan-send! ch 42)
+				(select
+					(recv ch x => (+ x 10)))))
+	`)
+	// Should receive 42 and bind to x, then evaluate (+ x 10) = 52
+	if result == nil || !ast.IsInt(result) || result.Int != 52 {
+		t.Errorf("select recv with binding = %v, want 52", result)
+	}
+
+	// Test recv without variable binding still works
+	result = evalString(`
+		(let ((ch (make-chan 1)))
+			(do
+				(chan-send! ch 99)
+				(select
+					(recv ch => 100))))
+	`)
+	// Should receive and return 100 (body doesn't use received value)
+	if result == nil || !ast.IsInt(result) || result.Int != 100 {
+		t.Errorf("select recv without binding = %v, want 100", result)
+	}
+}

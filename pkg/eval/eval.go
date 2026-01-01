@@ -1329,6 +1329,7 @@ func evalSelect(args, menv *ast.Value) *ast.Value {
 		ch      *ast.Value
 		isSend  bool
 		sendVal *ast.Value
+		recvVar *ast.Value // Variable to bind received value (for recv cases)
 		body    *ast.Value
 	}
 
@@ -1356,16 +1357,28 @@ func evalSelect(args, menv *ast.Value) *ast.Value {
 		}
 
 		// Parse channel operation
-		// (recv ch => body) or (send ch val => body)
+		// (recv ch var => body) or (recv ch => body) or (send ch val => body)
 		if ast.SymEqStr(first, "recv") {
 			if ast.IsCell(clause.Cdr) {
 				chExpr := clause.Cdr.Car
 				ch := Eval(chExpr, menv)
-				// Find body after =>
-				arrowRest := clause.Cdr.Cdr
+				// Check for optional variable: (recv ch var => body) or (recv ch => body)
+				afterCh := clause.Cdr.Cdr
+				var recvVar *ast.Value
+				var arrowRest *ast.Value
+				if ast.IsCell(afterCh) {
+					if ast.SymEqStr(afterCh.Car, "=>") {
+						// No variable: (recv ch => body)
+						arrowRest = afterCh
+					} else if ast.IsSym(afterCh.Car) {
+						// Has variable: (recv ch var => body)
+						recvVar = afterCh.Car
+						arrowRest = afterCh.Cdr
+					}
+				}
 				if ast.IsCell(arrowRest) && ast.SymEqStr(arrowRest.Car, "=>") {
 					body := arrowRest.Cdr.Car
-					cases = append(cases, selectCase{ch: ch, isSend: false, body: body})
+					cases = append(cases, selectCase{ch: ch, isSend: false, recvVar: recvVar, body: body})
 				}
 			}
 		} else if ast.SymEqStr(first, "send") {
@@ -1399,9 +1412,17 @@ func evalSelect(args, menv *ast.Value) *ast.Value {
 		} else {
 			val, ok := ChanRecv(c.ch)
 			if ok {
-				// Bind received value if needed
-				return Eval(c.body, menv)
-				_ = val // TODO: bind to variable
+				// Bind received value to variable if specified
+				bodyEnv := menv
+				if c.recvVar != nil {
+					bodyEnv = ast.NewMenv(
+						EnvExtend(menv.Env, c.recvVar, val),
+						menv.Parent,
+						menv.Level,
+						menv.CopyHandlers(),
+					)
+				}
+				return Eval(c.body, bodyEnv)
 			}
 		}
 	}
