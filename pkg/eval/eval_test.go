@@ -1151,6 +1151,36 @@ func TestCtrArgUserType(t *testing.T) {
 	}
 }
 
+func TestUserTypeString(t *testing.T) {
+	// Define a simple type
+	evalString("(deftype Person (name int) (age int))")
+
+	// Create a Person instance and check its String representation
+	result := evalString("(mk-Person 42 25)")
+	if result == nil || !ast.IsUserType(result) {
+		t.Errorf("mk-Person = %v, want UserType", result)
+		return
+	}
+
+	// Verify String() output format
+	str := result.String()
+	if !strings.Contains(str, "Person") {
+		t.Errorf("UserType.String() = %q, should contain 'Person'", str)
+	}
+	if !strings.Contains(str, "name=42") {
+		t.Errorf("UserType.String() = %q, should contain 'name=42'", str)
+	}
+	if !strings.Contains(str, "age=25") {
+		t.Errorf("UserType.String() = %q, should contain 'age=25'", str)
+	}
+
+	// Verify TagName works for TUserType
+	tagName := ast.TagName(ast.TUserType)
+	if tagName != "USERTYPE" {
+		t.Errorf("TagName(TUserType) = %q, want 'USERTYPE'", tagName)
+	}
+}
+
 // =============================================================================
 // Continuation Tests (Phase 4)
 // =============================================================================

@@ -505,6 +505,22 @@ func (v *Value) String() string {
 			state = states[v.ProcState]
 		}
 		return fmt.Sprintf("#<process %s>", state)
+	case TUserType:
+		var sb strings.Builder
+		sb.WriteString("#<")
+		sb.WriteString(v.UserTypeName)
+		for _, fieldName := range v.UserTypeFieldOrder {
+			sb.WriteString(" ")
+			sb.WriteString(fieldName)
+			sb.WriteString("=")
+			if val, ok := v.UserTypeFields[fieldName]; ok {
+				sb.WriteString(val.String())
+			} else {
+				sb.WriteString("nil")
+			}
+		}
+		sb.WriteString(">")
+		return sb.String()
 	default:
 		return "?"
 	}
@@ -581,6 +597,8 @@ func TagName(t Tag) string {
 		return "CHAN"
 	case TProcess:
 		return "PROCESS"
+	case TUserType:
+		return "USERTYPE"
 	default:
 		return fmt.Sprintf("UNKNOWN(%d)", t)
 	}
