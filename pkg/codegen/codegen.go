@@ -40,7 +40,7 @@ func NewCodeGenerator(w io.Writer) *CodeGenerator {
 		concurrencyCtx:   analysis.NewConcurrencyAnalyzer(),
 		reuseCtx:         analysis.NewReuseAnalyzer(),
 		arenaGen:         NewArenaCodeGenerator(),
-		useArenaFallback: true, // Enable arena fallback for CYCLIC/UNKNOWN shapes
+		useArenaFallback: false, // Arena is opt-in; default to non-arena strategies
 		enableRCOpt:      true, // Enable Lobster-style RC optimization
 	}
 }
@@ -58,7 +58,7 @@ func NewCodeGeneratorWithGlobalRegistry(w io.Writer) *CodeGenerator {
 		concurrencyCtx:   analysis.NewConcurrencyAnalyzer(),
 		reuseCtx:         analysis.NewReuseAnalyzer(),
 		arenaGen:         NewArenaCodeGenerator(),
-		useArenaFallback: true,
+		useArenaFallback: false,
 		enableRCOpt:      true,
 	}
 }
