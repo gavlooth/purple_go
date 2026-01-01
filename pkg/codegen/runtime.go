@@ -206,9 +206,8 @@ Obj* mk_pair(Obj* a, Obj* b) {
     x->scan_tag = 0;
     x->tag = TAG_PAIR;
     x->gen_obj = NULL;
-    /* Increment refs since caller borrows args (will decref after call) */
-    if (a) inc_ref(a);
-    if (b) inc_ref(b);
+    /* Move semantics: ownership transfers to pair, no inc_ref needed */
+    /* Caller must inc_ref before calling if they want to keep a reference */
     x->a = a;
     x->b = b;
     return x;
