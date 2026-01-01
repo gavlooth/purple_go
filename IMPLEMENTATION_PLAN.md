@@ -37,6 +37,13 @@
 
 # NEW: Full AST-to-C Native Compilation Plan (v0.6)
 
+## Findings / Baseline
+- Existing compile path is **staged**: AST is evaluated to `Code` values in `eval`, then `pkg/codegen.GenerateProgram` emits C. This is **not** direct AST→C.
+- Current C runtime is optimized for **`Obj` (int/pair)** plus **user-defined types**, but **does not provide native closures/boxes/channels/etc** yet.
+- `ValueToCExpr` and codegen helpers only handle ints/pairs; many primitives rely on interpreter-only behavior.
+
+This plan focuses on building a **direct AST→C lowering pipeline** and extending runtime/codegen where necessary to preserve full language semantics.
+
 Goal: Compile **AST directly to C** (no interpreter staging), emit a standalone C99 program, and build a native binary.
 
 ## Phase A: Compiler Entry + Pipeline
