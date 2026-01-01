@@ -761,6 +761,9 @@ func (c *Compiler) emitCall(fnName string, args []CValue, summary *analysis.Func
 	var temps []string
 	var frees []string
 
+	// Check if this is a consuming primitive (uses move semantics)
+	isConsuming := consumingPrimitives[fnName]
+
 	for i, arg := range args {
 		name := fmt.Sprintf("_arg%d_%d", i, c.tempCounter)
 		c.tempCounter++
@@ -768,6 +771,11 @@ func (c *Compiler) emitCall(fnName string, args []CValue, summary *analysis.Func
 		temps = append(temps, fmt.Sprintf("    Obj* %s = %s;\n", name, arg.Expr))
 
 		if arg.Owned {
+			// Consuming primitives (cons, box, list) take ownership - no dec_ref
+			if isConsuming {
+				// Args are moved into the result, don't free
+				continue
+			}
 			// Default to borrowed params unless summary says consumed.
 			consumed := false
 			if summary != nil && i < len(summary.Params) {
@@ -1021,6 +1029,14 @@ var primitiveArity = map[string]int{
 	"car": 1, "cdr": 1, "null?": 1, "pair?": 1, "int?": 1,
 	"float?": 1, "char?": 1, "symbol?": 1, "box": 1, "unbox": 1,
 	"not": 1, "abs": 1, "display": 1, "print": 1, "newline": 0,
+}
+
+// consumingPrimitives are constructors that take ownership of their args (move semantics).
+// Callers should NOT dec_ref args passed to these functions.
+var consumingPrimitives = map[string]bool{
+	"cons": true, // mk_pair uses move semantics
+	"box":  true, // mk_box takes ownership
+	"list": true, // list construction
 }
 
 func (c *Compiler) genPrimWrapper(name, cFn string) string {
