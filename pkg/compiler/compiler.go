@@ -517,6 +517,7 @@ func (c *Compiler) compileLet(expr *ast.Value) (CValue, error) {
 	var bindOrder []string
 	var bindNames []string
 	var bindExprs []CValue
+	var bindVals []*ast.Value // Keep AST for shape analysis
 
 	for !ast.IsNil(bindings) && ast.IsCell(bindings) {
 		binding := bindings.Car
@@ -529,12 +530,25 @@ func (c *Compiler) compileLet(expr *ast.Value) (CValue, error) {
 		bindOrder = append(bindOrder, cName)
 		bindNames = append(bindNames, name)
 		val := binding.Cdr.Car
+		bindVals = append(bindVals, val)
 		cv, err := c.compileExpr(val)
 		if err != nil {
 			return CValue{}, err
 		}
 		bindExprs = append(bindExprs, cv)
 		bindings = bindings.Cdr
+	}
+
+	// Shape analysis for each binding
+	for i, val := range bindVals {
+		c.shapeCtx.AnalyzeShapes(val)
+		shape := c.shapeCtx.ResultShape
+		bindExprs[i].Shape = shape
+		c.shapeCtx.AddShape(bindNames[i], shape)
+		// Update VarInfo with shape
+		info := local[bindNames[i]]
+		info.MemInfo.Shape = shape
+		local[bindNames[i]] = info
 	}
 
 	c.pushScope(local)
@@ -559,21 +573,29 @@ func (c *Compiler) compileLet(expr *ast.Value) (CValue, error) {
 	}
 	sb.WriteString(fmt.Sprintf("    Obj* _res = %s;\n", bodyVal.Expr))
 
+	// Free bindings using shape-aware strategy
 	for i := len(bindOrder) - 1; i >= 0; i-- {
 		usage := escapeCtx.FindVar(bindNames[i])
-		if usage != nil && (usage.CapturedByLambda || usage.Escape == analysis.EscapeGlobal) {
-			sb.WriteString(fmt.Sprintf("    /* %s escapes - no free */\n", bindOrder[i]))
-			continue
+		escapeClass := analysis.EscapeNone
+		if usage != nil {
+			escapeClass = usage.Escape
+			if usage.CapturedByLambda || usage.Escape == analysis.EscapeGlobal {
+				sb.WriteString(fmt.Sprintf("    /* %s escapes - no free */\n", bindOrder[i]))
+				continue
+			}
 		}
 		if bindExprs[i].Owned {
-			sb.WriteString(fmt.Sprintf("    dec_ref(%s);\n", bindOrder[i]))
+			shape := bindExprs[i].Shape
+			freeFn, _ := c.selectFreeStrategy(shape, escapeClass)
+			sb.WriteString(fmt.Sprintf("    %s(%s); /* shape: %s */\n",
+				freeFn, bindOrder[i], analysis.ShapeString(shape)))
 		}
 	}
 
 	sb.WriteString("    _res;\n")
 	sb.WriteString("})")
 
-	return CValue{Expr: sb.String(), Owned: bodyVal.Owned}, nil
+	return CValue{Expr: sb.String(), Owned: bodyVal.Owned, Shape: bodyVal.Shape}, nil
 }
 
 func (c *Compiler) compileSet(args *ast.Value) (CValue, error) {
