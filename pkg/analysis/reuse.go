@@ -512,9 +512,9 @@ func (po *PerceusOptimizer) GenerateReuseRuntime() string {
 
 /* Reuse a freed integer slot for a new integer */
 static inline Obj* reuse_as_int(Obj* old, int64_t value) {
-    if (old && old->rc == 1 && old->tag == TAG_INT) {
+    if (old && old->mark == 1 && old->tag == TAG_INT) {
         /* In-place update */
-        ((IntObj*)old)->value = value;
+        old->i = value;
         return old;
     }
     /* Fall back to fresh allocation */
@@ -524,13 +524,12 @@ static inline Obj* reuse_as_int(Obj* old, int64_t value) {
 
 /* Reuse a freed pair slot for a new pair */
 static inline Obj* reuse_as_pair(Obj* old, Obj* a, Obj* b) {
-    if (old && old->rc == 1 && old->is_pair) {
+    if (old && old->mark == 1 && old->is_pair) {
         /* In-place update */
-        PairObj* p = (PairObj*)old;
-        if (p->a) dec_ref(p->a);
-        if (p->b) dec_ref(p->b);
-        p->a = a;
-        p->b = b;
+        if (old->a) dec_ref(old->a);
+        if (old->b) dec_ref(old->b);
+        old->a = a;
+        old->b = b;
         if (a) inc_ref(a);
         if (b) inc_ref(b);
         return old;
@@ -542,11 +541,10 @@ static inline Obj* reuse_as_pair(Obj* old, Obj* a, Obj* b) {
 
 /* Reuse a freed box slot for a new box */
 static inline Obj* reuse_as_box(Obj* old, Obj* value) {
-    if (old && old->rc == 1 && old->tag == TAG_BOX) {
+    if (old && old->mark == 1 && old->tag == TAG_BOX) {
         /* In-place update */
-        BoxObj* b = (BoxObj*)old;
-        if (b->value) dec_ref(b->value);
-        b->value = value;
+        if (old->ptr) dec_ref((Obj*)old->ptr);
+        old->ptr = value;
         if (value) inc_ref(value);
         return old;
     }
@@ -556,8 +554,8 @@ static inline Obj* reuse_as_box(Obj* old, Obj* value) {
 }
 
 /* Check if a value can be reused (unique reference) */
-static inline bool can_reuse(Obj* obj) {
-    return obj && obj->rc == 1;
+static inline int can_reuse(Obj* obj) {
+    return obj && obj->mark == 1;
 }
 
 /* Consume a value for potential reuse */
@@ -591,31 +589,29 @@ static void map_into(Obj** dest, Obj* (*f)(Obj*), Obj* xs) {
 
     Obj** current = dest;
     while (xs && xs->is_pair) {
-        PairObj* p = (PairObj*)xs;
-        Obj* mapped = f(p->a);
+        Obj* mapped = f(xs->a);
 
         /* Allocate directly into destination chain */
         *current = mk_pair(mapped, NULL);
-        current = &((PairObj*)*current)->b;
+        current = &((*current)->b);
 
-        xs = p->b;
+        xs = xs->b;
     }
     *current = NULL;  /* Terminate list */
 }
 
 /* Filter with destination passing */
-static void filter_into(Obj** dest, bool (*pred)(Obj*), Obj* xs) {
+static void filter_into(Obj** dest, int (*pred)(Obj*), Obj* xs) {
     if (!xs || !dest) return;
 
     Obj** current = dest;
     while (xs && xs->is_pair) {
-        PairObj* p = (PairObj*)xs;
-        if (pred(p->a)) {
-            *current = mk_pair(p->a, NULL);
-            inc_ref(p->a);
-            current = &((PairObj*)*current)->b;
+        if (pred(xs->a)) {
+            *current = mk_pair(xs->a, NULL);
+            inc_ref(xs->a);
+            current = &((*current)->b);
         }
-        xs = p->b;
+        xs = xs->b;
     }
     *current = NULL;
 }
@@ -628,11 +624,10 @@ static void append_into(Obj** dest, Obj* xs, Obj* ys) {
 
     /* Copy first list */
     while (xs && xs->is_pair) {
-        PairObj* p = (PairObj*)xs;
-        *current = mk_pair(p->a, NULL);
-        inc_ref(p->a);
-        current = &((PairObj*)*current)->b;
-        xs = p->b;
+        *current = mk_pair(xs->a, NULL);
+        inc_ref(xs->a);
+        current = &((*current)->b);
+        xs = xs->b;
     }
 
     /* Append second list (can share structure) */

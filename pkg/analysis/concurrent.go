@@ -445,14 +445,14 @@ func (g *ConcurrencyCodeGenerator) GenerateAtomicRC() string {
 /* Atomic increment */
 static inline void atomic_inc_ref(Obj* obj) {
     if (obj) {
-        __atomic_add_fetch(&obj->rc, 1, __ATOMIC_SEQ_CST);
+        __atomic_add_fetch(&obj->mark, 1, __ATOMIC_SEQ_CST);
     }
 }
 
 /* Atomic decrement with potential free */
 static inline void atomic_dec_ref(Obj* obj) {
     if (obj) {
-        if (__atomic_sub_fetch(&obj->rc, 1, __ATOMIC_SEQ_CST) == 0) {
+        if (__atomic_sub_fetch(&obj->mark, 1, __ATOMIC_SEQ_CST) == 0) {
             free_obj(obj);
         }
     }
@@ -462,7 +462,7 @@ static inline void atomic_dec_ref(Obj* obj) {
 static inline bool try_acquire_unique(Obj* obj) {
     if (!obj) return false;
     int expected = 1;
-    return __atomic_compare_exchange_n(&obj->rc, &expected, 1,
+    return __atomic_compare_exchange_n(&obj->mark, &expected, 1,
         false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
 }
 `
@@ -474,8 +474,7 @@ func (g *ConcurrencyCodeGenerator) GenerateChannelRuntime() string {
 
 typedef struct Channel Channel;
 struct Channel {
-    Obj header;         /* Reference counting header */
-    void** buffer;      /* Ring buffer for values */
+    Obj** buffer;       /* Ring buffer for values */
     int capacity;       /* Buffer size (0 = unbuffered) */
     int count;          /* Current number of items */
     int read_pos;       /* Read position */
@@ -487,14 +486,12 @@ struct Channel {
 };
 
 /* Create a channel */
-static Channel* make_channel(int capacity) {
+static Obj* make_channel(int capacity) {
     Channel* ch = malloc(sizeof(Channel));
     if (!ch) return NULL;
 
-    ch->header.rc = 1;
-    ch->header.tag = TAG_CHANNEL;
     ch->capacity = capacity > 0 ? capacity : 1;
-    ch->buffer = malloc(sizeof(void*) * ch->capacity);
+    ch->buffer = malloc(sizeof(Obj*) * ch->capacity);
     ch->count = 0;
     ch->read_pos = 0;
     ch->write_pos = 0;
@@ -504,12 +501,32 @@ static Channel* make_channel(int capacity) {
     pthread_cond_init(&ch->not_empty, NULL);
     pthread_cond_init(&ch->not_full, NULL);
 
-    return ch;
+    Obj* obj = malloc(sizeof(Obj));
+    if (!obj) {
+        free(ch->buffer);
+        free(ch);
+        return NULL;
+    }
+    obj->mark = 1;
+    obj->scc_id = -1;
+    obj->is_pair = 0;
+    obj->scan_tag = 0;
+    obj->tag = TAG_CHANNEL;
+    obj->gen_obj = NULL;
+    obj->ptr = ch;
+
+    return obj;
+}
+
+static Channel* channel_payload(Obj* ch_obj) {
+    if (!ch_obj || ch_obj->tag != TAG_CHANNEL) return NULL;
+    return (Channel*)ch_obj->ptr;
 }
 
 /* Send value through channel (TRANSFERS OWNERSHIP) */
 /* After send, caller should NOT use or free the value */
-static bool channel_send(Channel* ch, Obj* value) {
+static bool channel_send(Obj* ch_obj, Obj* value) {
+    Channel* ch = channel_payload(ch_obj);
     if (!ch || ch->closed) return false;
 
     pthread_mutex_lock(&ch->lock);
@@ -537,7 +554,8 @@ static bool channel_send(Channel* ch, Obj* value) {
 
 /* Receive value from channel (RECEIVES OWNERSHIP) */
 /* Caller becomes owner, must free when done */
-static Obj* channel_recv(Channel* ch) {
+static Obj* channel_recv(Obj* ch_obj) {
+    Channel* ch = channel_payload(ch_obj);
     if (!ch) return NULL;
 
     pthread_mutex_lock(&ch->lock);
@@ -565,7 +583,8 @@ static Obj* channel_recv(Channel* ch) {
 }
 
 /* Close a channel */
-static void channel_close(Channel* ch) {
+static void channel_close(Obj* ch_obj) {
+    Channel* ch = channel_payload(ch_obj);
     if (!ch) return;
 
     pthread_mutex_lock(&ch->lock);
@@ -576,7 +595,8 @@ static void channel_close(Channel* ch) {
 }
 
 /* Free a channel */
-static void free_channel(Channel* ch) {
+static void free_channel_obj(Obj* ch_obj) {
+    Channel* ch = channel_payload(ch_obj);
     if (!ch) return;
 
     /* Free any remaining values (ownership cleanup) */
@@ -592,6 +612,9 @@ static void free_channel(Channel* ch) {
     pthread_cond_destroy(&ch->not_empty);
     pthread_cond_destroy(&ch->not_full);
     free(ch);
+    if (ch_obj) {
+        ch_obj->ptr = NULL;
+    }
 }
 `
 }
@@ -662,9 +685,6 @@ func (g *ConcurrencyCodeGenerator) GenerateConcurrencyRuntime() string {
 
 #include <pthread.h>
 #include <stdbool.h>
-#include <stdatomic.h>
-
-#define TAG_CHANNEL 100
 
 ` + g.GenerateAtomicRC() + "\n" + g.GenerateChannelRuntime() + "\n" + g.GenerateGoroutineRuntime()
 }

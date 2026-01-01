@@ -219,8 +219,8 @@ static void exception_throw(Obj* value) {
     if (!g_exception_ctx) {
         /* No handler - print and abort */
         fprintf(stderr, "Uncaught exception: ");
-        if (value && value->tag == TAG_ERROR) {
-            fprintf(stderr, "%%s\n", ((ErrorObj*)value)->message);
+        if (value && value->tag == TAG_ERROR && value->ptr) {
+            fprintf(stderr, "%%s\n", (char*)value->ptr);
         } else {
             fprintf(stderr, "<unknown>\n");
         }

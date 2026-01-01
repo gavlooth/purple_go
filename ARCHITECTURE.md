@@ -198,6 +198,40 @@ Assertion-based safety for complex ownership:
 
 **Safety Check Overhead:**
 
+---
+
+## Authoritative Memory Policy (Arena vs GenRef vs RC)
+
+This policy is the source of truth for future features. It prevents second-guessing
+by making the choice deterministic. The compiler uses ASAP as the baseline and then
+selects the lightest safe runtime guard.
+
+### Inputs (compile-time facts)
+- Shape: tree / DAG / cyclic
+- Escape class: local / arg / global
+- Capture: captured by closure or callback
+- Sharing: shared across threads or transferred
+- Weak edges: inferred or annotated
+
+### Decision Table (authoritative)
+
+| Condition | Action | Rationale |
+|-----------|--------|-----------|
+| Captured by closure or callback | Use GenRef for that reference (generate GenRef, validate on deref) | Robust UAF detection where lifetimes are hard |
+| Shared across threads | Use atomic RC only on shared objects | Correctness with minimal scope |
+| Shape = tree and unique | `free_unique` (no RC) | Zero RC overhead |
+| Shape = tree, not provably unique | `free_tree` with ASAP frees | Deterministic, no RC |
+| Shape = DAG or aliasing | `dec_ref` (RC) | Required for shared acyclic graphs |
+| Shape = cyclic and weak edges break cycle | `dec_ref` (RC) | Weak edges make it acyclic for ownership |
+| Shape = cyclic and unbroken, escapes | Symmetric RC or SCC-local release | Deterministic, no arena reliance |
+| Shape = cyclic and local only | Arena allocation is allowed (opt-in) | Bulk free is safe and fast |
+
+### Notes
+- Arena is **not** the default. It is only selected for proven-local cyclic structures or explicit opt-in.
+- GenRef is **targeted**: only for capture/callback edges, not for every pointer.
+- RC is minimized via rcopt/uniqueness/borrowing; it should not dominate runtime.
+
+
 | Operation | Time | vs Raw Pointer |
 |-----------|------|----------------|
 | Raw pointer deref | 0.13 ns | baseline |

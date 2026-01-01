@@ -10,6 +10,7 @@ import (
 
 	"purple_go/pkg/ast"
 	"purple_go/pkg/codegen"
+	"purple_go/pkg/compiler"
 	"purple_go/pkg/eval"
 	"purple_go/pkg/jit"
 	"purple_go/pkg/memory"
@@ -18,6 +19,7 @@ import (
 
 var (
 	compileMode = flag.Bool("c", false, "Compile to C code instead of interpreting")
+	nativeMode  = flag.Bool("native", false, "Compile AST directly to a native binary")
 	outputFile  = flag.String("o", "", "Output file (default: stdout)")
 	evalExpr    = flag.String("e", "", "Evaluate expression from command line")
 	verbose     = flag.Bool("v", false, "Verbose output")
@@ -79,8 +81,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *compileMode {
-		// Compile to C
+	if *nativeMode {
+		// Native compilation: AST -> C -> binary (or emit C with -c)
+		compileNative(exprs)
+	} else if *compileMode {
+		// Staged compile to C (via eval)
 		compileToC(exprs)
 	} else {
 		// Interpret
@@ -105,6 +110,48 @@ func interpret(exprs []*ast.Value) {
 				fmt.Printf("Result: %s\n", result.String())
 			}
 		}
+	}
+}
+
+func compileNative(exprs []*ast.Value) {
+	comp := compiler.New()
+
+	if *compileMode {
+		// --native -c: emit C to stdout or file
+		code, err := comp.CompileProgram(exprs)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Compile error: %v\n", err)
+			os.Exit(1)
+		}
+
+		if *outputFile != "" {
+			if err := os.WriteFile(*outputFile, []byte(code), 0644); err != nil {
+				fmt.Fprintf(os.Stderr, "Error writing output: %v\n", err)
+				os.Exit(1)
+			}
+			if *verbose {
+				fmt.Fprintf(os.Stderr, "Generated C code written to %s\n", *outputFile)
+			}
+		} else {
+			fmt.Print(code)
+		}
+		return
+	}
+
+	// --native without -c: compile to binary
+	output := *outputFile
+	if output == "" {
+		output = "a.out"
+	}
+
+	binPath, err := comp.CompileToBinary(exprs, output)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Native compile error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if *verbose {
+		fmt.Fprintf(os.Stderr, "Native binary written to %s\n", binPath)
 	}
 }
 

@@ -270,6 +270,10 @@ func (g *CodeGenerator) ValueToCExpr(v *ast.Value) string {
 		return v.Str
 	case ast.TInt:
 		return fmt.Sprintf("mk_int(%d)", v.Int)
+	case ast.TFloat:
+		return fmt.Sprintf("mk_float(%g)", v.Float)
+	case ast.TChar:
+		return fmt.Sprintf("mk_char(%d)", v.Int)
 	case ast.TCell:
 		carExpr := g.ValueToCExpr(v.Car)
 		cdrExpr := g.ValueToCExpr(v.Cdr)
@@ -289,6 +293,10 @@ func (g *CodeGenerator) LiftValue(v *ast.Value) *ast.Value {
 		return v
 	case ast.TInt:
 		return ast.NewCode(fmt.Sprintf("mk_int(%d)", v.Int))
+	case ast.TFloat:
+		return ast.NewCode(fmt.Sprintf("mk_float(%g)", v.Float))
+	case ast.TChar:
+		return ast.NewCode(fmt.Sprintf("mk_char(%d)", v.Int))
 	case ast.TSym:
 		return ast.NewCode(fmt.Sprintf("mk_sym(\"%s\")", v.Str))
 	case ast.TCell:
@@ -545,8 +553,21 @@ func (g *CodeGenerator) GenerateProgram(exprs []*ast.Value) {
 		} else {
 			g.emit("    result = %s;\n", g.ValueToCExpr(expr))
 		}
-		g.emit("    if (result && !result->is_pair) {\n")
-		g.emit("        printf(\"Result: %%ld\\n\", result->i);\n")
+		g.emit("    if (result) {\n")
+		g.emit("        switch (result->tag) {\n")
+		g.emit("        case TAG_INT:\n")
+		g.emit("            printf(\"Result: %%ld\\n\", result->i);\n")
+		g.emit("            break;\n")
+		g.emit("        case TAG_FLOAT:\n")
+		g.emit("            printf(\"Result: %%g\\n\", result->f);\n")
+		g.emit("            break;\n")
+		g.emit("        case TAG_CHAR:\n")
+		g.emit("            printf(\"Result: %%c\\n\", (char)result->i);\n")
+		g.emit("            break;\n")
+		g.emit("        default:\n")
+		g.emit("            /* Non-scalar result */\n")
+		g.emit("            break;\n")
+		g.emit("        }\n")
 		g.emit("    }\n")
 		g.emit("    free_obj(result);\n")
 	}

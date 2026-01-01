@@ -25,7 +25,7 @@ func (g *RuntimeGenerator) emit(format string, args ...interface{}) {
 
 // GenerateHeader generates the main runtime header
 func (g *RuntimeGenerator) GenerateHeader() {
-	g.emit(`/* Purple + ASAP C Compiler Output */
+    g.emit(`/* Purple + ASAP C Compiler Output */
 /* Primary Strategy: ASAP + ISMM 2024 (Deeply Immutable Cycles) */
 /* Generated ANSI C99 + POSIX Code */
 
@@ -38,19 +38,87 @@ func (g *RuntimeGenerator) GenerateHeader() {
 #include <stdint.h>
 #include <string.h>
 #include <pthread.h>
+#include <stdbool.h>
 
 /* Forward declarations */
+typedef struct Obj Obj;
+typedef struct GenObj GenObj;
+typedef struct GenRef GenRef;
+typedef struct Closure Closure;
 void invalidate_weak_refs_for(void* target);
+static GenRef* genref_from_obj(Obj* obj, const char* source_desc);
+static void genref_invalidate_obj(Obj* obj);
+static Obj* call_closure(Obj* clos, Obj** args, int arg_count);
+static void closure_release(Closure* c);
+static void release_user_obj(Obj* x);
+static void free_channel_obj(Obj* ch_obj);
+static void scan_user_obj(Obj* obj);
+static void clear_marks_user_obj(Obj* obj);
 
+/* Reference counting forward declarations */
+static void inc_ref(Obj* x);
+static void dec_ref(Obj* x);
+static void free_obj(Obj* x);
+
+/* Primitive operations forward declarations */
+static Obj* prim_add(Obj* a, Obj* b);
+static Obj* prim_sub(Obj* a, Obj* b);
+static Obj* prim_mul(Obj* a, Obj* b);
+static Obj* prim_div(Obj* a, Obj* b);
+static Obj* prim_mod(Obj* a, Obj* b);
+static Obj* prim_lt(Obj* a, Obj* b);
+static Obj* prim_gt(Obj* a, Obj* b);
+static Obj* prim_le(Obj* a, Obj* b);
+static Obj* prim_ge(Obj* a, Obj* b);
+static Obj* prim_eq(Obj* a, Obj* b);
+static Obj* prim_not(Obj* a);
+static Obj* prim_abs(Obj* a);
+static Obj* prim_null(Obj* x);
+static Obj* prim_pair(Obj* x);
+static Obj* prim_int(Obj* x);
+static Obj* prim_float(Obj* x);
+static Obj* prim_char(Obj* x);
+static Obj* prim_sym(Obj* x);
+static Obj* obj_car(Obj* p);
+static Obj* obj_cdr(Obj* p);
+
+/* Core tags for runtime values */
+typedef enum {
+    TAG_INT = 1,
+    TAG_FLOAT,
+    TAG_CHAR,
+    TAG_PAIR,
+    TAG_SYM,
+    TAG_BOX,
+    TAG_CLOSURE,
+    TAG_CHANNEL,
+    TAG_ERROR
+} ObjTag;
+
+#define TAG_USER_BASE 1000
+`)
+
+	if g.registry != nil {
+		userTypes := g.registry.GetUserDefinedTypes()
+		for i, typeDef := range userTypes {
+			g.emit("#define TAG_USER_%s (TAG_USER_BASE + %d)\n", typeDef.Name, i)
+		}
+	}
+
+	g.emit(`
 /* Core object type */
 typedef struct Obj {
     int mark;           /* Reference count or mark bit */
     int scc_id;         /* SCC identifier (-1 if not in SCC) */
-    int is_pair;        /* 1 if pair, 0 if int */
+    int is_pair;        /* 1 if pair, 0 if not */
     unsigned int scan_tag;  /* Scanner mark (separate from RC) */
+    int tag;            /* ObjTag */
+    GenObj* gen_obj;    /* Optional generational header (lazy) */
     union {
         long i;
+        double f;
         struct { struct Obj *a, *b; };
+        void* ptr;
     };
 } Obj;
 
@@ -92,6 +160,8 @@ Obj* mk_int(long i) {
     x->scc_id = -1;
     x->is_pair = 0;
     x->scan_tag = 0;
+    x->tag = TAG_INT;
+    x->gen_obj = NULL;
     x->i = i;
     return x;
 }
@@ -103,14 +173,28 @@ Obj* mk_float(double f) {
     x->scc_id = -1;
     x->is_pair = 0;
     x->scan_tag = 0;
-    /* Store float in the same space as int (union) */
-    *((double*)&x->i) = f;
+    x->tag = TAG_FLOAT;
+    x->gen_obj = NULL;
+    x->f = f;
     return x;
 }
 
 double get_float(Obj* x) {
     if (!x) return 0.0;
-    return *((double*)&x->i);
+    return x->f;
+}
+
+Obj* mk_char(long c) {
+    Obj* x = malloc(sizeof(Obj));
+    if (!x) return NULL;
+    x->mark = 1;
+    x->scc_id = -1;
+    x->is_pair = 0;
+    x->scan_tag = 0;
+    x->tag = TAG_CHAR;
+    x->gen_obj = NULL;
+    x->i = c;
+    return x;
 }
 
 Obj* mk_pair(Obj* a, Obj* b) {
@@ -120,14 +204,88 @@ Obj* mk_pair(Obj* a, Obj* b) {
     x->scc_id = -1;
     x->is_pair = 1;
     x->scan_tag = 0;
+    x->tag = TAG_PAIR;
+    x->gen_obj = NULL;
+    /* Increment refs since caller borrows args (will decref after call) */
+    if (a) inc_ref(a);
+    if (b) inc_ref(b);
     x->a = a;
     x->b = b;
     return x;
 }
 
 Obj* mk_sym(const char* s) {
-    /* For now, symbols are not supported at runtime */
-    return NULL;
+    Obj* x = malloc(sizeof(Obj));
+    if (!x) return NULL;
+    x->mark = 1;
+    x->scc_id = -1;
+    x->is_pair = 0;
+    x->scan_tag = 0;
+    x->tag = TAG_SYM;
+    x->gen_obj = NULL;
+    if (s) {
+        size_t len = strlen(s);
+        char* copy = malloc(len + 1);
+        if (!copy) {
+            free(x);
+            return NULL;
+        }
+        memcpy(copy, s, len + 1);
+        x->ptr = copy;
+    } else {
+        x->ptr = NULL;
+    }
+    return x;
+}
+
+Obj* mk_box(Obj* v) {
+    Obj* x = malloc(sizeof(Obj));
+    if (!x) return NULL;
+    x->mark = 1;
+    x->scc_id = -1;
+    x->is_pair = 0;
+    x->scan_tag = 0;
+    x->tag = TAG_BOX;
+    x->gen_obj = NULL;
+    if (v) inc_ref(v);
+    x->ptr = v;
+    return x;
+}
+
+Obj* box_get(Obj* b) {
+    if (!b || b->tag != TAG_BOX) return NULL;
+    return (Obj*)b->ptr;
+}
+
+void box_set(Obj* b, Obj* v) {
+    if (!b || b->tag != TAG_BOX) return;
+    if (v) inc_ref(v);
+    if (b->ptr) dec_ref((Obj*)b->ptr);
+    b->ptr = v;
+}
+
+Obj* mk_error(const char* msg) {
+    Obj* x = malloc(sizeof(Obj));
+    if (!x) return NULL;
+    x->mark = 1;
+    x->scc_id = -1;
+    x->is_pair = 0;
+    x->scan_tag = 0;
+    x->tag = TAG_ERROR;
+    x->gen_obj = NULL;
+    if (msg) {
+        size_t len = strlen(msg);
+        char* copy = malloc(len + 1);
+        if (!copy) {
+            free(x);
+            return NULL;
+        }
+        memcpy(copy, msg, len + 1);
+        x->ptr = copy;
+    } else {
+        x->ptr = NULL;
+    }
+    return x;
 }
 
 Obj* mk_int_stack(long i) {
@@ -137,6 +295,8 @@ Obj* mk_int_stack(long i) {
         x->scc_id = -1;
         x->is_pair = 0;
         x->scan_tag = 0;
+        x->tag = TAG_INT;
+        x->gen_obj = NULL;
         x->i = i;
         return x;
     }
@@ -150,14 +310,60 @@ Obj* mk_int_stack(long i) {
 func (g *RuntimeGenerator) GenerateMemoryManagement() {
 	g.emit(`/* Shape-based Deallocation (Ghiya-Hendren analysis) */
 
+static void release_children(Obj* x) {
+    if (!x) return;
+    switch (x->tag) {
+    case TAG_PAIR:
+        dec_ref(x->a);
+        dec_ref(x->b);
+        break;
+    case TAG_BOX:
+        if (x->ptr) dec_ref((Obj*)x->ptr);
+        break;
+    case TAG_CLOSURE:
+        if (x->ptr) closure_release((Closure*)x->ptr);
+        break;
+    case TAG_SYM:
+    case TAG_ERROR:
+        if (x->ptr) free(x->ptr);
+        break;
+    case TAG_CHANNEL:
+        if (x->ptr) free_channel_obj(x);
+        break;
+    default:
+        if (x->tag >= TAG_USER_BASE) {
+            release_user_obj(x);
+        }
+        break;
+    }
+}
+
 /* TREE: Direct free (ASAP) */
 void free_tree(Obj* x) {
     if (!x) return;
     if (is_stack_obj(x)) return;
-    if (x->is_pair) {
+    switch (x->tag) {
+    case TAG_PAIR:
         free_tree(x->a);
         free_tree(x->b);
+        break;
+    case TAG_BOX:
+        if (x->ptr) free_tree((Obj*)x->ptr);
+        break;
+    case TAG_CLOSURE:
+        if (x->ptr) closure_release((Closure*)x->ptr);
+        break;
+    case TAG_SYM:
+    case TAG_ERROR:
+        if (x->ptr) free(x->ptr);
+        break;
+    default:
+        if (x->tag >= TAG_USER_BASE) {
+            release_user_obj(x);
+        }
+        break;
     }
+    genref_invalidate_obj(x);
     invalidate_weak_refs_for(x);
     free(x);
 }
@@ -169,10 +375,8 @@ void dec_ref(Obj* x) {
     if (x->mark < 0) return;
     x->mark--;
     if (x->mark <= 0) {
-        if (x->is_pair) {
-            dec_ref(x->a);
-            dec_ref(x->b);
-        }
+        release_children(x);
+        genref_invalidate_obj(x);
         invalidate_weak_refs_for(x);
         free(x);
     }
@@ -191,11 +395,8 @@ void free_unique(Obj* x) {
     if (!x) return;
     if (is_stack_obj(x)) return;
     /* Proven unique at compile time - no RC check needed */
-    if (x->is_pair) {
-        /* Children might not be unique, use dec_ref for safety */
-        dec_ref(x->a);
-        dec_ref(x->b);
-    }
+    release_children(x);
+    genref_invalidate_obj(x);
     invalidate_weak_refs_for(x);
     free(x);
 }
@@ -212,6 +413,8 @@ void free_obj(Obj* x) {
     x->mark = -1;
     FreeNode* n = malloc(sizeof(FreeNode));
     if (!n) {
+        release_children(x);
+        genref_invalidate_obj(x);
         invalidate_weak_refs_for(x);
         free(x);
         return;
@@ -227,11 +430,8 @@ void flush_freelist(void) {
         FreeNode* n = FREE_HEAD;
         FREE_HEAD = n->next;
         if (n->obj->mark < 0) {
-            /* Decrement children before freeing (prevents memory leak) */
-            if (n->obj->is_pair) {
-                dec_ref(n->obj->a);
-                dec_ref(n->obj->b);
-            }
+            release_children(n->obj);
+            genref_invalidate_obj(n->obj);
             invalidate_weak_refs_for(n->obj);
             free(n->obj);
         }
@@ -251,23 +451,48 @@ void deferred_release(Obj* x) {
 // GenerateArithmetic generates arithmetic operations
 func (g *RuntimeGenerator) GenerateArithmetic() {
 	g.emit(`/* Arithmetic Operations */
+static double num_to_double(Obj* x) {
+    if (!x) return 0.0;
+    if (x->tag == TAG_FLOAT) return x->f;
+    return (double)x->i;
+}
+
+static int num_is_float(Obj* x) {
+    return x && x->tag == TAG_FLOAT;
+}
+
 Obj* add(Obj* a, Obj* b) {
     if (!a || !b) return mk_int(0);
+    if (num_is_float(a) || num_is_float(b)) {
+        return mk_float(num_to_double(a) + num_to_double(b));
+    }
     return mk_int(a->i + b->i);
 }
 
 Obj* sub(Obj* a, Obj* b) {
     if (!a || !b) return mk_int(0);
+    if (num_is_float(a) || num_is_float(b)) {
+        return mk_float(num_to_double(a) - num_to_double(b));
+    }
     return mk_int(a->i - b->i);
 }
 
 Obj* mul(Obj* a, Obj* b) {
     if (!a || !b) return mk_int(0);
+    if (num_is_float(a) || num_is_float(b)) {
+        return mk_float(num_to_double(a) * num_to_double(b));
+    }
     return mk_int(a->i * b->i);
 }
 
 Obj* div_op(Obj* a, Obj* b) {
-    if (!a || !b || b->i == 0) return mk_int(0);
+    if (!a || !b) return mk_int(0);
+    if (num_is_float(a) || num_is_float(b)) {
+        double denom = num_to_double(b);
+        if (denom == 0.0) return mk_float(0.0);
+        return mk_float(num_to_double(a) / denom);
+    }
+    if (b->i == 0) return mk_int(0);
     return mk_int(a->i / b->i);
 }
 
@@ -285,32 +510,219 @@ func (g *RuntimeGenerator) GenerateComparison() {
 Obj* eq_op(Obj* a, Obj* b) {
     if (!a && !b) return mk_int(1);
     if (!a || !b) return mk_int(0);
+    if (a->tag == TAG_FLOAT || b->tag == TAG_FLOAT) {
+        return mk_int(num_to_double(a) == num_to_double(b) ? 1 : 0);
+    }
     return mk_int(a->i == b->i ? 1 : 0);
 }
 
 Obj* lt_op(Obj* a, Obj* b) {
     if (!a || !b) return mk_int(0);
+    if (a->tag == TAG_FLOAT || b->tag == TAG_FLOAT) {
+        return mk_int(num_to_double(a) < num_to_double(b) ? 1 : 0);
+    }
     return mk_int(a->i < b->i ? 1 : 0);
 }
 
 Obj* gt_op(Obj* a, Obj* b) {
     if (!a || !b) return mk_int(0);
+    if (a->tag == TAG_FLOAT || b->tag == TAG_FLOAT) {
+        return mk_int(num_to_double(a) > num_to_double(b) ? 1 : 0);
+    }
     return mk_int(a->i > b->i ? 1 : 0);
 }
 
 Obj* le_op(Obj* a, Obj* b) {
     if (!a || !b) return mk_int(0);
+    if (a->tag == TAG_FLOAT || b->tag == TAG_FLOAT) {
+        return mk_int(num_to_double(a) <= num_to_double(b) ? 1 : 0);
+    }
     return mk_int(a->i <= b->i ? 1 : 0);
 }
 
 Obj* ge_op(Obj* a, Obj* b) {
     if (!a || !b) return mk_int(0);
+    if (a->tag == TAG_FLOAT || b->tag == TAG_FLOAT) {
+        return mk_int(num_to_double(a) >= num_to_double(b) ? 1 : 0);
+    }
     return mk_int(a->i >= b->i ? 1 : 0);
 }
 
 Obj* not_op(Obj* a) {
     if (!a) return mk_int(1);
     return mk_int(a->i == 0 ? 1 : 0);
+}
+
+static int is_truthy(Obj* x) {
+    if (!x) return 0;
+    switch (x->tag) {
+    case TAG_INT:
+        return x->i != 0;
+    case TAG_FLOAT:
+        return x->f != 0.0;
+    case TAG_CHAR:
+        return x->i != 0;
+    default:
+        return 1;
+    }
+}
+
+/* Primitive aliases for compiler */
+static Obj* prim_add(Obj* a, Obj* b) { return add(a, b); }
+static Obj* prim_sub(Obj* a, Obj* b) { return sub(a, b); }
+static Obj* prim_mul(Obj* a, Obj* b) { return mul(a, b); }
+static Obj* prim_div(Obj* a, Obj* b) { return div_op(a, b); }
+static Obj* prim_mod(Obj* a, Obj* b) { return mod_op(a, b); }
+static Obj* prim_lt(Obj* a, Obj* b) { return lt_op(a, b); }
+static Obj* prim_gt(Obj* a, Obj* b) { return gt_op(a, b); }
+static Obj* prim_le(Obj* a, Obj* b) { return le_op(a, b); }
+static Obj* prim_ge(Obj* a, Obj* b) { return ge_op(a, b); }
+static Obj* prim_eq(Obj* a, Obj* b) { return eq_op(a, b); }
+static Obj* prim_not(Obj* a) { return not_op(a); }
+static Obj* prim_abs(Obj* a) {
+    if (!a) return mk_int(0);
+    if (a->tag == TAG_FLOAT) return mk_float(a->f < 0 ? -a->f : a->f);
+    return mk_int(a->i < 0 ? -a->i : a->i);
+}
+
+/* Type predicate wrappers - return Obj* for uniformity */
+static Obj* prim_null(Obj* x) { return mk_int(x == NULL ? 1 : 0); }
+static Obj* prim_pair(Obj* x) { return mk_int(x && x->tag == TAG_PAIR ? 1 : 0); }
+static Obj* prim_int(Obj* x) { return mk_int(x && x->tag == TAG_INT ? 1 : 0); }
+static Obj* prim_float(Obj* x) { return mk_int(x && x->tag == TAG_FLOAT ? 1 : 0); }
+static Obj* prim_char(Obj* x) { return mk_int(x && x->tag == TAG_CHAR ? 1 : 0); }
+static Obj* prim_sym(Obj* x) { return mk_int(x && x->tag == TAG_SYM ? 1 : 0); }
+
+`)
+}
+
+// GenerateListRuntime generates list and closure-aware helpers
+func (g *RuntimeGenerator) GenerateListRuntime() {
+	g.emit(`/* List Operations */
+Obj* car(Obj* p) {
+    if (!p || p->tag != TAG_PAIR) return NULL;
+    return p->a;
+}
+
+Obj* cdr(Obj* p) {
+    if (!p || p->tag != TAG_PAIR) return NULL;
+    return p->b;
+}
+
+/* Aliases for compiler - return owned references */
+static Obj* obj_car(Obj* p) {
+    Obj* r = car(p);
+    if (r) inc_ref(r);
+    return r;
+}
+static Obj* obj_cdr(Obj* p) {
+    Obj* r = cdr(p);
+    if (r) inc_ref(r);
+    return r;
+}
+
+Obj* list_length(Obj* xs) {
+    long n = 0;
+    while (xs && xs->tag == TAG_PAIR) {
+        n++;
+        xs = xs->b;
+    }
+    return mk_int(n);
+}
+
+Obj* list_map(Obj* fn, Obj* xs) {
+    if (!fn) return NULL;
+    Obj* head = NULL;
+    Obj* tail = NULL;
+    while (xs && xs->tag == TAG_PAIR) {
+        Obj* args[1];
+        args[0] = xs->a;
+        Obj* val = call_closure(fn, args, 1);
+        Obj* node = mk_pair(val, NULL);
+        if (!head) {
+            head = node;
+        } else {
+            tail->b = node;
+        }
+        tail = node;
+        xs = xs->b;
+    }
+    return head;
+}
+
+Obj* list_fold(Obj* fn, Obj* init, Obj* xs) {
+    if (!fn) return init;
+    Obj* acc = init;
+    while (xs && xs->tag == TAG_PAIR) {
+        Obj* args[2];
+        args[0] = acc;
+        args[1] = xs->a;
+        acc = call_closure(fn, args, 2);
+        xs = xs->b;
+    }
+    return acc;
+}
+
+`)
+}
+
+// GenerateScanRuntime generates generic scanner helpers (non-GC)
+func (g *RuntimeGenerator) GenerateScanRuntime() {
+	g.emit(`/* Generic Scanners (debug/verification only) */
+static void scan_obj(Obj* x) {
+    if (!x || x->scan_tag) return;
+    x->scan_tag = 1;
+    switch (x->tag) {
+    case TAG_PAIR:
+        scan_obj(x->a);
+        scan_obj(x->b);
+        break;
+    case TAG_BOX:
+        scan_obj((Obj*)x->ptr);
+        break;
+    case TAG_CLOSURE: {
+        Closure* c = (Closure*)x->ptr;
+        if (c && c->captures) {
+            for (int i = 0; i < c->capture_count; i++) {
+                scan_obj(c->captures[i]);
+            }
+        }
+        break;
+    }
+    default:
+        if (x->tag >= TAG_USER_BASE) {
+            scan_user_obj(x);
+        }
+        break;
+    }
+}
+
+static void clear_marks_obj(Obj* x) {
+    if (!x || !x->scan_tag) return;
+    x->scan_tag = 0;
+    switch (x->tag) {
+    case TAG_PAIR:
+        clear_marks_obj(x->a);
+        clear_marks_obj(x->b);
+        break;
+    case TAG_BOX:
+        clear_marks_obj((Obj*)x->ptr);
+        break;
+    case TAG_CLOSURE: {
+        Closure* c = (Closure*)x->ptr;
+        if (c && c->captures) {
+            for (int i = 0; i < c->capture_count; i++) {
+                clear_marks_obj(c->captures[i]);
+            }
+        }
+        break;
+    }
+    default:
+        if (x->tag >= TAG_USER_BASE) {
+            clear_marks_user_obj(x);
+        }
+        break;
+    }
 }
 
 `)
@@ -418,6 +830,8 @@ func (g *RuntimeGenerator) GenerateUserTypeScanners() {
 
 	userTypes := g.registry.GetUserDefinedTypes()
 	if len(userTypes) == 0 {
+		g.emit("static void scan_user_obj(Obj* obj) { (void)obj; }\n")
+		g.emit("static void clear_marks_user_obj(Obj* obj) { (void)obj; }\n\n")
 		return
 	}
 
@@ -429,51 +843,64 @@ func (g *RuntimeGenerator) GenerateUserTypeScanners() {
 
 	for _, typeDef := range userTypes {
 		// Generate scan function
-		g.emit("void scan_%s(%s* x) {\n", typeDef.Name, typeDef.Name)
+		g.emit("void scan_%s(Obj* obj) {\n", typeDef.Name)
+		g.emit("    if (!obj || obj->tag != TAG_USER_%s) return;\n", typeDef.Name)
+		g.emit("    %s* x = (%s*)obj->ptr;\n", typeDef.Name, typeDef.Name)
 		g.emit("    if (!x) return;\n")
 
 		for _, field := range typeDef.Fields {
-			if !field.IsScannable {
-				continue
-			}
-
 			if field.Strength == FieldWeak {
 				g.emit("    /* x->%s: WEAK - skip to avoid back-edge traversal */\n", field.Name)
 			} else {
-				// For strong fields, recursively scan if it's a known type
-				targetType := g.registry.FindType(field.Type)
-				if targetType != nil {
-					g.emit("    if (x->%s) scan_%s(x->%s);\n", field.Name, field.Type, field.Name)
-				} else {
-					// Generic object scan
-					g.emit("    /* x->%s: scan as generic Obj */\n", field.Name)
-				}
+				g.emit("    if (x->%s) scan_obj(x->%s);\n", field.Name, field.Name)
 			}
 		}
 
 		g.emit("}\n\n")
 
 		// Generate clear_marks function
-		g.emit("void clear_marks_%s(%s* x) {\n", typeDef.Name, typeDef.Name)
+		g.emit("void clear_marks_%s(Obj* obj) {\n", typeDef.Name)
+		g.emit("    if (!obj || obj->tag != TAG_USER_%s) return;\n", typeDef.Name)
+		g.emit("    %s* x = (%s*)obj->ptr;\n", typeDef.Name, typeDef.Name)
 		g.emit("    if (!x) return;\n")
 
 		for _, field := range typeDef.Fields {
-			if !field.IsScannable {
-				continue
-			}
-
 			if field.Strength == FieldWeak {
 				g.emit("    /* x->%s: WEAK - skip */\n", field.Name)
 			} else {
-				targetType := g.registry.FindType(field.Type)
-				if targetType != nil {
-					g.emit("    if (x->%s) clear_marks_%s(x->%s);\n", field.Name, field.Type, field.Name)
-				}
+				g.emit("    if (x->%s) clear_marks_obj(x->%s);\n", field.Name, field.Name)
 			}
 		}
 
 		g.emit("}\n\n")
 	}
+
+	// Dispatcher for user-defined scanners
+	g.emit("static void scan_user_obj(Obj* obj) {\n")
+	g.emit("    if (!obj) return;\n")
+	g.emit("    switch (obj->tag) {\n")
+	for _, typeDef := range userTypes {
+		g.emit("    case TAG_USER_%s:\n", typeDef.Name)
+		g.emit("        scan_%s(obj);\n", typeDef.Name)
+		g.emit("        break;\n")
+	}
+	g.emit("    default:\n")
+	g.emit("        break;\n")
+	g.emit("    }\n")
+	g.emit("}\n\n")
+
+	g.emit("static void clear_marks_user_obj(Obj* obj) {\n")
+	g.emit("    if (!obj) return;\n")
+	g.emit("    switch (obj->tag) {\n")
+	for _, typeDef := range userTypes {
+		g.emit("    case TAG_USER_%s:\n", typeDef.Name)
+		g.emit("        clear_marks_%s(obj);\n", typeDef.Name)
+		g.emit("        break;\n")
+	}
+	g.emit("    default:\n")
+	g.emit("        break;\n")
+	g.emit("    }\n")
+	g.emit("}\n\n")
 }
 
 // GenerateArenaRuntime generates arena allocation runtime with externals support
@@ -614,6 +1041,8 @@ Obj* arena_mk_int(Arena* a, long i) {
     x->scc_id = -1;
     x->is_pair = 0;
     x->scan_tag = 0;
+    x->tag = TAG_INT;
+    x->gen_obj = NULL;
     x->i = i;
     return x;
 }
@@ -625,6 +1054,8 @@ Obj* arena_mk_pair(Arena* a, Obj* car, Obj* cdr) {
     x->scc_id = -1;
     x->is_pair = 1;
     x->scan_tag = 0;
+    x->tag = TAG_PAIR;
+    x->gen_obj = NULL;
     x->a = car;
     x->b = cdr;
     return x;
@@ -658,6 +1089,8 @@ Obj* reuse_as_int(Obj* old, long value) {
     obj->scc_id = -1;
     obj->is_pair = 0;
     obj->scan_tag = 0;
+    obj->tag = TAG_INT;
+    obj->gen_obj = NULL;
     obj->i = value;
     return obj;
 }
@@ -669,6 +1102,8 @@ Obj* reuse_as_pair(Obj* old, Obj* a, Obj* b) {
     obj->scc_id = -1;
     obj->is_pair = 1;
     obj->scan_tag = 0;
+    obj->tag = TAG_PAIR;
+    obj->gen_obj = NULL;
     obj->a = a;
     obj->b = b;
     return obj;
@@ -1267,27 +1702,8 @@ func (g *RuntimeGenerator) GenerateUserTypes() {
 
 // fieldTypeToCType converts a field type to a C type
 func (g *RuntimeGenerator) fieldTypeToCType(field TypeField) string {
-	if !field.IsScannable {
-		// Primitive type
-		switch field.Type {
-		case "int", "i32":
-			return "int"
-		case "long", "i64":
-			return "long"
-		case "float", "f32":
-			return "float"
-		case "double", "f64":
-			return "double"
-		case "bool", "boolean":
-			return "int"
-		case "char":
-			return "char"
-		default:
-			return "int"
-		}
-	}
-	// Pointer type
-	return fmt.Sprintf("struct %s*", field.Type)
+	// Store all fields as Obj* for uniform runtime representation.
+	return "Obj*"
 }
 
 // GenerateTypeReleaseFunctions generates release functions for user-defined types
@@ -1297,39 +1713,53 @@ func (g *RuntimeGenerator) GenerateTypeReleaseFunctions() {
 	}
 
 	userTypes := g.registry.GetUserDefinedTypes()
-	if len(userTypes) == 0 {
-		return
-	}
-
 	g.emit(`/* Type-Aware Release Functions */
 /* Automatically skip weak fields (back-edges) to prevent double-free */
 
 `)
 
+	if len(userTypes) == 0 {
+		g.emit("static void release_user_obj(Obj* obj) { (void)obj; }\n\n")
+		return
+	}
+
 	for _, typeDef := range userTypes {
-		g.emit("void release_%s(%s* x) {\n", typeDef.Name, typeDef.Name)
+		g.emit("void release_%s(Obj* obj) {\n", typeDef.Name)
+		g.emit("    if (!obj) return;\n")
+		g.emit("    if (obj->tag != TAG_USER_%s) return;\n", typeDef.Name)
+		g.emit("    %s* x = (%s*)obj->ptr;\n", typeDef.Name, typeDef.Name)
 		g.emit("    if (!x) return;\n")
 
 		// Process each field
 		for _, field := range typeDef.Fields {
-			if !field.IsScannable {
-				continue // Skip primitive fields
-			}
-
 			switch field.Strength {
-			case FieldStrong:
-				// Strong field - decrement reference
-				g.emit("    if (x->%s) dec_ref((Obj*)x->%s); /* strong */\n", field.Name, field.Name)
 			case FieldWeak:
-				// Weak field - DO NOT decrement, just comment
+				// Weak field - DO NOT decrement
 				g.emit("    /* x->%s: weak back-edge - skip to prevent cycle */\n", field.Name)
+			default:
+				// Treat all non-weak fields as strong
+				g.emit("    if (x->%s) dec_ref(x->%s); /* strong */\n", field.Name, field.Name)
 			}
 		}
 
-		g.emit("    invalidate_weak_refs_for(x);\n")
 		g.emit("    free(x);\n")
+		g.emit("    obj->ptr = NULL;\n")
 		g.emit("}\n\n")
 	}
+
+	// Dispatcher for user-defined types
+	g.emit("static void release_user_obj(Obj* obj) {\n")
+	g.emit("    if (!obj) return;\n")
+	g.emit("    switch (obj->tag) {\n")
+	for _, typeDef := range userTypes {
+		g.emit("    case TAG_USER_%s:\n", typeDef.Name)
+		g.emit("        release_%s(obj);\n", typeDef.Name)
+		g.emit("        break;\n")
+	}
+	g.emit("    default:\n")
+	g.emit("        break;\n")
+	g.emit("    }\n")
+	g.emit("}\n\n")
 }
 
 // GenerateTypeConstructors generates constructor functions for user-defined types
@@ -1355,18 +1785,27 @@ func (g *RuntimeGenerator) GenerateTypeConstructors() {
 			paramStr = "void"
 		}
 
-		g.emit("%s* mk_%s(%s) {\n", typeDef.Name, typeDef.Name, paramStr)
+		g.emit("Obj* mk_%s(%s) {\n", typeDef.Name, paramStr)
 		g.emit("    %s* x = malloc(sizeof(%s));\n", typeDef.Name, typeDef.Name)
 		g.emit("    if (!x) return NULL;\n")
 
 		for _, field := range typeDef.Fields {
-			if field.IsScannable && field.Strength == FieldStrong {
-				g.emit("    if (%s) inc_ref((Obj*)%s); /* strong ref */\n", field.Name, field.Name)
+			if field.Strength != FieldWeak {
+				g.emit("    if (%s) inc_ref(%s); /* strong ref */\n", field.Name, field.Name)
 			}
 			g.emit("    x->%s = %s;\n", field.Name, field.Name)
 		}
 
-		g.emit("    return x;\n")
+		g.emit("    Obj* obj = malloc(sizeof(Obj));\n")
+		g.emit("    if (!obj) { free(x); return NULL; }\n")
+		g.emit("    obj->mark = 1;\n")
+		g.emit("    obj->scc_id = -1;\n")
+		g.emit("    obj->is_pair = 0;\n")
+		g.emit("    obj->scan_tag = 0;\n")
+		g.emit("    obj->tag = TAG_USER_%s;\n", typeDef.Name)
+		g.emit("    obj->gen_obj = NULL;\n")
+		g.emit("    obj->ptr = x;\n")
+		g.emit("    return obj;\n")
 		g.emit("}\n\n")
 	}
 }
@@ -1386,35 +1825,37 @@ func (g *RuntimeGenerator) GenerateFieldAccessors() {
 	userTypes := g.registry.GetUserDefinedTypes()
 	for _, typeDef := range userTypes {
 		for _, field := range typeDef.Fields {
-			if !field.IsScannable {
-				continue // Skip primitive fields for now
-			}
-
 			cType := g.fieldTypeToCType(field)
 
 			// Getter
 			if field.Strength == FieldWeak {
 				g.emit("/* %s.%s getter - WEAK field, no ref count increment */\n", typeDef.Name, field.Name)
-				g.emit("%s get_%s_%s(%s* x) {\n", cType, typeDef.Name, field.Name, typeDef.Name)
+				g.emit("%s get_%s_%s(Obj* obj) {\n", cType, typeDef.Name, field.Name)
+				g.emit("    if (!obj || obj->tag != TAG_USER_%s) return NULL;\n", typeDef.Name)
+				g.emit("    %s* x = (%s*)obj->ptr;\n", typeDef.Name, typeDef.Name)
 				g.emit("    return x ? x->%s : NULL;\n", field.Name)
 				g.emit("}\n\n")
 			} else {
 				g.emit("/* %s.%s getter - STRONG field */\n", typeDef.Name, field.Name)
-				g.emit("%s get_%s_%s(%s* x) {\n", cType, typeDef.Name, field.Name, typeDef.Name)
+				g.emit("%s get_%s_%s(Obj* obj) {\n", cType, typeDef.Name, field.Name)
+				g.emit("    if (!obj || obj->tag != TAG_USER_%s) return NULL;\n", typeDef.Name)
+				g.emit("    %s* x = (%s*)obj->ptr;\n", typeDef.Name, typeDef.Name)
 				g.emit("    if (!x) return NULL;\n")
-				g.emit("    if (x->%s) inc_ref((Obj*)x->%s);\n", field.Name, field.Name)
+				g.emit("    if (x->%s) inc_ref(x->%s);\n", field.Name, field.Name)
 				g.emit("    return x->%s;\n", field.Name)
 				g.emit("}\n\n")
 			}
 
 			// Setter
 			g.emit("/* %s.%s setter */\n", typeDef.Name, field.Name)
-			g.emit("void set_%s_%s(%s* x, %s value) {\n", typeDef.Name, field.Name, typeDef.Name, cType)
+			g.emit("void set_%s_%s(Obj* obj, %s value) {\n", typeDef.Name, field.Name, cType)
+			g.emit("    if (!obj || obj->tag != TAG_USER_%s) return;\n", typeDef.Name)
+			g.emit("    %s* x = (%s*)obj->ptr;\n", typeDef.Name, typeDef.Name)
 			g.emit("    if (!x) return;\n")
 
-			if field.Strength == FieldStrong {
-				g.emit("    if (value) inc_ref((Obj*)value); /* new value */\n")
-				g.emit("    if (x->%s) dec_ref((Obj*)x->%s); /* old value */\n", field.Name, field.Name)
+			if field.Strength != FieldWeak {
+				g.emit("    if (value) inc_ref(value); /* new value */\n")
+				g.emit("    if (x->%s) dec_ref(x->%s); /* old value */\n", field.Name, field.Name)
 			} else {
 				g.emit("    /* weak field - no ref count management */\n")
 			}
@@ -1636,6 +2077,8 @@ struct GenRefContext {
     pthread_mutex_t mutex;
 };
 
+static GenRefContext* g_genref_ctx = NULL;
+
 /* Fast xorshift64 PRNG for generation IDs */
 static Generation genref_random(void) {
     static uint64_t state = 0;
@@ -1658,6 +2101,12 @@ static GenRefContext* genref_context_new(void) {
         pthread_mutex_init(&ctx->mutex, NULL);
     }
     return ctx;
+}
+
+static void genref_init(void) {
+    if (!g_genref_ctx) {
+        g_genref_ctx = genref_context_new();
+    }
 }
 
 static GenObj* genref_alloc(GenRefContext* ctx, void* data, void (*destructor)(void*)) {
@@ -1702,6 +2151,10 @@ static void genref_free(GenObj* obj) {
     obj->data = NULL;
     pthread_rwlock_unlock(&obj->rwlock);
     pthread_rwlock_destroy(&obj->rwlock);
+}
+
+static void genref_release(GenRef* ref) {
+    if (ref) free(ref);
 }
 
 static GenRef* genref_create(GenObj* obj, const char* source_desc) {
@@ -1750,6 +2203,22 @@ static void* genref_deref(GenRef* ref) {
     return data;
 }
 
+/* Bind generational header to Obj (lazy) */
+static GenRef* genref_from_obj(Obj* obj, const char* source_desc) {
+    if (!obj) return NULL;
+    genref_init();
+    if (!obj->gen_obj) {
+        obj->gen_obj = genref_alloc(g_genref_ctx, obj, NULL);
+    }
+    return genref_create(obj->gen_obj, source_desc);
+}
+
+static void genref_invalidate_obj(Obj* obj) {
+    if (!obj || !obj->gen_obj) return;
+    genref_free(obj->gen_obj);
+    obj->gen_obj = NULL;
+}
+
 /* Closure support for safe lambda captures */
 static GenClosure* genclosure_new(GenRef** captures, int count, void* (*func)(void*), void* ctx) {
     GenClosure* c = calloc(1, sizeof(GenClosure));
@@ -1777,6 +2246,116 @@ static void* genclosure_call(GenClosure* c) {
         return NULL;
     }
     return c->func ? c->func(c->ctx) : NULL;
+}
+
+`)
+}
+
+// GenerateClosureRuntime generates closure support for AST->C compilation
+func (g *RuntimeGenerator) GenerateClosureRuntime() {
+	g.emit(`
+/* ========== Closure Runtime ========== */
+typedef Obj* (*ClosureFn)(Obj** captures, Obj** args, int arg_count);
+
+struct Closure {
+    ClosureFn fn;
+    Obj** captures;
+    GenRef** capture_refs;
+    int capture_count;
+    int arity;
+};
+
+static Obj* mk_closure(ClosureFn fn, Obj** captures, GenRef** refs, int count, int arity) {
+    Obj* x = malloc(sizeof(Obj));
+    if (!x) return NULL;
+    x->mark = 1;
+    x->scc_id = -1;
+    x->is_pair = 0;
+    x->scan_tag = 0;
+    x->tag = TAG_CLOSURE;
+    x->gen_obj = NULL;
+
+    Closure* c = calloc(1, sizeof(Closure));
+    if (!c) {
+        free(x);
+        return NULL;
+    }
+    c->fn = fn;
+    c->capture_count = count;
+    c->arity = arity;
+
+    /* Copy captures array - the passed array may be stack-allocated */
+    if (count > 0 && captures) {
+        c->captures = malloc(count * sizeof(Obj*));
+        if (!c->captures) {
+            free(c);
+            free(x);
+            return NULL;
+        }
+        memcpy(c->captures, captures, count * sizeof(Obj*));
+
+        if (refs) {
+            c->capture_refs = malloc(count * sizeof(GenRef*));
+            if (c->capture_refs) {
+                memcpy(c->capture_refs, refs, count * sizeof(GenRef*));
+            }
+        } else {
+            c->capture_refs = NULL;
+        }
+    } else {
+        c->captures = NULL;
+        c->capture_refs = NULL;
+    }
+
+    for (int i = 0; i < count; i++) {
+        if (c->captures && c->captures[i]) inc_ref(c->captures[i]);
+    }
+
+    x->ptr = c;
+    return x;
+}
+
+static void closure_release(Closure* c) {
+    if (!c) return;
+    for (int i = 0; i < c->capture_count; i++) {
+        if (c->captures && c->captures[i]) {
+            dec_ref(c->captures[i]);
+        }
+        if (c->capture_refs && c->capture_refs[i]) {
+            genref_release(c->capture_refs[i]);
+        }
+    }
+    free(c->captures);
+    free(c->capture_refs);
+    free(c);
+}
+
+static int closure_validate(Closure* c) {
+    if (!c || !c->capture_refs) return 1;
+    for (int i = 0; i < c->capture_count; i++) {
+        if (c->capture_refs[i] && !genref_is_valid(c->capture_refs[i])) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static Obj* call_closure(Obj* clos, Obj** args, int arg_count) {
+    if (!clos || clos->tag != TAG_CLOSURE) {
+        fprintf(stderr, "call_closure: not a closure\n");
+        return NULL;
+    }
+    Closure* c = (Closure*)clos->ptr;
+    if (!c) return NULL;
+    if (c->arity >= 0 && arg_count != c->arity) {
+        fprintf(stderr, "call_closure: arity mismatch (expected %d, got %d)\n", c->arity, arg_count);
+        return NULL;
+    }
+    if (!closure_validate(c)) {
+        fprintf(stderr, "call_closure: invalid capture detected\n");
+        return NULL;
+    }
+    return c->fn ? c->fn(c->captures, args, arg_count) : NULL;
 }
 
 `)
@@ -1937,9 +2516,12 @@ func (g *RuntimeGenerator) GenerateAll() {
 	g.GenerateSymmetricRuntime()
 	g.GenerateRegionRuntime()
 	g.GenerateGenRefRuntime()
+	g.GenerateClosureRuntime()
 	g.GenerateConstraintRuntime()
 	g.GenerateArithmetic()
 	g.GenerateComparison()
+	g.GenerateListRuntime()
+	g.GenerateScanRuntime()
 	g.GeneratePerceusRuntime()
 	g.GenerateConcurrencyRuntime()
 	g.GenerateDPSRuntime()

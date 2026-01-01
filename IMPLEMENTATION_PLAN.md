@@ -1,5 +1,232 @@
 # Purple Go - Gap Elimination Implementation Plan
 
+## VERIFIED STATUS + UPDATED PLAN (2026-01-01)
+
+This section **supersedes** everything below. It reflects a repo audit and the current
+implementation trajectory. The legacy sections are kept for reference only.
+
+### Verified Status (repo audit)
+
+**Pipeline**
+- AST->C is **partially implemented** in `pkg/compiler/` (literals, `if`, `do`, `let`, `set!`, `define`),
+  but closures, `quote`, `and/or`, `try/error`, `letrec`, non-symbol application, and macro expansion are missing.
+- Default compile path is still **stage-polymorphic** (`eval` -> `Code` -> `pkg/codegen.GenerateProgram`).
+- `main.go` exposes `--native` but it is **not wired** yet. JIT uses staged codegen.
+
+**Runtime / C Emission**
+- C runtime now supports **Obj tags** for int/float/char/pair/box/closure/channel/error + **user types**.
+- **Randomized generational references** are present (GenRef + lazy GenObj) and are used in the closure runtime.
+- Closure runtime exists (`mk_closure`, `call_closure`, `closure_release`, GenRef validation).
+- List runtime exists for `length`, `map`, `fold`, but **append/reverse/filter** are missing.
+- No native runtime for I/O (`display`, `print`, `read`) or string utilities yet.
+
+**Memory Model**
+- ASAP is still the base rule (compile-time frees, no GC).
+- RC is present in runtime but should be **minimized via analysis**; no new runtime counters will be added.
+- Arena is optional and **not** the default model; GenRef is the current safety choice for closures.
+
+**Analysis**
+- escape/liveness/shape/ownership/rcopt/reuse exist but are **not yet fully integrated** into the new compiler.
+- concurrency analysis exists and emits atomic RC via GCC builtins (C99-compatible, no `<stdatomic.h>`).
+
+**Tests / Validation**
+- Valgrind/ASan/TSan harness exists in `test/validation/`, but targets **staged codegen** today.
+
+---
+
+## Updated Execution Plan (v0.7)
+
+This plan is intentionally **step-by-step** with checkboxes and the reasoning inline. It aims to
+deliver **full AST->C semantics** and native compilation while keeping **RC overhead low** and
+using **GenRef** for closure safety.
+
+### Global Constraints (non-negotiable)
+- C99 + POSIX only (no `<stdatomic.h>`, no stop-the-world GC).
+- ASAP must remain correct with **no runtime GC**.
+- RC should be **minimized** and not dominate; prefer borrow/unique/reuse over refcount churn.
+- Arena remains opt-in; **GenRef** is the primary robustness mechanism for captures.
+- No new runtime counters; use existing `Obj.mark` RC and compile-time analysis.
+
+### Authoritative Memory Policy (do not second-guess)
+
+This table is the single source of truth for "arena vs GenRef vs RC" decisions.
+
+| Condition | Action | Why |
+|-----------|--------|-----|
+| Captured by closure or callback | Use GenRef for that edge | Detects UAF where lifetimes are hard |
+| Shared across threads | Use atomic RC only on shared objects | Correctness with minimal scope |
+| Shape = tree and unique | `free_unique` (no RC) | Zero RC overhead |
+| Shape = tree, not provably unique | `free_tree` with ASAP frees | Deterministic, no RC |
+| Shape = DAG or aliasing | `dec_ref` (RC) | Required for shared acyclic graphs |
+| Shape = cyclic and weak edges break cycle | `dec_ref` (RC) | Weak edges make it acyclic for ownership |
+| Shape = cyclic and unbroken, escapes | Symmetric RC or SCC-local release | Deterministic, no arena reliance |
+| Shape = cyclic and local only | Arena allocation is allowed (opt-in) | Bulk free is safe and fast |
+
+Notes:
+- Arena is not default. It is only selected for proven-local cyclic structures or explicit opt-in.
+- GenRef is targeted: only for capture/callback edges, not for every pointer.
+- RC should be kept low via uniqueness/borrowing/reuse; it is not the primary strategy.
+
+---
+
+## Phase 0: Plan + Safety Alignment (1-2 commits)
+
+Reasoning: lock in the memory model and eliminate ambiguity before deep changes.
+
+- [ ] P0.1 Update `IMPLEMENTATION_PLAN.md` with this audit and plan (done here).
+- [ ] P0.2 Add a short "Native pipeline overview" section in `README.md` once compiler is wired.
+- [ ] P0.3 Add a small `docs/NATIVE_PIPELINE.md` that documents AST->C lowering and memory strategy.
+
+---
+
+## Phase 1: Wire the AST->C compiler entry points
+
+Reasoning: Without a real entry point the compiler work can’t be exercised or tested.
+
+- [ ] P1.1 Add `compiler.CompileProgram` / `CompileToBinary` to the CLI behind `--native`.
+- [ ] P1.2 Add `--emit-c` (or reuse `-c` when `--native` is active) to dump AST->C output.
+- [ ] P1.3 Add `jit.CompileAndRunAST(exprs)` for tests/benchmarks (bypasses `eval`).
+- [ ] P1.4 Route native path through `compiler` (no staged `eval` in native mode).
+
+---
+
+## Phase 2: Core AST -> C lowering (expressions)
+
+Reasoning: This is the minimum semantic surface needed for most programs.
+
+- [ ] P2.1 Literals: int/float/char/bool/nil/symbol; string as list-of-chars.
+- [ ] P2.2 Variable resolution + hygiene (scope stack, gensym).
+- [ ] P2.3 `if` lowering with proper temp lifetimes (`is_truthy`).
+- [ ] P2.4 `do` lowering with ASAP frees for prior temps.
+- [ ] P2.5 `let` with boxing for mutated or captured vars.
+- [ ] P2.6 `letrec` support (self-recursive lambdas + mutual recursion).
+- [ ] P2.7 `quote` lowering (static constructors).
+- [ ] P2.8 `set!` for variables **and** field setters (deftype + box).
+
+---
+
+## Phase 3: Closures + apply (full function semantics)
+
+Reasoning: Full language parity requires closures, capture tracking, and call dispatch.
+
+- [ ] P3.1 Implement capture discovery (use `analysis.FindFreeVars`).
+- [ ] P3.2 Emit closure functions: `static Obj* fn(Obj** captures, Obj** args, int n)`.
+- [ ] P3.3 Emit `mk_closure` with capture array + GenRefs (`genref_from_obj`) for safety.
+- [ ] P3.4 Apply semantics:
+  - Symbol -> known function / primitive
+  - Non-symbol -> evaluate to closure and call `call_closure`
+- [ ] P3.5 Ownership-aware argument passing using summaries (borrow/consume/fresh).
+- [ ] P3.6 Optional optimization: allow *moved* captures to skip `inc_ref` when proven dead.
+
+---
+
+## Phase 4: Runtime parity for primitives
+
+Reasoning: AST->C needs runtime equivalents for all interpreter primitives.
+
+- [ ] P4.1 Arithmetic + comparison already exist; ensure parity for `%`, `not`, `abs`, etc.
+- [ ] P4.2 List ops: add `append`, `reverse`, `filter`, `foldl`, `foldr`, `length`.
+- [ ] P4.3 Higher-order ops: `apply`, `compose`, `flip` (C closures).
+- [ ] P4.4 Box ops: `box`, `unbox`, `set-box!` (already in runtime, wire in compiler).
+- [ ] P4.5 I/O: `print`, `display`, `newline`, `read`, `read-char`, `eof-object?`.
+- [ ] P4.6 String ops: `string?`, `string-length`, `string-append`, `string-ref`, `substring`
+  (as list-of-char helpers).
+- [ ] P4.7 Predicates: `null?`, `pair?`, `int?`, `float?`, `char?`, `symbol?`, `error?`, `box?`.
+- [ ] P4.8 Exceptions: map `error` to `THROW`, `try` to TRY macros (already in runtime).
+
+---
+
+## Phase 5: `deftype` in native mode
+
+Reasoning: user-defined types must work with constructors/accessors/setters and weak fields.
+
+- [ ] P5.1 Parse `deftype` in compiler (not eval) and register with `TypeRegistry`.
+- [ ] P5.2 Emit constructor/accessor/setter calls using runtime `mk_Type`, `get_Type_field`, `set_Type_field`.
+- [ ] P5.3 Honor `:weak` annotation in setters (no RC update).
+- [ ] P5.4 Generate scanners and release functions (already present in runtime).
+
+---
+
+## Phase 6: Control + concurrency semantics
+
+Reasoning: AST->C must match interpreter semantics for control and CSP.
+
+- [ ] P6.1 `try`/`error` compilation using exception runtime.
+- [ ] P6.2 `go`/`make-chan`/`chan-send!`/`chan-recv!`/`select` lowering.
+- [ ] P6.3 Ownership transfer rules on send/recv (integrate concurrency analysis).
+- [ ] P6.4 Continuations (`call/cc`, `prompt`, `control`):
+  - Start with single-shot continuations (setjmp/longjmp).
+  - Extend to delimited via explicit stacks / continuation objects.
+
+---
+
+## Phase 7: `match` lowering
+
+Reasoning: pattern matching is a visible language feature; must compile to C conditionals.
+
+- [ ] P7.1 Compile patterns to a decision tree (nested `if` + bindings).
+- [ ] P7.2 Support list patterns, literals, `_`, `or`, `@`, and user-type constructors.
+- [ ] P7.3 Ensure bindings are scoped with ASAP frees.
+
+---
+
+## Phase 8: Macro expansion in native mode
+
+Reasoning: macros transform AST before evaluation; native compilation must see expanded forms.
+
+- [ ] P8.1 Implement a macro-expansion pre-pass (reuse `eval`’s macro table).
+- [ ] P8.2 Support `defmacro`, `mcall`, `macroexpand` in compile mode.
+- [ ] P8.3 Freeze macro expansion before lowering to C.
+
+---
+
+## Phase 9: Memory strategy integration (keep RC under control)
+
+Reasoning: correctness + performance. RC is a tool, not the strategy.
+
+- [ ] P9.1 Use escape + liveness to insert frees at last use (ASAP).
+- [ ] P9.2 Use shape + ownership + rcopt to select `free_tree` / `dec_ref` / `free_unique`.
+- [ ] P9.3 Use reuse analysis for Perceus-style reuse (`reuse_as_*`).
+- [ ] P9.4 Use GenRef for closure captures (random generation checks on deref).
+- [ ] P9.5 Avoid arenas by default; only enable when explicitly requested.
+
+---
+
+## Phase 10: Native build + CLI polishing
+
+Reasoning: deliver a real native compiler with usable flags.
+
+- [ ] P10.1 `--native` compiles AST directly to C and a native binary.
+- [ ] P10.2 `--cc` and `--cc-flags` allow toolchain override.
+- [ ] P10.3 `--emit-c` dumps generated C for inspection.
+- [ ] P10.4 REPL: add `native` toggle to compile current exprs via compiler.
+
+---
+
+## Phase 11: Validation + parity
+
+Reasoning: ensure memory correctness and semantic equivalence.
+
+- [ ] P11.1 Port validation tests (Valgrind/ASan/TSan) to AST->C pipeline.
+- [ ] P11.2 Add golden-output tests for key constructs (closures, match, channels).
+- [ ] P11.3 Compare native output vs interpreter on corpus of examples.
+
+---
+
+## Delivery cadence (per user request)
+
+- [ ] Commit **after every phase** (or sub-phase) and push.
+- [ ] Use "dirty commits" for partial steps when work is large.
+- [ ] Keep commits small and clearly labeled.
+
+---
+
+## Legacy Plan (pre-audit, superseded)
+
+The sections below are kept for reference. They **do not** reflect the current verified state.
+
+---
+
 ## Current Status (Updated: 2026-01-01)
 
 **Completed - Language Features:**

@@ -47,7 +47,7 @@ func (da *DPSAnalyzer) AnalyzeFunction(name string, params *ast.Value, body *ast
 
 	candidate := &DPSCandidate{
 		Name:       name,
-		Params:     extractParamNames(params),
+		Params:     dpsExtractParamNames(params),
 		ReturnType: "Obj",
 		IsTailCall: isTail,
 		BodyExpr:   body,
@@ -57,7 +57,7 @@ func (da *DPSAnalyzer) AnalyzeFunction(name string, params *ast.Value, body *ast
 	return candidate
 }
 
-func extractParamNames(params *ast.Value) []string {
+func dpsExtractParamNames(params *ast.Value) []string {
 	var names []string
 	for !ast.IsNil(params) && ast.IsCell(params) {
 		param := params.Car
