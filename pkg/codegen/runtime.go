@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"purple_go/pkg/analysis"
 )
 
 // RuntimeGenerator generates the C99 runtime code
@@ -1939,6 +1941,8 @@ func (g *RuntimeGenerator) GenerateAll() {
 	g.GenerateArithmetic()
 	g.GenerateComparison()
 	g.GeneratePerceusRuntime()
+	g.GenerateConcurrencyRuntime()
+	g.GenerateDPSRuntime()
 	g.GenerateScanner("List", true)
 	g.GenerateUserTypes()
 	g.GenerateTypeReleaseFunctions()
@@ -1952,6 +1956,19 @@ func (g *RuntimeGenerator) GenerateAll() {
 func (g *RuntimeGenerator) GenerateExceptionRuntime() {
 	excGen := NewExceptionCodeGenerator(g.w, g.registry)
 	excGen.GenerateExceptionRuntime()
+}
+
+// GenerateConcurrencyRuntime generates thread-safe runtime for goroutines and channels
+func (g *RuntimeGenerator) GenerateConcurrencyRuntime() {
+	ctx := analysis.NewConcurrencyContext()
+	gen := analysis.NewConcurrencyCodeGenerator(ctx)
+	g.emit("%s\n", gen.GenerateConcurrencyRuntime())
+}
+
+// GenerateDPSRuntime generates Destination-Passing Style runtime
+func (g *RuntimeGenerator) GenerateDPSRuntime() {
+	dps := analysis.NewDPSOptimizer()
+	g.emit("%s\n", dps.GenerateDPSRuntime())
 }
 
 // GenerateRuntime generates the complete C99 runtime to a string
