@@ -24,6 +24,7 @@ type RCOptInfo struct {
 	Aliases       []string // Other variables that alias this one
 	IsUnique      bool     // True if provably the only reference
 	IsBorrowed    bool     // True if borrowed (no ownership transfer)
+	IsConsumed    bool     // True if ownership was transferred to callee
 	DefinedAt     int      // Program point where defined
 	LastUsedAt    int      // Program point of last use
 	AliasOf       string   // If this is an alias, name of original
@@ -173,6 +174,25 @@ func (ctx *RCOptContext) IsBorrowed(name string) bool {
 	}
 	if info := ctx.Vars[name]; info != nil {
 		return info.IsBorrowed
+	}
+	return false
+}
+
+// MarkConsumed marks a variable as consumed (ownership transferred to callee).
+// This means the caller should NOT dec_ref after the call - callee owns it now.
+func (ctx *RCOptContext) MarkConsumed(name string) {
+	if info := ctx.Vars[name]; info != nil {
+		info.IsConsumed = true
+		// Consumed variables don't need dec_ref - callee will free
+		info.Optimizations = append(info.Optimizations, RCOptElideDecRef)
+		ctx.Stats.TransferSkips++
+	}
+}
+
+// IsConsumed returns true if a variable's ownership was transferred.
+func (ctx *RCOptContext) IsConsumed(name string) bool {
+	if info := ctx.Vars[name]; info != nil {
+		return info.IsConsumed
 	}
 	return false
 }
@@ -340,6 +360,12 @@ func (ctx *RCOptContext) GetOptimizedDecRef(name string) RCOptimization {
 	if info == nil {
 		ctx.recordOp(false)
 		return RCOptNone
+	}
+
+	// Consumed references don't need dec_ref - callee owns them now
+	if info.IsConsumed {
+		ctx.recordSkip("transfer")
+		return RCOptElideDecRef
 	}
 
 	// Borrowed references don't need dec_ref
@@ -528,6 +554,41 @@ func (ctx *RCOptContext) ShouldEmitIncRef(name string) bool {
 func (ctx *RCOptContext) ShouldEmitDecRef(name string) bool {
 	opt := ctx.GetOptimizedDecRef(name)
 	return opt == RCOptNone || opt == RCOptDirectFree
+}
+
+// GetElisionReason returns a human-readable reason for why an RC op was elided
+func (ctx *RCOptContext) GetElisionReason(name string, op string) string {
+	info := ctx.Vars[name]
+	if info == nil {
+		return "unknown"
+	}
+
+	if op == "inc" {
+		opt := ctx.GetOptimizedIncRef(name)
+		switch opt {
+		case RCOptElideIncRef:
+			if info.IsBorrowed {
+				return "borrowed"
+			}
+			return "already counted"
+		case RCOptElideAll:
+			return "unique+owned"
+		}
+	} else if op == "dec" {
+		if info.IsConsumed {
+			return "consumed by callee"
+		}
+		if info.IsBorrowed {
+			return "borrowed"
+		}
+		if info.IsUnique {
+			return "unique (use free_unique)"
+		}
+		if len(info.Aliases) > 0 {
+			return "alias will handle"
+		}
+	}
+	return "optimized"
 }
 
 // GetFreeFunction returns the best free function to use

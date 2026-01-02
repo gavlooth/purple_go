@@ -6,38 +6,46 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"purple_go/pkg/ast"
 	"purple_go/pkg/codegen"
 	"purple_go/pkg/compiler"
 	"purple_go/pkg/eval"
-	"purple_go/pkg/jit"
-	"purple_go/pkg/memory"
 	"purple_go/pkg/parser"
 )
 
 var (
-	compileMode = flag.Bool("c", false, "Compile to C code instead of interpreting")
-	nativeMode  = flag.Bool("native", false, "Compile AST directly to a native binary")
-	outputFile  = flag.String("o", "", "Output file (default: stdout)")
+	compileMode = flag.Bool("c", false, "Compile to C code instead of executing")
+	interpMode  = flag.Bool("interp", false, "Use Go interpreter (legacy, slower)")
+	outputFile  = flag.String("o", "", "Output file (default: stdout for -c, a.out for binary)")
 	evalExpr    = flag.String("e", "", "Evaluate expression from command line")
 	verbose     = flag.Bool("v", false, "Verbose output")
+	runtimePath = flag.String("runtime", "", "Path to external runtime (auto-detected if not set)")
 )
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Purple Go - ASAP Memory Management Compiler\n\n")
+		fmt.Fprintf(os.Stderr, "Purple Go - Native Compiler with ASAP Memory Management\n\n")
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] [file.purple]\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  %s -e '(+ 1 2)'              # Evaluate expression\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s -c -e '(lift 42)'         # Compile to C\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s program.purple            # Run file\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -e '(+ 1 2)'              # Compile and run expression\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -c -e '(+ 1 2)'           # Emit C code to stdout\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s program.purple            # Compile and run file\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -c program.purple -o out.c # Compile file to C\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -o prog program.purple    # Compile to binary 'prog'\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s --interp -e '(+ 1 2)'     # Use Go interpreter (legacy)\n", os.Args[0])
 	}
 	flag.Parse()
+
+	// Auto-detect runtime path if not specified
+	if *runtimePath == "" {
+		*runtimePath = findRuntimePath()
+	}
 
 	var input string
 	var err error
@@ -81,16 +89,51 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *nativeMode {
-		// Native compilation: AST -> C -> binary (or emit C with -c)
-		compileNative(exprs)
-	} else if *compileMode {
-		// Staged compile to C (via eval)
-		compileToC(exprs)
-	} else {
-		// Interpret
+	if *interpMode {
+		// Legacy Go interpreter (slower, for debugging)
 		interpret(exprs)
+	} else if *compileMode {
+		// Emit C code to stdout or file
+		emitCCode(exprs)
+	} else {
+		// Default: Native compilation and execution
+		runNative(exprs)
 	}
+}
+
+// findRuntimePath searches for the runtime directory
+func findRuntimePath() string {
+	// Check relative to executable
+	exe, err := os.Executable()
+	if err == nil {
+		exeDir := filepath.Dir(exe)
+		candidates := []string{
+			filepath.Join(exeDir, "runtime"),
+			filepath.Join(exeDir, "..", "runtime"),
+		}
+		for _, path := range candidates {
+			if _, err := os.Stat(filepath.Join(path, "libpurple.a")); err == nil {
+				return path
+			}
+		}
+	}
+
+	// Check relative to current directory
+	if _, err := os.Stat("runtime/libpurple.a"); err == nil {
+		return "runtime"
+	}
+
+	// Check relative to working directory
+	wd, err := os.Getwd()
+	if err == nil {
+		path := filepath.Join(wd, "runtime")
+		if _, err := os.Stat(filepath.Join(path, "libpurple.a")); err == nil {
+			return path
+		}
+	}
+
+	// Not found - will use embedded runtime
+	return ""
 }
 
 func interpret(exprs []*ast.Value) {
@@ -113,45 +156,89 @@ func interpret(exprs []*ast.Value) {
 	}
 }
 
-func compileNative(exprs []*ast.Value) {
-	comp := compiler.New()
+// runNative compiles and executes expressions natively (default mode)
+func runNative(exprs []*ast.Value) {
+	var comp *compiler.Compiler
 
-	if *compileMode {
-		// --native -c: emit C to stdout or file
-		code, err := comp.CompileProgram(exprs)
+	if *runtimePath != "" {
+		comp = compiler.NewWithExternalRuntime(*runtimePath)
+		if *verbose {
+			fmt.Fprintf(os.Stderr, "Using external runtime: %s\n", *runtimePath)
+		}
+	} else {
+		comp = compiler.New()
+		if *verbose {
+			fmt.Fprintf(os.Stderr, "Using embedded runtime\n")
+		}
+	}
+
+	// If output file specified, compile to binary (don't run)
+	if *outputFile != "" {
+		binPath, err := comp.CompileToBinary(exprs, *outputFile)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Compile error: %v\n", err)
 			os.Exit(1)
 		}
-
-		if *outputFile != "" {
-			if err := os.WriteFile(*outputFile, []byte(code), 0644); err != nil {
-				fmt.Fprintf(os.Stderr, "Error writing output: %v\n", err)
-				os.Exit(1)
-			}
-			if *verbose {
-				fmt.Fprintf(os.Stderr, "Generated C code written to %s\n", *outputFile)
-			}
-		} else {
-			fmt.Print(code)
+		if *verbose {
+			fmt.Fprintf(os.Stderr, "Binary written to %s\n", binPath)
 		}
 		return
 	}
 
-	// --native without -c: compile to binary
-	output := *outputFile
-	if output == "" {
-		output = "a.out"
-	}
-
-	binPath, err := comp.CompileToBinary(exprs, output)
+	// Compile to temp binary and execute
+	tmpDir, err := os.MkdirTemp("", "purple_run_")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Native compile error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error creating temp dir: %v\n", err)
+		os.Exit(1)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	binPath := filepath.Join(tmpDir, "program")
+	_, err = comp.CompileToBinary(exprs, binPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Compile error: %v\n", err)
 		os.Exit(1)
 	}
 
-	if *verbose {
-		fmt.Fprintf(os.Stderr, "Native binary written to %s\n", binPath)
+	// Execute the binary
+	cmd := exec.Command(binPath)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			os.Exit(exitErr.ExitCode())
+		}
+		fmt.Fprintf(os.Stderr, "Execution error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// emitCCode generates C code and writes to stdout or file
+func emitCCode(exprs []*ast.Value) {
+	var comp *compiler.Compiler
+
+	if *runtimePath != "" {
+		comp = compiler.NewWithExternalRuntime(*runtimePath)
+	} else {
+		comp = compiler.New()
+	}
+
+	code, err := comp.CompileProgram(exprs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Compile error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if *outputFile != "" {
+		if err := os.WriteFile(*outputFile, []byte(code), 0644); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing output: %v\n", err)
+			os.Exit(1)
+		}
+		if *verbose {
+			fmt.Fprintf(os.Stderr, "C code written to %s\n", *outputFile)
+		}
+	} else {
+		fmt.Print(code)
 	}
 }
 
@@ -192,28 +279,43 @@ func compileToC(exprs []*ast.Value) {
 }
 
 func runREPL() {
-	fmt.Println("Purple Go REPL - Tower of Interpreters with ASAP Memory Management")
+	fmt.Println("Purple Native REPL - ASAP Memory Management")
 	fmt.Println()
 
-	// Check JIT availability
-	j := jit.Get()
-	if j.IsAvailable() {
-		fmt.Println("  JIT: enabled (gcc found)")
+	// Check GCC availability for JIT
+	_, gccErr := exec.LookPath("gcc")
+	if gccErr != nil {
+		fmt.Println("  Error: gcc not found - REPL requires gcc for native compilation")
+		os.Exit(1)
+	}
+
+	// Check runtime
+	if *runtimePath != "" {
+		fmt.Printf("  Runtime: %s\n", *runtimePath)
 	} else {
-		fmt.Println("  JIT: disabled (gcc not found)")
+		fmt.Println("  Runtime: embedded")
 	}
 	fmt.Println()
 	fmt.Println("Type 'help' for commands, 'quit' to exit")
 	fmt.Println()
 
-	env := eval.DefaultEnv()
-	menv := eval.NewMenv(ast.Nil, env)
-	compiling := false
+	// Create persistent temp directory for JIT
+	tmpDir, err := os.MkdirTemp("", "purple_repl_")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating temp dir: %v\n", err)
+		os.Exit(1)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Track definitions for multi-line sessions
+	var definitions []string
+	jitCounter := 0
+	showCCode := false
 
 	scanner := bufio.NewScanner(os.Stdin)
 	for {
-		if compiling {
-			fmt.Print("purple(compile)> ")
+		if showCCode {
+			fmt.Print("purple(c)> ")
 		} else {
 			fmt.Print("purple> ")
 		}
@@ -227,44 +329,45 @@ func runREPL() {
 			continue
 		}
 
+		// Handle commands first (before parsing)
 		switch line {
 		case "quit", "exit":
 			fmt.Println("Goodbye!")
 			return
-		case "compile":
-			compiling = !compiling
-			if compiling {
-				fmt.Println("Compile mode ON - expressions will generate C code")
+		case "code":
+			showCCode = !showCCode
+			if showCCode {
+				fmt.Println("C code display ON")
 			} else {
-				fmt.Println("Compile mode OFF - expressions will be interpreted")
+				fmt.Println("C code display OFF")
 			}
 			continue
-		case "macros":
-			fmt.Println("Registered macros: (use defmacro to define, mcall to call)")
+		case "clear":
+			definitions = nil
+			fmt.Println("Definitions cleared")
+			continue
+		case "defs":
+			if len(definitions) == 0 {
+				fmt.Println("No definitions")
+			} else {
+				fmt.Println("Current definitions:")
+				for _, d := range definitions {
+					fmt.Printf("  %s\n", d)
+				}
+			}
 			continue
 		case "help":
 			printREPLHelp()
 			continue
-		case "runtime":
-			registry := codegen.NewTypeRegistry()
-			registry.InitDefaultTypes()
+		}
 
-			// Also include memory management runtimes
-			gen := codegen.NewRuntimeGenerator(os.Stdout, registry)
-			gen.GenerateAll()
-
-			sccGen := memory.NewSCCGenerator(os.Stdout)
-			sccGen.GenerateSCCRuntime()
-			sccGen.GenerateSCCDetection()
-
-			deferredGen := memory.NewDeferredGenerator(os.Stdout)
-			deferredGen.GenerateDeferredRuntime()
-
-			arenaGen := memory.NewArenaGenerator(os.Stdout)
-			arenaGen.GenerateArenaRuntime()
+		// Skip if it's just a bare word (not a valid expression)
+		if !strings.HasPrefix(line, "(") && !strings.HasPrefix(line, "'") {
+			fmt.Printf("Unknown command: %s (use 'help' for commands)\n", line)
 			continue
 		}
 
+		// Parse the expression
 		p := parser.New(line)
 		expr, err := p.Parse()
 		if err != nil {
@@ -276,64 +379,114 @@ func runREPL() {
 			continue
 		}
 
-		result := eval.Eval(expr, menv)
-		if result != nil {
-			if ast.IsError(result) {
-				fmt.Printf("Error: %s\n", result.Str)
-			} else if ast.IsCode(result) {
-				if compiling {
-					fmt.Println("Generated C:")
-					fmt.Println(result.Str)
-				} else {
-					fmt.Printf("Code: %s\n", result.Str)
-				}
-			} else {
-				fmt.Printf("=> %s\n", result.String())
-			}
+		// Check if it's a definition
+		isDefine := ast.IsCell(expr) && ast.IsSym(expr.Car) && expr.Car.Str == "define"
+		if isDefine {
+			definitions = append(definitions, line)
+			fmt.Println("Defined")
+			continue
 		}
+
+		// Build full program with definitions + expression
+		var fullInput strings.Builder
+		for _, def := range definitions {
+			fullInput.WriteString(def)
+			fullInput.WriteString("\n")
+		}
+		fullInput.WriteString(line)
+
+		// Parse the full program
+		fullParser := parser.New(fullInput.String())
+		exprs, err := fullParser.ParseAll()
+		if err != nil {
+			fmt.Printf("Parse error: %v\n", err)
+			continue
+		}
+
+		// Compile
+		var comp *compiler.Compiler
+		if *runtimePath != "" {
+			comp = compiler.NewWithExternalRuntime(*runtimePath)
+		} else {
+			comp = compiler.New()
+		}
+
+		code, err := comp.CompileProgram(exprs)
+		if err != nil {
+			fmt.Printf("Compile error: %v\n", err)
+			continue
+		}
+
+		if showCCode {
+			fmt.Println("--- C code ---")
+			fmt.Print(code)
+			fmt.Println("--- end ---")
+		}
+
+		// Compile to binary
+		jitCounter++
+		binPath := filepath.Join(tmpDir, fmt.Sprintf("repl_%d", jitCounter))
+		srcPath := binPath + ".c"
+
+		if err := os.WriteFile(srcPath, []byte(code), 0644); err != nil {
+			fmt.Printf("Error writing source: %v\n", err)
+			continue
+		}
+
+		var gccCmd *exec.Cmd
+		if *runtimePath != "" {
+			includePath := filepath.Join(*runtimePath, "include")
+			gccCmd = exec.Command("gcc",
+				"-std=c99", "-pthread", "-O2",
+				"-I", includePath,
+				"-o", binPath,
+				srcPath,
+				"-L", *runtimePath, "-lpurple",
+			)
+		} else {
+			gccCmd = exec.Command("gcc", "-std=c99", "-pthread", "-O2", "-o", binPath, srcPath)
+		}
+
+		output, err := gccCmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("Compile error: %v\n%s", err, output)
+			continue
+		}
+
+		// Execute
+		runCmd := exec.Command(binPath)
+		runCmd.Stdout = os.Stdout
+		runCmd.Stderr = os.Stderr
+		runCmd.Run()
 	}
 }
 
 func printREPLHelp() {
 	fmt.Println("Commands:")
 	fmt.Println("  quit     - exit the REPL")
-	fmt.Println("  compile  - toggle compile mode (generate C code)")
-	fmt.Println("  macros   - list defined macros")
-	fmt.Println("  runtime  - print C runtime")
+	fmt.Println("  code     - toggle C code display")
+	fmt.Println("  defs     - show current definitions")
+	fmt.Println("  clear    - clear all definitions")
 	fmt.Println("  help     - show this help")
 	fmt.Println()
-	fmt.Println("Special Forms:")
-	fmt.Println("  (lambda (x) body)       - create function")
-	fmt.Println("  (lambda self (x) body)  - recursive function")
+	fmt.Println("Language:")
+	fmt.Println("  (define name value)     - define a variable")
+	fmt.Println("  (define (f x) body)     - define a function")
+	fmt.Println("  (lambda (x) body)       - anonymous function")
 	fmt.Println("  (let ((x val)) body)    - local binding")
-	fmt.Println("  (letrec ((f fn)) body)  - recursive binding")
 	fmt.Println("  (if cond then else)     - conditional")
-	fmt.Println("  (match val (pat body)...) - pattern matching")
+	fmt.Println("  (do expr1 expr2 ...)    - sequence")
 	fmt.Println("  (quote x) or 'x         - quote expression")
-	fmt.Println("  (quasiquote x)          - quasiquote with ,unquote")
 	fmt.Println()
-	fmt.Println("Staging (Tower of Interpreters):")
-	fmt.Println("  (lift val)              - lift value to code")
-	fmt.Println("  (run code)              - execute code (JIT if available)")
-	fmt.Println("  (EM expr)               - evaluate at parent meta-level")
-	fmt.Println("  (shift n expr)          - go up n levels")
-	fmt.Println("  (meta-level)            - get current tower level")
-	fmt.Println("  (clambda (x) body)      - compile lambda")
-	fmt.Println()
-	fmt.Println("Handler Customization:")
-	fmt.Println("  (get-meta 'name)        - get handler by name")
-	fmt.Println("  (set-meta! 'name fn)    - install handler")
-	fmt.Println("  (with-handlers ((name fn)) body)")
-	fmt.Println("  (default-handler 'name arg)")
-	fmt.Println()
-	fmt.Println("Macros:")
-	fmt.Println("  (defmacro name (params) body scope)")
-	fmt.Println("  (mcall macro-name args...)")
-	fmt.Println("  (macroexpand expr)      - expand without eval")
+	fmt.Println("Primitives:")
+	fmt.Println("  Arithmetic: + - * / %")
+	fmt.Println("  Comparison: < > <= >= = eq?")
+	fmt.Println("  Lists: cons car cdr null? pair? list")
+	fmt.Println("  I/O: display print newline")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  (+ 1 2)                 => 3")
+	fmt.Println("  (+ 1 2)                         => 3")
+	fmt.Println("  (define (fib n) (if (<= n 1) n (+ (fib (- n 1)) (fib (- n 2)))))")
+	fmt.Println("  (fib 10)                        => 55")
 	fmt.Println("  (map (lambda (x) (* x 2)) '(1 2 3)) => (2 4 6)")
-	fmt.Println("  (lift 42)               => Code: mk_int(42)")
-	fmt.Println("  (defmacro inc (x) `(+ 1 ,x) (mcall inc 5)) => 6")
 }

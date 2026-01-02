@@ -55,16 +55,17 @@ func TestLargeAllocation(t *testing.T) {
 	}
 }
 
-func TestManyGoroutines(t *testing.T) {
+func TestManyThreads(t *testing.T) {
 	requireJIT(t)
 
+	// Use thread (OS threads) with OS channels for true concurrency
 	code := `
         (let ((ch (make-chan 0)))
           (do
             (letrec ((spawn (lambda (n)
                               (if (= n 0)
                                   nil
-                                  (do (go (lambda () (chan-send! ch n)))
+                                  (do (thread (chan-send! ch n))
                                       (spawn (- n 1)))))))
               (spawn 1000))
             (letrec ((collect (lambda (sum n)

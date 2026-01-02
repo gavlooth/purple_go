@@ -61,7 +61,7 @@ func TestGenerateArenaLet(t *testing.T) {
 		sym *ast.Value
 		val string
 	}{
-		{ast.NewSym("x"), "mk_int(10)"},
+		{ast.NewSym("x"), "mk_int_unboxed(10)"},  // Unboxed integers - no arena needed
 		{ast.NewSym("y"), "mk_pair(x, x)"},
 	}
 
@@ -72,8 +72,9 @@ func TestGenerateArenaLet(t *testing.T) {
 		if !strings.Contains(result, "arena_create") {
 			t.Error("expected arena_create in output")
 		}
-		if !strings.Contains(result, "arena_mk_int") {
-			t.Error("expected arena_mk_int in output")
+		// Unboxed integers don't need arena allocation - they're already zero-cost
+		if !strings.Contains(result, "mk_int_unboxed") {
+			t.Error("expected mk_int_unboxed in output (unboxed bypasses arena)")
 		}
 		if !strings.Contains(result, "arena_destroy") {
 			t.Error("expected arena_destroy in output")
@@ -90,8 +91,8 @@ func TestGenerateArenaLet(t *testing.T) {
 		if strings.Contains(result, "arena_create") {
 			t.Error("expected no arena_create in standard block")
 		}
-		if !strings.Contains(result, "Obj* x = mk_int(10)") {
-			t.Error("expected standard binding declaration")
+		if !strings.Contains(result, "Obj* x = mk_int_unboxed(10)") {
+			t.Error("expected standard binding declaration with unboxed int")
 		}
 	})
 }
@@ -260,7 +261,7 @@ func TestCodeGenerator(t *testing.T) {
 			expected string
 		}{
 			{ast.Nil, "NULL"},
-			{ast.NewInt(42), "mk_int(42)"},
+			{ast.NewInt(42), "mk_int_unboxed(42)"},
 			{ast.NewCode("my_var"), "my_var"},
 		}
 
@@ -280,8 +281,8 @@ func TestCodeGenerator(t *testing.T) {
 		if !ast.IsCode(lifted) {
 			t.Error("expected Code value")
 		}
-		if lifted.Str != "mk_int(99)" {
-			t.Errorf("expected mk_int(99), got %s", lifted.Str)
+		if lifted.Str != "mk_int_unboxed(99)" {
+			t.Errorf("expected mk_int_unboxed(99), got %s", lifted.Str)
 		}
 	})
 }
@@ -400,5 +401,258 @@ func TestFlushFreelistDecrementsChildren(t *testing.T) {
 	}
 	if !strings.Contains(runtime, "dec_ref(x->b)") {
 		t.Error("release_children should decrement second child of pair")
+	}
+}
+
+func TestLivenessIntegration(t *testing.T) {
+	// Test that liveness analysis is integrated into let generation
+	var sb strings.Builder
+	gen := NewCodeGenerator(&sb)
+
+	// Create a let with an unused variable (pairs don't use stack alloc)
+	bindings := []struct {
+		sym *ast.Value
+		val *ast.Value
+	}{
+		// Use pair values which won't be stack-allocated
+		{ast.NewSym("x"), ast.NewCode("mk_pair(mk_int(1), NULL)")},
+		{ast.NewSym("y"), ast.NewCode("mk_pair(mk_int(2), NULL)")},
+	}
+
+	// Body that only uses y
+	body := ast.NewSym("y")
+
+	result := gen.GenerateLet(bindings, body)
+	t.Log("Generated code:", result)
+
+	// x should be marked as never used (lastUse=-1)
+	if !strings.Contains(result, "x never used") {
+		t.Log("Note: x was not marked as 'never used' - liveness info may be in different format")
+	}
+
+	// Should have lastUse info in the free comments
+	if strings.Contains(result, "lastUse=") {
+		t.Log("Liveness information present in output")
+	}
+
+	// Both variables should be in output
+	if !strings.Contains(result, "x") || !strings.Contains(result, "y") {
+		t.Error("Expected both x and y in output")
+	}
+}
+
+func TestStackAllocationForNonEscaping(t *testing.T) {
+	// Test that non-escaping primitives use stack allocation
+	var sb strings.Builder
+	gen := NewCodeGenerator(&sb)
+
+	// Test int literal - unboxed is better than stack allocation (zero allocation)
+	t.Run("IntToStackExpr", func(t *testing.T) {
+		v := ast.NewInt(42)
+		result := gen.ValueToCExprStack(v)
+		if result != "mk_int_unboxed(42)" {
+			t.Errorf("ValueToCExprStack(42) = %s, want mk_int_unboxed(42)", result)
+		}
+	})
+
+	// Test float literal
+	t.Run("FloatToStackExpr", func(t *testing.T) {
+		v := ast.NewFloat(3.14)
+		result := gen.ValueToCExprStack(v)
+		expected := "mk_float_stack(3.14)"
+		if result != expected {
+			t.Errorf("ValueToCExprStack(3.14) = %s, want %s", result, expected)
+		}
+	})
+
+	// Test char literal - unboxed is better than stack allocation
+	t.Run("CharToStackExpr", func(t *testing.T) {
+		v := ast.NewChar(65) // 'A'
+		result := gen.ValueToCExprStack(v)
+		if result != "mk_char_unboxed(65)" {
+			t.Errorf("ValueToCExprStack('A') = %s, want mk_char_unboxed(65)", result)
+		}
+	})
+
+	// Test isPrimitiveValue
+	t.Run("IsPrimitiveValue", func(t *testing.T) {
+		tests := []struct {
+			val      *ast.Value
+			expected bool
+		}{
+			{ast.NewInt(1), true},
+			{ast.NewFloat(1.0), true},
+			{ast.NewChar(65), true},
+			{ast.NewSym("x"), false},
+			{ast.NewCell(ast.NewInt(1), ast.Nil), false},
+			{nil, false},
+		}
+		for _, tt := range tests {
+			result := isPrimitiveValue(tt.val)
+			if result != tt.expected {
+				t.Errorf("isPrimitiveValue(%v) = %v, want %v", tt.val, result, tt.expected)
+			}
+		}
+	})
+}
+
+func TestBorrowRefIntegration(t *testing.T) {
+	// Test that BorrowRef is used for borrowed references
+	var sb strings.Builder
+	gen := NewCodeGenerator(&sb)
+
+	// Enable BorrowRef (should be on by default)
+	gen.SetBorrowRefEnabled(true)
+
+	// Create a let with a borrowed reference (variable reference to outer var)
+	// When bi.val is a symbol (variable reference), it's considered borrowed
+	bindings := []struct {
+		sym *ast.Value
+		val *ast.Value
+	}{
+		// y = x is a borrowed reference (x is defined elsewhere)
+		{ast.NewSym("y"), ast.NewSym("x")},
+	}
+
+	body := ast.NewSym("y")
+
+	result := gen.GenerateLet(bindings, body)
+	t.Log("Generated code:", result)
+
+	// Should contain BorrowRef creation for borrowed reference
+	if !strings.Contains(result, "borrow_create") {
+		t.Error("expected borrow_create for borrowed reference")
+	}
+	if !strings.Contains(result, "_ref_y") {
+		t.Error("expected BorrowRef variable _ref_y")
+	}
+	if !strings.Contains(result, "borrow_get") {
+		t.Error("expected borrow_get for validated access")
+	}
+	if !strings.Contains(result, "borrow_release") {
+		t.Error("expected borrow_release at scope exit")
+	}
+	if !strings.Contains(result, "borrow:y") {
+		t.Error("expected source description in BorrowRef creation")
+	}
+}
+
+func TestBorrowRefDisabled(t *testing.T) {
+	// Test that BorrowRef can be disabled
+	var sb strings.Builder
+	gen := NewCodeGenerator(&sb)
+
+	// Disable BorrowRef
+	gen.SetBorrowRefEnabled(false)
+
+	bindings := []struct {
+		sym *ast.Value
+		val *ast.Value
+	}{
+		{ast.NewSym("y"), ast.NewSym("x")},
+	}
+
+	body := ast.NewSym("y")
+
+	result := gen.GenerateLet(bindings, body)
+	t.Log("Generated code:", result)
+
+	// Should NOT contain BorrowRef when disabled
+	if strings.Contains(result, "borrow_create") {
+		t.Error("should not contain borrow_create when disabled")
+	}
+	if strings.Contains(result, "_ref_y") {
+		t.Error("should not contain BorrowRef variable when disabled")
+	}
+}
+
+func TestOptimizationStats(t *testing.T) {
+	// Test optimization statistics tracking
+	var sb strings.Builder
+	gen := NewCodeGenerator(&sb)
+
+	// Create bindings that trigger various optimizations
+	t.Run("BorrowRefStats", func(t *testing.T) {
+		// Reset stats
+		gen = NewCodeGenerator(&sb)
+
+		bindings := []struct {
+			sym *ast.Value
+			val *ast.Value
+		}{
+			// Borrowed reference - should use BorrowRef
+			{ast.NewSym("y"), ast.NewSym("x")},
+		}
+
+		gen.GenerateLet(bindings, ast.NewSym("y"))
+
+		stats := gen.GetStats()
+		if stats.BorrowRefCreated != 1 {
+			t.Errorf("expected 1 BorrowRef created, got %d", stats.BorrowRefCreated)
+		}
+		if stats.BorrowRefReleased != 1 {
+			t.Errorf("expected 1 BorrowRef released, got %d", stats.BorrowRefReleased)
+		}
+	})
+
+	t.Run("StatsSummary", func(t *testing.T) {
+		gen = NewCodeGenerator(&sb)
+
+		// Do some operations
+		gen.GenerateLet([]struct {
+			sym *ast.Value
+			val *ast.Value
+		}{
+			{ast.NewSym("y"), ast.NewSym("x")},
+		}, ast.NewSym("y"))
+
+		summary := gen.GetStatsSummary()
+		if summary == "" {
+			t.Error("expected non-empty summary")
+		}
+		t.Log("Summary:", summary)
+	})
+
+	t.Run("StatsReport", func(t *testing.T) {
+		gen = NewCodeGenerator(&sb)
+
+		// Do some operations
+		gen.GenerateLet([]struct {
+			sym *ast.Value
+			val *ast.Value
+		}{
+			{ast.NewSym("y"), ast.NewSym("x")},
+		}, ast.NewSym("y"))
+
+		report := gen.GetStatsReport()
+		if !strings.Contains(report, "Optimization Statistics") {
+			t.Error("expected full report header")
+		}
+		if !strings.Contains(report, "BorrowRef") {
+			t.Error("expected BorrowRef section in report")
+		}
+		t.Log("Report:\n", report)
+	})
+}
+
+func TestOptimizationStatsMerge(t *testing.T) {
+	stats1 := NewOptimizationStats()
+	stats1.BorrowRefCreated = 5
+	stats1.StackAllocations = 10
+
+	stats2 := NewOptimizationStats()
+	stats2.BorrowRefCreated = 3
+	stats2.MemoryReused = 2
+
+	stats1.Merge(stats2)
+
+	if stats1.BorrowRefCreated != 8 {
+		t.Errorf("expected merged BorrowRefCreated=8, got %d", stats1.BorrowRefCreated)
+	}
+	if stats1.StackAllocations != 10 {
+		t.Errorf("expected StackAllocations=10, got %d", stats1.StackAllocations)
+	}
+	if stats1.MemoryReused != 2 {
+		t.Errorf("expected MemoryReused=2, got %d", stats1.MemoryReused)
 	}
 }

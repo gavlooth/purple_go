@@ -24,7 +24,10 @@ const (
 	TFloat     // Floating point value (float64)
 	TBox       // Mutable reference cell (for set!)
 	TCont      // First-class continuation
-	TChan      // CSP channel
+	TChan      // CSP channel (Go channel based, for OS threads)
+	TGreenChan // Green channel (continuation based, for green threads)
+	TAtom      // Atomic reference (for shared state)
+	TThread    // OS thread handle
 	TProcess   // Green thread / process
 	TUserType  // User-defined type instance
 )
@@ -106,10 +109,20 @@ type Value struct {
 	ContFn   func(*Value) *Value // Continuation function
 	ContMenv *Value              // Captured meta-environment
 
-	// TChan - channel
+	// TChan - channel (Go channel based, for OS threads)
 	ChanSend chan *Value // For sending
 	ChanRecv chan *Value // For receiving (same as Send for normal channels)
 	ChanCap  int         // Capacity (0 = unbuffered)
+
+	// TGreenChan - green channel (continuation based)
+	GreenChan interface{} // *eval.GreenChannel (use interface to avoid import cycle)
+
+	// TAtom - atomic reference
+	AtomValue *Value // Current value (use sync/atomic for actual atomicity in Go)
+
+	// TThread - OS thread handle
+	ThreadDone   chan *Value // Channel to receive result
+	ThreadResult *Value      // Result when done
 
 	// TProcess - green thread
 	ProcCont   *Value // Current continuation
@@ -196,7 +209,7 @@ func NewCont(fn func(*Value) *Value, menv *Value) *Value {
 	return &Value{Tag: TCont, ContFn: fn, ContMenv: menv}
 }
 
-// NewChan creates a channel value
+// NewChan creates a channel value (Go channel based, for OS threads)
 func NewChan(capacity int) *Value {
 	ch := make(chan *Value, capacity)
 	return &Value{
@@ -204,6 +217,30 @@ func NewChan(capacity int) *Value {
 		ChanSend: ch,
 		ChanRecv: ch,
 		ChanCap:  capacity,
+	}
+}
+
+// NewGreenChan creates a green channel value (continuation based)
+func NewGreenChan(greenChan interface{}) *Value {
+	return &Value{
+		Tag:       TGreenChan,
+		GreenChan: greenChan,
+	}
+}
+
+// NewAtom creates an atomic reference
+func NewAtom(val *Value) *Value {
+	return &Value{
+		Tag:       TAtom,
+		AtomValue: val,
+	}
+}
+
+// NewThread creates an OS thread handle
+func NewThread() *Value {
+	return &Value{
+		Tag:        TThread,
+		ThreadDone: make(chan *Value, 1),
 	}
 }
 
@@ -381,9 +418,24 @@ func IsCont(v *Value) bool {
 	return v != nil && v.Tag == TCont
 }
 
-// IsChan checks if a value is a channel
+// IsChan checks if a value is a channel (Go channel based)
 func IsChan(v *Value) bool {
 	return v != nil && v.Tag == TChan
+}
+
+// IsGreenChan checks if a value is a green channel
+func IsGreenChan(v *Value) bool {
+	return v != nil && v.Tag == TGreenChan
+}
+
+// IsAtom checks if a value is an atomic reference
+func IsAtom(v *Value) bool {
+	return v != nil && v.Tag == TAtom
+}
+
+// IsThread checks if a value is an OS thread handle
+func IsThread(v *Value) bool {
+	return v != nil && v.Tag == TThread
 }
 
 // IsProcess checks if a value is a process/green thread
@@ -498,6 +550,12 @@ func (v *Value) String() string {
 		return "#<continuation>"
 	case TChan:
 		return fmt.Sprintf("#<channel cap=%d>", v.ChanCap)
+	case TGreenChan:
+		return "#<green-channel>"
+	case TAtom:
+		return fmt.Sprintf("#<atom %s>", v.AtomValue.String())
+	case TThread:
+		return "#<thread>"
 	case TProcess:
 		states := []string{"ready", "running", "parked", "done"}
 		state := "unknown"
@@ -595,6 +653,12 @@ func TagName(t Tag) string {
 		return "CONT"
 	case TChan:
 		return "CHAN"
+	case TGreenChan:
+		return "GREEN_CHAN"
+	case TAtom:
+		return "ATOM"
+	case TThread:
+		return "THREAD"
 	case TProcess:
 		return "PROCESS"
 	case TUserType:

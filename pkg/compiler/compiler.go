@@ -59,6 +59,10 @@ type Compiler struct {
 	typeRegistry *codegen.TypeRegistry    // Type registry for back-edge analysis
 	symScopes    []bool                   // Stack of symmetric RC scope flags
 	arenaScopes  []bool                   // Stack of arena scope flags
+
+	// External runtime configuration
+	useExternalRuntime bool   // If true, link against libpurple.a instead of embedding
+	runtimePath        string // Path to runtime directory (for includes/libs)
 }
 
 // New creates a new Compiler.
@@ -76,6 +80,20 @@ func New() *Compiler {
 		symScopes:    []bool{false}, // Global scope starts without symmetric RC
 		arenaScopes:  []bool{false}, // Global scope starts without arena
 	}
+}
+
+// NewWithExternalRuntime creates a compiler that links against libpurple.a
+func NewWithExternalRuntime(runtimePath string) *Compiler {
+	c := New()
+	c.useExternalRuntime = true
+	c.runtimePath = runtimePath
+	return c
+}
+
+// SetExternalRuntime configures the compiler to use an external runtime.
+func (c *Compiler) SetExternalRuntime(runtimePath string) {
+	c.useExternalRuntime = true
+	c.runtimePath = runtimePath
 }
 
 // selectFreeStrategy determines the appropriate free strategy for a value.
@@ -181,9 +199,16 @@ func (c *Compiler) CompileProgram(exprs []*ast.Value) (string, error) {
 		compiledExprs = append(compiledExprs, cv)
 	}
 
-	runtime := codegen.GenerateRuntime(c.genRegistry())
-	sb.WriteString(runtime)
-	sb.WriteString("\n")
+	if c.useExternalRuntime {
+		// External runtime mode: include header only, link against libpurple.a
+		sb.WriteString("/* Purple Compiled Code - External Runtime */\n")
+		sb.WriteString("#include <purple.h>\n\n")
+	} else {
+		// Embedded runtime mode: generate full runtime inline
+		runtime := codegen.GenerateRuntime(c.genRegistry())
+		sb.WriteString(runtime)
+		sb.WriteString("\n")
+	}
 
 	for _, def := range c.helperDefs {
 		sb.WriteString(def)
@@ -213,15 +238,16 @@ func (c *Compiler) CompileProgram(exprs []*ast.Value) (string, error) {
 			sb.WriteString("    /* result owned by current expr */\n")
 		}
 		sb.WriteString("    if (result) {\n")
-		sb.WriteString("        switch (result->tag) {\n")
+		sb.WriteString("        /* Use obj_tag() for tagged pointer compatibility */\n")
+		sb.WriteString("        switch (obj_tag(result)) {\n")
 		sb.WriteString("        case TAG_INT:\n")
-		sb.WriteString("            printf(\"Result: %ld\\n\", result->i);\n")
+		sb.WriteString("            printf(\"Result: %ld\\n\", obj_to_int(result));\n")
 		sb.WriteString("            break;\n")
 		sb.WriteString("        case TAG_FLOAT:\n")
 		sb.WriteString("            printf(\"Result: %g\\n\", result->f);\n")
 		sb.WriteString("            break;\n")
 		sb.WriteString("        case TAG_CHAR:\n")
-		sb.WriteString("            printf(\"Result: %c\\n\", (char)result->i);\n")
+		sb.WriteString("            printf(\"Result: %c\\n\", (char)obj_to_char(result));\n")
 		sb.WriteString("            break;\n")
 		sb.WriteString("        default:\n")
 		sb.WriteString("            /* Non-scalar result */\n")
@@ -261,7 +287,23 @@ func (c *Compiler) CompileToBinary(exprs []*ast.Value, output string) (string, e
 		outPath = "a.out"
 	}
 
-	cmd := exec.Command("gcc", "-std=c99", "-pthread", "-O2", "-o", outPath, srcPath)
+	var cmd *exec.Cmd
+	if c.useExternalRuntime {
+		// External runtime: link against libpurple.a
+		includePath := filepath.Join(c.runtimePath, "include")
+		libPath := c.runtimePath
+		cmd = exec.Command("gcc",
+			"-std=c99", "-pthread", "-O2",
+			"-I", includePath,
+			"-o", outPath,
+			srcPath,
+			"-L", libPath, "-lpurple",
+		)
+	} else {
+		// Embedded runtime: single-file compilation
+		cmd = exec.Command("gcc", "-std=c99", "-pthread", "-O2", "-o", outPath, srcPath)
+	}
+
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("compile failed: %v\n%s", err, out)
 	}
@@ -349,7 +391,7 @@ func (c *Compiler) compileExpr(expr *ast.Value) (CValue, error) {
 	case ast.TFloat:
 		return CValue{Expr: fmt.Sprintf("mk_float(%f)", expr.Float), Owned: true, Shape: analysis.ShapeTree}, nil
 	case ast.TChar:
-		return CValue{Expr: fmt.Sprintf("mk_int(%d)", expr.Int), Owned: true, Shape: analysis.ShapeTree}, nil
+		return CValue{Expr: fmt.Sprintf("mk_char(%d)", expr.Int), Owned: true, Shape: analysis.ShapeTree}, nil
 	case ast.TSym:
 		if expr.Str == "nil" {
 			return CValue{Expr: "NULL", Owned: false, IsNil: true, Shape: analysis.ShapeTree}, nil
@@ -399,6 +441,31 @@ func (c *Compiler) compileCall(expr *ast.Value) (CValue, error) {
 			return c.compileTry(args)
 		case "error":
 			return c.compileError(args)
+		// Concurrency: green threads (compile to OS threads in native)
+		case "go":
+			return c.compileGo(args)
+		case "thread":
+			return c.compileThread(args)
+		case "thread-join":
+			return c.compileThreadJoin(args)
+		// Channels
+		case "chan":
+			return c.compileChan(args)
+		case ">!":
+			return c.compileChanSend(args)
+		case "<!":
+			return c.compileChanRecv(args)
+		case "close!":
+			return c.compileChanClose(args)
+		// Atoms
+		case "atom":
+			return c.compileAtom(args)
+		case "deref":
+			return c.compileDeref(args)
+		case "reset!":
+			return c.compileReset(args)
+		case "swap!":
+			return c.compileSwap(args)
 		}
 
 		// Primitive or function call
@@ -768,7 +835,15 @@ func (c *Compiler) emitCall(fnName string, args []CValue, summary *analysis.Func
 		name := fmt.Sprintf("_arg%d_%d", i, c.tempCounter)
 		c.tempCounter++
 		argExprs = append(argExprs, name)
-		temps = append(temps, fmt.Sprintf("    Obj* %s = %s;\n", name, arg.Expr))
+
+		if !arg.Owned && isConsuming {
+			// Borrowed reference passed to consuming primitive (cons, box, list).
+			// Must inc_ref because the primitive takes ownership via move semantics.
+			temps = append(temps, fmt.Sprintf("    Obj* %s = %s;\n", name, arg.Expr))
+			temps = append(temps, fmt.Sprintf("    if (%s) inc_ref(%s); /* borrowed->consumed */\n", name, name))
+		} else {
+			temps = append(temps, fmt.Sprintf("    Obj* %s = %s;\n", name, arg.Expr))
+		}
 
 		if arg.Owned {
 			// Consuming primitives (cons, box, list) take ownership - no dec_ref
@@ -983,17 +1058,36 @@ func (c *Compiler) inferReturnOwnership(body *ast.Value, params map[string]bool)
 
 // primitiveNames lists all built-in primitives that compile to C functions.
 var primitiveNames = map[string]string{
+	// Arithmetic
 	"+": "prim_add", "-": "prim_sub", "*": "prim_mul", "/": "prim_div",
-	"%": "prim_mod", "<": "prim_lt", ">": "prim_gt", "<=": "prim_le",
-	">=": "prim_ge", "=": "prim_eq", "eq?": "prim_eq",
+	"%": "prim_mod", "abs": "prim_abs",
+	// Comparison
+	"<": "prim_lt", ">": "prim_gt", "<=": "prim_le", ">=": "prim_ge",
+	"=": "prim_eq", "eq?": "prim_eq", "not": "prim_not",
+	// Pair/List core
 	"cons": "mk_pair", "car": "obj_car", "cdr": "obj_cdr",
+	"list": "mk_list",
+	// Type predicates
 	"null?": "prim_null", "pair?": "prim_pair", "int?": "prim_int",
 	"float?": "prim_float", "char?": "prim_char", "symbol?": "prim_sym",
+	// Type introspection
+	"ctr-tag": "ctr_tag", "ctr-arg": "ctr_arg",
+	// Box/mutable
 	"box": "mk_box", "unbox": "box_get", "set-box!": "box_set",
-	"not": "prim_not", "abs": "prim_abs",
+	// I/O
 	"display": "prim_display", "newline": "prim_newline", "print": "prim_print",
+	// List operations
 	"length": "list_length", "append": "list_append", "reverse": "list_reverse",
-	"map": "list_map", "filter": "list_filter", "fold": "list_fold",
+	"map": "list_map", "filter": "list_filter",
+	"fold": "list_fold", "foldl": "list_fold", "foldr": "list_foldr",
+	// Higher-order
+	"apply": "prim_apply", "compose": "prim_compose",
+	// Character
+	"char->int": "char_to_int", "int->char": "int_to_char",
+	// Float
+	"int->float": "int_to_float", "float->int": "float_to_int",
+	"floor": "prim_floor", "ceil": "prim_ceil",
+	// Channels
 	"make-chan": "channel_create", "chan-send!": "channel_send", "chan-recv!": "channel_recv",
 }
 
@@ -1023,12 +1117,24 @@ func (c *Compiler) primFuncName(name string) string {
 
 // Primitive arity map for wrapper generation
 var primitiveArity = map[string]int{
+	// Binary
 	"+": 2, "-": 2, "*": 2, "/": 2, "%": 2,
 	"<": 2, ">": 2, "<=": 2, ">=": 2, "=": 2, "eq?": 2,
-	"cons": 2, "set-box!": 2,
+	"cons": 2, "set-box!": 2, "append": 2, "compose": 2,
+	"apply": 2, "ctr-arg": 2,
+	// Ternary
+	"fold": 3, "foldl": 3, "foldr": 3,
+	// Unary
 	"car": 1, "cdr": 1, "null?": 1, "pair?": 1, "int?": 1,
 	"float?": 1, "char?": 1, "symbol?": 1, "box": 1, "unbox": 1,
-	"not": 1, "abs": 1, "display": 1, "print": 1, "newline": 0,
+	"not": 1, "abs": 1, "display": 1, "print": 1,
+	"length": 1, "reverse": 1, "ctr-tag": 1,
+	"char->int": 1, "int->char": 1,
+	"int->float": 1, "float->int": 1, "floor": 1, "ceil": 1,
+	// Nullary
+	"newline": 0,
+	// Variable arity (handled specially)
+	"map": 2, "filter": 2,
 }
 
 // consumingPrimitives are constructors that take ownership of their args (move semantics).
@@ -1060,7 +1166,14 @@ func (c *Compiler) genPrimWrapper(name, cFn string) string {
     return %s(args[0]);
 }
 `, wrapperName, cFn)
-	default: // 2+
+	case 3:
+		return fmt.Sprintf(`static Obj* %s(Obj** captures, Obj** args, int n) {
+    (void)captures;
+    if (n < 3) return NULL;
+    return %s(args[0], args[1], args[2]);
+}
+`, wrapperName, cFn)
+	default: // 2
 		return fmt.Sprintf(`static Obj* %s(Obj** captures, Obj** args, int n) {
     (void)captures;
     if (n < 2) return NULL;
@@ -1112,11 +1225,11 @@ func (c *Compiler) compileLambda(expr *ast.Value) (CValue, error) {
 	var sb strings.Builder
 	sb.WriteString("({\n")
 	sb.WriteString(fmt.Sprintf("    Obj* _caps[%d];\n", len(freeVars)))
-	sb.WriteString(fmt.Sprintf("    GenRef* _refs[%d];\n", len(freeVars)))
+	sb.WriteString(fmt.Sprintf("    BorrowRef* _refs[%d];\n", len(freeVars)))
 	for i, cap := range freeVars {
 		info, _ := c.lookup(cap)
 		sb.WriteString(fmt.Sprintf("    _caps[%d] = %s;\n", i, info.CName))
-		sb.WriteString(fmt.Sprintf("    _refs[%d] = genref_from_obj(%s, \"%s\");\n", i, info.CName, cap))
+		sb.WriteString(fmt.Sprintf("    _refs[%d] = borrow_create(%s, \"%s\");\n", i, info.CName, cap))
 	}
 	sb.WriteString(fmt.Sprintf("    mk_closure(%s, _caps, _refs, %d, %d);\n", fnName, len(freeVars), len(paramNames)))
 	sb.WriteString("})")
@@ -1258,11 +1371,11 @@ func (c *Compiler) genCaptureArray(captures []string) string {
 	var sb strings.Builder
 	sb.WriteString("{\n")
 	sb.WriteString(fmt.Sprintf("    Obj* _caps[%d];\n", len(captures)))
-	sb.WriteString(fmt.Sprintf("    GenRef* _refs[%d];\n", len(captures)))
+	sb.WriteString(fmt.Sprintf("    BorrowRef* _refs[%d];\n", len(captures)))
 	for i, cap := range captures {
 		info, _ := c.lookup(cap)
 		sb.WriteString(fmt.Sprintf("    _caps[%d] = %s;\n", i, info.CName))
-		sb.WriteString(fmt.Sprintf("    _refs[%d] = genref_from_obj(%s, \"%s\");\n", i, info.CName, cap))
+		sb.WriteString(fmt.Sprintf("    _refs[%d] = borrow_create(%s, \"%s\");\n", i, info.CName, cap))
 	}
 	sb.WriteString("}\n")
 	return sb.String()
@@ -1284,7 +1397,7 @@ func (c *Compiler) quoteToCExpr(expr *ast.Value) (CValue, error) {
 	case ast.TFloat:
 		return CValue{Expr: fmt.Sprintf("mk_float(%f)", expr.Float), Owned: true}, nil
 	case ast.TChar:
-		return CValue{Expr: fmt.Sprintf("mk_int(%d)", expr.Int), Owned: true}, nil
+		return CValue{Expr: fmt.Sprintf("mk_char(%d)", expr.Int), Owned: true}, nil
 	case ast.TSym:
 		// Symbols become interned symbols
 		return CValue{Expr: fmt.Sprintf("mk_sym(\"%s\")", expr.Str), Owned: true}, nil
@@ -1470,6 +1583,226 @@ func (c *Compiler) compileError(args *ast.Value) (CValue, error) {
 
 	return CValue{
 		Expr:  fmt.Sprintf("THROW(mk_error_obj(%s))", msgVal.Expr),
+		Owned: true,
+	}, nil
+}
+
+// ============================================================================
+// CONCURRENCY PRIMITIVES
+// ============================================================================
+
+// compileGo compiles (go expr) - in native, same as thread (spawn OS thread)
+func (c *Compiler) compileGo(args *ast.Value) (CValue, error) {
+	// In native compilation, green threads become OS threads
+	return c.compileThread(args)
+}
+
+// compileThread compiles (thread expr) - spawn OS thread
+func (c *Compiler) compileThread(args *ast.Value) (CValue, error) {
+	if ast.IsNil(args) {
+		return CValue{}, fmt.Errorf("thread: requires an expression")
+	}
+
+	body := args.Car
+
+	// Create a thunk (0-arg lambda) for the thread body
+	thunkExpr := &ast.Value{
+		Tag: ast.TCell,
+		Car: ast.NewSym("lambda"),
+		Cdr: &ast.Value{
+			Tag: ast.TCell,
+			Car: ast.Nil, // no params
+			Cdr: &ast.Value{
+				Tag: ast.TCell,
+				Car: body,
+				Cdr: ast.Nil,
+			},
+		},
+	}
+
+	thunkVal, err := c.compileExpr(thunkExpr)
+	if err != nil {
+		return CValue{}, err
+	}
+
+	return CValue{
+		Expr:  fmt.Sprintf("spawn_thread(%s)", thunkVal.Expr),
+		Owned: true,
+	}, nil
+}
+
+// compileThreadJoin compiles (thread-join t) - wait for thread result
+func (c *Compiler) compileThreadJoin(args *ast.Value) (CValue, error) {
+	if ast.IsNil(args) {
+		return CValue{}, fmt.Errorf("thread-join: requires a thread")
+	}
+
+	threadVal, err := c.compileExpr(args.Car)
+	if err != nil {
+		return CValue{}, err
+	}
+
+	return CValue{
+		Expr:  fmt.Sprintf("thread_join(%s)", threadVal.Expr),
+		Owned: true,
+	}, nil
+}
+
+// compileChan compiles (chan capacity) - create channel
+func (c *Compiler) compileChan(args *ast.Value) (CValue, error) {
+	capacity := "1" // default unbuffered (capacity 1 for blocking semantics)
+	if !ast.IsNil(args) {
+		arg := args.Car
+		// If it's a literal int, use directly
+		if ast.IsInt(arg) {
+			capacity = fmt.Sprintf("%d", arg.Int)
+		} else {
+			capVal, err := c.compileExpr(arg)
+			if err != nil {
+				return CValue{}, err
+			}
+			// Extract int from Obj* at runtime
+			capacity = fmt.Sprintf("(%s)->i", capVal.Expr)
+		}
+	}
+
+	return CValue{
+		Expr:  fmt.Sprintf("make_channel(%s)", capacity),
+		Owned: true,
+	}, nil
+}
+
+// compileChanSend compiles (>! ch val) - send on channel
+func (c *Compiler) compileChanSend(args *ast.Value) (CValue, error) {
+	if ast.IsNil(args) || ast.IsNil(args.Cdr) {
+		return CValue{}, fmt.Errorf(">!: requires channel and value")
+	}
+
+	chVal, err := c.compileExpr(args.Car)
+	if err != nil {
+		return CValue{}, err
+	}
+
+	valExpr, err := c.compileExpr(args.Cdr.Car)
+	if err != nil {
+		return CValue{}, err
+	}
+
+	// channel_send transfers ownership, returns bool as int
+	return CValue{
+		Expr:  fmt.Sprintf("mk_int(channel_send(%s, %s))", chVal.Expr, valExpr.Expr),
+		Owned: true,
+	}, nil
+}
+
+// compileChanRecv compiles (<! ch) - receive from channel
+func (c *Compiler) compileChanRecv(args *ast.Value) (CValue, error) {
+	if ast.IsNil(args) {
+		return CValue{}, fmt.Errorf("<!: requires a channel")
+	}
+
+	chVal, err := c.compileExpr(args.Car)
+	if err != nil {
+		return CValue{}, err
+	}
+
+	return CValue{
+		Expr:  fmt.Sprintf("channel_recv(%s)", chVal.Expr),
+		Owned: true,
+	}, nil
+}
+
+// compileChanClose compiles (close! ch) - close channel
+func (c *Compiler) compileChanClose(args *ast.Value) (CValue, error) {
+	if ast.IsNil(args) {
+		return CValue{}, fmt.Errorf("close!: requires a channel")
+	}
+
+	chVal, err := c.compileExpr(args.Car)
+	if err != nil {
+		return CValue{}, err
+	}
+
+	return CValue{
+		Expr:  fmt.Sprintf("(channel_close(%s), NULL)", chVal.Expr),
+		Owned: false,
+	}, nil
+}
+
+// compileAtom compiles (atom val) - create atomic reference
+func (c *Compiler) compileAtom(args *ast.Value) (CValue, error) {
+	initial := "NULL"
+	if !ast.IsNil(args) {
+		initVal, err := c.compileExpr(args.Car)
+		if err != nil {
+			return CValue{}, err
+		}
+		initial = initVal.Expr
+	}
+
+	return CValue{
+		Expr:  fmt.Sprintf("make_atom(%s)", initial),
+		Owned: true,
+	}, nil
+}
+
+// compileDeref compiles (deref a) - read atom value
+func (c *Compiler) compileDeref(args *ast.Value) (CValue, error) {
+	if ast.IsNil(args) {
+		return CValue{}, fmt.Errorf("deref: requires an atom")
+	}
+
+	atomVal, err := c.compileExpr(args.Car)
+	if err != nil {
+		return CValue{}, err
+	}
+
+	return CValue{
+		Expr:  fmt.Sprintf("atom_deref(%s)", atomVal.Expr),
+		Owned: true,
+	}, nil
+}
+
+// compileReset compiles (reset! a val) - set atom value
+func (c *Compiler) compileReset(args *ast.Value) (CValue, error) {
+	if ast.IsNil(args) || ast.IsNil(args.Cdr) {
+		return CValue{}, fmt.Errorf("reset!: requires atom and value")
+	}
+
+	atomVal, err := c.compileExpr(args.Car)
+	if err != nil {
+		return CValue{}, err
+	}
+
+	newVal, err := c.compileExpr(args.Cdr.Car)
+	if err != nil {
+		return CValue{}, err
+	}
+
+	return CValue{
+		Expr:  fmt.Sprintf("atom_reset(%s, %s)", atomVal.Expr, newVal.Expr),
+		Owned: true,
+	}, nil
+}
+
+// compileSwap compiles (swap! a fn) - update atom with function
+func (c *Compiler) compileSwap(args *ast.Value) (CValue, error) {
+	if ast.IsNil(args) || ast.IsNil(args.Cdr) {
+		return CValue{}, fmt.Errorf("swap!: requires atom and function")
+	}
+
+	atomVal, err := c.compileExpr(args.Car)
+	if err != nil {
+		return CValue{}, err
+	}
+
+	fnVal, err := c.compileExpr(args.Cdr.Car)
+	if err != nil {
+		return CValue{}, err
+	}
+
+	return CValue{
+		Expr:  fmt.Sprintf("atom_swap(%s, %s)", atomVal.Expr, fnVal.Expr),
 		Owned: true,
 	}, nil
 }

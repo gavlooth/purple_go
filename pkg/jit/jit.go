@@ -19,9 +19,10 @@ import (
 
 // JIT represents a Just-In-Time compiler
 type JIT struct {
-	mu      sync.Mutex
-	tempDir string
-	counter int
+	mu          sync.Mutex
+	tempDir     string
+	counter     int
+	runtimePath string // Path to external runtime (for faster compilation)
 }
 
 // Result holds the result of JIT execution
@@ -55,6 +56,18 @@ func (j *JIT) IsAvailable() bool {
 	return err == nil && j.tempDir != ""
 }
 
+// SetRuntimePath sets the path to the external runtime for faster compilation
+func (j *JIT) SetRuntimePath(path string) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.runtimePath = path
+}
+
+// HasExternalRuntime returns true if external runtime is configured
+func (j *JIT) HasExternalRuntime() bool {
+	return j.runtimePath != ""
+}
+
 // CompiledCode represents compiled JIT code
 type CompiledCode struct {
 	exePath string
@@ -79,8 +92,23 @@ func (j *JIT) Compile(code string) (*CompiledCode, error) {
 		return nil, fmt.Errorf("failed to write source: %v", err)
 	}
 
-	// Compile with gcc - create executable that prints result
-	cmd := exec.Command("gcc", "-std=c99", "-pthread", "-O2", "-o", exePath, srcPath)
+	// Compile with gcc
+	var cmd *exec.Cmd
+	if j.runtimePath != "" {
+		// Use external runtime for faster compilation
+		includePath := filepath.Join(j.runtimePath, "include")
+		cmd = exec.Command("gcc",
+			"-std=c99", "-pthread", "-O2",
+			"-I", includePath,
+			"-o", exePath,
+			srcPath,
+			"-L", j.runtimePath, "-lpurple",
+		)
+	} else {
+		// Embedded runtime (slower but self-contained)
+		cmd = exec.Command("gcc", "-std=c99", "-pthread", "-O2", "-o", exePath, srcPath)
+	}
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("GCC compilation failed: %v\n%s", err, output)
@@ -211,4 +239,85 @@ int main(void) {
     return 0;
 }
 `, runtime, computation)
+}
+
+// CompileExprs compiles AST expressions directly using the native compiler
+func (j *JIT) CompileExprs(exprs []*ast.Value) (*CompiledCode, error) {
+	j.mu.Lock()
+	runtimePath := j.runtimePath
+	j.mu.Unlock()
+
+	// Import compiler package dynamically to avoid circular dependency
+	// For now, generate code directly
+	if runtimePath != "" {
+		// Generate minimal code with external runtime
+		code := generateCodeWithExternalRuntime(exprs)
+		return j.Compile(code)
+	}
+
+	// Fall back to embedded runtime via codegen
+	code := codegen.GenerateProgramToString(exprs)
+	return j.Compile(code)
+}
+
+// generateCodeWithExternalRuntime generates C code that uses external runtime
+func generateCodeWithExternalRuntime(exprs []*ast.Value) string {
+	// This is a simplified version - full implementation would use the compiler package
+	// For now, we return code that includes purple.h
+	var sb strings.Builder
+	sb.WriteString("/* Purple JIT - External Runtime */\n")
+	sb.WriteString("#include <purple.h>\n\n")
+	sb.WriteString("int main(void) {\n")
+	sb.WriteString("    Obj* result = NULL;\n")
+
+	// Generate code for each expression
+	for _, expr := range exprs {
+		code := exprToC(expr)
+		sb.WriteString(fmt.Sprintf("    result = %s;\n", code))
+		sb.WriteString("    if (result) {\n")
+		sb.WriteString("        switch (result->tag) {\n")
+		sb.WriteString("        case TAG_INT:\n")
+		sb.WriteString("            printf(\"Result: %ld\\n\", result->i);\n")
+		sb.WriteString("            break;\n")
+		sb.WriteString("        case TAG_FLOAT:\n")
+		sb.WriteString("            printf(\"Result: %g\\n\", result->f);\n")
+		sb.WriteString("            break;\n")
+		sb.WriteString("        default:\n")
+		sb.WriteString("            prim_print(result);\n")
+		sb.WriteString("            prim_newline();\n")
+		sb.WriteString("            break;\n")
+		sb.WriteString("        }\n")
+		sb.WriteString("    }\n")
+	}
+
+	sb.WriteString("    flush_freelist();\n")
+	sb.WriteString("    return 0;\n")
+	sb.WriteString("}\n")
+
+	return sb.String()
+}
+
+// exprToC converts a simple AST expression to C code
+// This is a minimal implementation for basic REPL usage
+func exprToC(expr *ast.Value) string {
+	if expr == nil {
+		return "NULL"
+	}
+	switch expr.Tag {
+	case ast.TInt:
+		return fmt.Sprintf("mk_int(%d)", expr.Int)
+	case ast.TFloat:
+		return fmt.Sprintf("mk_float(%f)", expr.Float)
+	case ast.TChar:
+		return fmt.Sprintf("mk_char(%d)", expr.Int)
+	case ast.TSym:
+		if expr.Str == "nil" {
+			return "NULL"
+		}
+		return fmt.Sprintf("mk_sym(\"%s\")", expr.Str)
+	default:
+		// For complex expressions, fall back to NULL
+		// Full implementation would use the compiler package
+		return "NULL"
+	}
 }

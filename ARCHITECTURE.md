@@ -29,6 +29,79 @@ Purple Go is a **stage-polymorphic evaluator**: the same evaluator interprets co
 - **Locality**: work is per-object, per-scope, or per-subgraph.
 - **Bounded Work**: deferred RC is capped per safe point; SCC computation is local to frozen graphs.
 - **Explicit Registration**: external references are explicitly registered (e.g., arena externals).
+- **Go is compiler-only**: Go is used ONLY for the compiler toolchain (parsing, analysis, codegen). Go must NEVER be in runtime/interpretation hot paths. All production execution is pure C.
+
+## Execution Strategy (Non-Negotiable)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    GO (Compiler Only)                            │
+│  Parser → Analysis → Codegen → Emit C                           │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    C (Runtime Only)                              │
+│  gcc/clang → Native Binary OR                                   │
+│  JIT: Compile → Cache .so → dlopen (no Go in hot path)          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### JIT + Cache Strategy
+1. **AOT (preferred)**: Purple → C → native binary
+2. **JIT with cache**: Emit C → compile → cache `.so`/`.dylib` → dlopen
+3. **Bytecode + C VM**: Compile to bytecode → interpret in pure C VM
+
+The Go-based `eval` is for development/testing only, NOT production.
+
+## C Runtime: Full Library for REPL/JIT
+
+**Principle**: The runtime is a complete library with ALL features available.
+It's compiled once and used by REPL, JIT, and compiled programs.
+
+```bash
+# Compile runtime once as library
+gcc -std=c99 -pthread -c purple_runtime.c -o purple_runtime.o
+ar rcs libpurple.a purple_runtime.o
+
+# Programs link against it
+gcc -std=c99 -pthread program.c -L. -lpurple -o program
+```
+
+### Two-Level Optimization
+
+1. **Codegen level**: Compiler analyzes program, decides which runtime functions to CALL
+2. **Link level**: LTO can eliminate unused functions from final binary
+
+| Analysis Result | Functions Called | Unused Functions |
+|-----------------|------------------|------------------|
+| No cycles | `free_tree` | `scc_*`, `sym_*` |
+| No closures | direct calls | `call_closure` |
+| No floats | `mk_int_unboxed` | `nanbox_*` |
+| No concurrency | - | `channel_*`, `spawn_*` |
+
+### Runtime Contents (Always Available)
+
+**Core ASAP:**
+- Object representation (`Obj` struct)
+- Tagged pointers for immediates (int, bool, char)
+- Constructors (`mk_int`, `mk_pair`, etc.)
+- `free_obj`, `free_tree` memory management
+- **Automatic weak references** - compiler auto-detects back-edges
+- Primitives (arithmetic, comparison, list operations)
+- User type support
+
+**All Features (for REPL/JIT):**
+- Closure runtime
+- BorrowRef/IPGE (UAF safety)
+- Pool allocator
+- NaN-boxing
+- Perceus reuse (FBIP)
+- SCC/Symmetric RC (cycles)
+- Concurrency (channels, goroutines)
+- Arena allocator
+- Region refs, Constraint refs
+- DPS runtime
 
 ## What "ASAP First" Means
 - The compiler must remain correct **with only ASAP**.
@@ -416,6 +489,18 @@ Compile with: `gcc -std=c99 -pthread` or `clang -std=c99 -pthread`
 - **Implementation**: `pkg/analysis/rcopt.go`
 - **Reference**: Lobster language (https://aardappel.github.io/lobster/memory_management.html)
 
+### Lobster Ownership Modes (v0.7.0)
+- **Consumption Tracking**: Track when values are consumed (moved) by function calls
+- **Ownership Modes**: `ModeOwned` / `ModeBorrowed` / `ModeConsumed`
+- **RC Decision Helpers**: `NeedsIncRef()` / `NeedsDecRef()` based on ownership
+- **Single-Use Detection**: Identify values used exactly once for move optimization
+- **Implementation**: `pkg/analysis/ownership.go`
+- **Key Methods**:
+  - `ConsumeOwnership(name, consumer)` - Mark value as consumed
+  - `IsConsumed(name)` / `GetConsumer(name)` - Query consumption status
+  - `GetOwnershipMode(name)` - Get current ownership mode
+  - `IsSingleUse(name)` - Check for move optimization opportunity
+
 ### Symmetric Reference Counting (Hybrid Strategy)
 - **Default for unbroken cycles** - more memory efficient than arenas
 - **Key insight**: Treat scope as an object that participates in ownership graph
@@ -444,7 +529,10 @@ purple_go/
 │   │   ├── escape.go          # Escape analysis
 │   │   ├── shape.go           # Shape analysis + CyclicFreeStrategy
 │   │   ├── liveness.go        # Liveness analysis
-│   │   └── ownership.go       # Constructor-level ownership tracking
+│   │   ├── ownership.go       # Constructor-level ownership + Lobster modes
+│   │   ├── ownership_test.go  # Ownership analysis tests
+│   │   ├── pool.go            # Pool allocation eligibility analysis
+│   │   └── pool_test.go       # Pool analysis tests
 │   ├── codegen/
 │   │   ├── codegen.go         # C99 code generation
 │   │   ├── runtime.go         # Runtime header generation (integrated)
@@ -479,8 +567,11 @@ purple_go/
 | Deferred RC | `codegen/runtime.go` | **Integrated** - bounded processing |
 | Symmetric RC | `codegen/runtime.go` | **Integrated** - scope-as-object |
 | Region refs | `codegen/runtime.go` | **Integrated** - O(1) scope validation |
-| GenRef | `codegen/runtime.go` | **Integrated** - UAF detection |
+| GenRef / BorrowRef | `codegen/runtime.go` | **Integrated** - UAF detection via IPGE |
 | Constraint refs | `codegen/runtime.go` | **Integrated** - atomic ops, debug mode |
+| Pool allocation | `codegen/runtime.go` | **Integrated** - thread-local bump allocator |
+| NaN-boxing | `codegen/runtime.go` | **Integrated** - unboxed floats |
+| Lobster ownership | `analysis/ownership.go` | **Integrated** - consumption tracking |
 
 ### Runtime Features
 
@@ -504,7 +595,8 @@ The `pkg/codegen/runtime.go` now includes all memory management strategies:
    - `flush_deferred()` for cleanup at program exit
 
 4. **Perceus Reuse**:
-   - `try_reuse()`, `reuse_as_int()`, `reuse_as_pair()`
+   - `try_reuse()`, `reuse_as_int()`, `reuse_as_pair()`, `reuse_as_box()`, `reuse_as_closure()`
+   - `can_reuse()`, `consume_for_reuse()` helper functions
    - Enables "Functional But In-Place" (FBIP) programming
 
 5. **Region References (v0.5.0)**:
@@ -524,6 +616,22 @@ The `pkg/codegen/runtime.go` now includes all memory management strategies:
    - `constraint_free()`, `constraint_is_valid()`, `constraint_deref()`
    - Atomic operations (`_Atomic int`) for thread safety
    - Optional debug tracking with `-DCONSTRAINT_DEBUG`
+
+8. **Pool Allocation (v0.7.0)**:
+   - Thread-local bump allocator for non-escaping temporary values
+   - `pool_create()`, `pool_destroy()`, `pool_reset()`
+   - `pool_alloc()`, `pool_mk_int()`, `pool_mk_pair()`, `pool_mk_box()`
+   - `pool_escape_to_heap()` for values that escape pool scope
+   - `pool_enter_scope()`, `pool_exit_scope()` for nested scopes
+   - Eligibility analysis via `PoolContext` in `pkg/analysis/pool.go`
+   - Zero overhead for eligible allocations (bump pointer)
+
+9. **NaN-Boxing for Floats (v0.7.0)**:
+   - IEEE 754 quiet NaN payload for storing pointers in float values
+   - 48-bit pointer storage in NaN payload (sufficient for x86-64)
+   - `nanbox_is_float()`, `nanbox_to_obj()`, `nanbox_from_float()`, `nanbox_from_obj()`
+   - Enables unboxed float representation without heap allocation
+   - Complements tagged pointers (integers/booleans/characters)
 
 The standalone implementations in `pkg/memory/` are kept for reference and testing.
 
@@ -623,13 +731,115 @@ Compile-time analysis determines where RC operations are needed.
 12. **Collapsing Towers**: Amin & Rompf, "Collapsing Towers of Interpreters" (POPL 2018)
     - https://dl.acm.org/doi/10.1145/3158140
 
+## Runtime Optimizations (v0.6.0)
+
+### Tagged Pointers (Multi-Type Immediates)
+
+Zero-allocation representation for primitive types using pointer tagging:
+
+```
+Low 3 bits | Type        | Payload          | Size
+-----------|-------------|------------------|------
+   000     | Heap ptr    | 64-bit pointer   | 40 B
+   001     | Integer     | 61-bit signed    | 8 B
+   010     | Character   | 21-bit Unicode   | 8 B
+   011     | Boolean     | 1-bit            | 8 B
+```
+
+**Performance Impact:**
+
+| Operation | Boxed | Unboxed | Speedup |
+|-----------|-------|---------|---------|
+| Fibonacci | 987 µs | 335 µs | 2.9× |
+| Sum(100k) | 73 ms | 9 ms | 8.1× |
+| Memory/int | 40 B | 8 B | 5× reduction |
+
+**API:**
+```c
+mk_int_unboxed(n)    // Zero allocation integer
+mk_bool(b)           // PURPLE_TRUE or PURPLE_FALSE
+mk_char_unboxed(c)   // Unicode codepoint (0-0x10FFFF)
+IS_IMMEDIATE(p)      // Check if value is unboxed
+obj_to_int(p)        // Safe extraction (handles all types)
+```
+
+### IPGE: In-Place Generational Evolution
+
+Deterministic memory safety without indirection tables:
+
+```c
+// Full-period LCG ensures unique generations
+#define IPGE_MULTIPLIER  0x5851f42D4C957F2DULL  // Knuth MMIX
+#define IPGE_INCREMENT   0x1442695040888963ULL
+
+// On allocation: obj->generation = ipge_evolve(seed)
+// On free: obj->generation = ipge_evolve(obj->generation)
+// On deref: validate(obj->generation == expected_gen)
+```
+
+**vs Random GenRef:**
+
+| Aspect | Random GenRef | IPGE |
+|--------|---------------|------|
+| Collision risk | 1/2^64 | Zero |
+| Indirection | Hash table | None |
+| Cache locality | Poor | Excellent |
+| Per-object overhead | +8 B | +8 B (reuses gen_obj slot) |
+
+**Usage (BorrowRef API):**
+```c
+BorrowRef ref = borrow_ref_create(obj);  // Snapshot generation
+// ... obj might be freed ...
+Obj* p = borrow_ref_deref(ref);          // NULL if freed
+bool valid = borrow_ref_is_valid(ref);   // Check validity
+```
+
+**Note**: BorrowRef is the implementation name for IPGE-validated borrowed references,
+formerly called GenRef. It provides Vale-style use-after-free detection with zero
+indirection overhead.
+
+### Object Layout (v0.6.0)
+
+```c
+typedef struct Obj {
+    uint64_t generation;    // IPGE generation ID (8 B)
+    int mark;               // Reference count (4 B)
+    int tag;                // ObjTag enum (4 B)
+    int is_pair;            // Pair flag (4 B)
+    int scc_id;             // SCC ID for cycles (4 B)
+    unsigned int scan_tag;  // Scanner mark (4 B)
+    union {                 // Payload (8 B)
+        long i;
+        double f;
+        struct { Obj *a, *b; };
+        void* ptr;
+    };
+} Obj;  // Total: 40 bytes (down from 48)
+```
+
+### Codegen Integration
+
+The codegen automatically emits optimized constructors:
+
+| Type | Old | New | Allocation |
+|------|-----|-----|------------|
+| Integer | `mk_int(n)` | `mk_int_unboxed(n)` | Zero |
+| Char | `mk_char(c)` | `mk_char_unboxed(c)` | Zero |
+| Bool | `mk_int(0/1)` | `mk_bool(b)` | Zero |
+| Float | `mk_float(f)` | `mk_float(f)` | Heap (48→40 B) |
+
 ## Generated C99 Output
 
 The compiler generates ANSI C99 code with:
-- `Obj` tagged union for runtime values
-- `mk_int()`, `mk_pair()` constructors
+- `Obj` tagged union for runtime values (40 bytes)
+- Tagged pointers for integers, booleans, characters (8 bytes, zero alloc)
+- NaN-boxing for floats (8 bytes, zero alloc for pure floats)
+- IPGE generation IDs for memory safety (BorrowRef)
+- `mk_int_unboxed()`, `mk_bool()`, `mk_char_unboxed()` constructors
 - `free_tree()`, `dec_ref()`, `deferred_release()` memory management
-- Stack allocation pool for short-lived objects
+- Thread-local pool allocator for non-escaping temporaries
+- Perceus reuse functions: `reuse_as_int()`, `reuse_as_pair()`, `reuse_as_box()`, `reuse_as_closure()`
+- Lobster-style ownership tracking with consumption analysis
 - Weak reference support for breaking cycles
 - SCC registry for frozen cyclic structures
 - Deferred decrement queue with bounded processing

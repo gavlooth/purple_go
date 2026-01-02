@@ -1306,17 +1306,89 @@ func TestChannelOps(t *testing.T) {
 	}
 }
 
-func TestGo(t *testing.T) {
-	// Spawn a goroutine
-	result := evalString("(go (+ 1 2))")
-	if result == nil || !ast.IsProcess(result) {
-		t.Errorf("(go ...) = %v, want process", result)
+func TestThread(t *testing.T) {
+	// Spawn an OS thread
+	result := evalString("(thread (+ 1 2))")
+	if result == nil || !ast.IsThread(result) {
+		t.Errorf("(thread ...) = %v, want thread", result)
 	}
 
-	// process? predicate
-	result = evalString("(process? (go 1))")
+	// thread? predicate
+	result = evalString("(thread? (thread 1))")
 	if ast.IsNil(result) {
-		t.Error("(process? (go 1)) should be true")
+		t.Error("(thread? (thread 1)) should be true")
+	}
+}
+
+func TestGreenGo(t *testing.T) {
+	// Spawn a green thread (returns unit)
+	result := evalString("(go (+ 1 2))")
+	if !ast.IsNil(result) {
+		t.Errorf("(go ...) = %v, want nil/unit", result)
+	}
+}
+
+func TestGreenChannel(t *testing.T) {
+	// Create a green channel
+	result := evalString("(chan 1)")
+	if !ast.IsGreenChan(result) {
+		t.Errorf("(chan 1) = %v, want green-chan", result)
+	}
+
+	// green-chan? predicate
+	result = evalString("(green-chan? (chan 1))")
+	if ast.IsNil(result) {
+		t.Error("(green-chan? (chan 1)) should be true")
+	}
+}
+
+func TestAtom(t *testing.T) {
+	// Create an atom
+	result := evalString("(atom 42)")
+	if !ast.IsAtom(result) {
+		t.Errorf("(atom 42) = %v, want atom", result)
+	}
+
+	// atom? predicate
+	result = evalString("(atom? (atom 0))")
+	if ast.IsNil(result) {
+		t.Error("(atom? (atom 0)) should be true")
+	}
+
+	// deref
+	result = evalString("(deref (atom 42))")
+	if result == nil || !ast.IsInt(result) || result.Int != 42 {
+		t.Errorf("(deref (atom 42)) = %v, want 42", result)
+	}
+
+	// reset!
+	result = evalString(`
+		(let ((a (atom 1)))
+			(do
+				(reset! a 100)
+				(deref a)))
+	`)
+	if result == nil || !ast.IsInt(result) || result.Int != 100 {
+		t.Errorf("reset! = %v, want 100", result)
+	}
+
+	// swap!
+	result = evalString(`
+		(let ((a (atom 10)))
+			(do
+				(swap! a (lambda (x) (+ x 5)))
+				(deref a)))
+	`)
+	if result == nil || !ast.IsInt(result) || result.Int != 15 {
+		t.Errorf("swap! = %v, want 15", result)
+	}
+}
+
+func TestThreadJoin(t *testing.T) {
+	// Spawn thread and join to get result
+	result := evalString("(thread-join (thread (+ 10 20)))")
+	if result == nil || !ast.IsInt(result) || result.Int != 30 {
+		t.Errorf("thread-join = %v, want 30", result)
 	}
 }
 

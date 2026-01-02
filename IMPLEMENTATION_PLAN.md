@@ -600,6 +600,96 @@ Sender loses ownership → Receiver gains ownership
 
 ---
 
+## Phase 7b: Unified Optimization Plan (Vale + Lobster + Perceus) ✅
+
+**Status**: COMPLETE
+
+### Implementation Summary
+
+This phase enhanced the existing optimization infrastructure with additional features from Vale, Lobster, and Perceus research:
+
+#### Phase 2a: Lobster Ownership Modes (Enhanced) ✅
+- **File**: `pkg/analysis/ownership.go`
+- **New Ownership Class**: `OwnerConsumed` for tracking consumed (moved) values
+- **New Ownership Modes**: `ModeOwned`, `ModeBorrowed`, `ModeConsumed`
+- **Consumption Tracking**: `ConsumeOwnership()`, `IsConsumed()`, `GetConsumer()`
+- **RC Decision Helpers**: `NeedsIncRef()`, `NeedsDecRef()` based on ownership analysis
+- **Move Optimization**: `IsSingleUse()`, `GetOwnershipMode()` for detecting move opportunities
+- **Tests**: `pkg/analysis/ownership_test.go`
+
+#### Phase 2b: Perceus Reuse Analysis (Enhanced) ✅
+- **File**: `pkg/codegen/runtime.go`
+- **New Functions**: `reuse_as_box()`, `reuse_as_closure()` (in addition to existing `reuse_as_int()`, `reuse_as_pair()`)
+- **Helper Functions**: `can_reuse()`, `consume_for_reuse()` for reuse eligibility checks
+- **FBIP Support**: Full "Functional But In-Place" capability for all boxed types
+
+#### Phase 3a: Pool Allocation ✅
+- **Analysis**: `pkg/analysis/pool.go` - Pool eligibility analysis
+- **Tests**: `pkg/analysis/pool_test.go`
+- **Runtime**: `pkg/codegen/runtime.go` - `GeneratePoolRuntime()`
+- **Types**:
+  - `PoolEligibility`: `PoolIneligible`, `PoolEligible`, `PoolPreferred`
+  - `PoolCandidate`: Tracks variable eligibility with reason
+  - `PoolContext`: Integrates escape, purity, and ownership analysis
+- **Runtime Features**:
+  - Thread-local bump allocator with configurable block size (64KB default)
+  - `pool_create()`, `pool_destroy()`, `pool_reset()`
+  - `pool_mk_int()`, `pool_mk_pair()`, `pool_mk_box()` - pool-allocated constructors
+  - `pool_escape_to_heap()` - escape hatch for values leaving pool scope
+  - `pool_enter_scope()`, `pool_exit_scope()` - nested scope support
+- **Eligibility Criteria**:
+  - Non-escaping (not `EscapeGlobal` or `EscapeArg`)
+  - Not captured by closure
+  - Not borrowed
+  - Pure context → `PoolPreferred`
+
+#### Phase 3b: NaN-Boxing for Floats ✅
+- **File**: `pkg/codegen/runtime.go` - `GenerateNaNBoxingRuntime()`
+- **Technique**: IEEE 754 quiet NaN payload bits (48-bit) store pointers
+- **Constants**:
+  - `NANBOX_PREFIX`: `0x7FF8000000000000ULL` (quiet NaN marker)
+  - `NANBOX_PTR_MASK`: `0x0000FFFFFFFFFFFFULL` (48-bit pointer extraction)
+- **Functions**:
+  - `nanbox_is_float()` - Check if value is a float (not NaN-boxed pointer)
+  - `nanbox_to_obj()` - Extract Obj pointer from NaN-boxed value
+  - `nanbox_from_float()` - Create NaN-boxed float
+  - `nanbox_from_obj()` - Create NaN-boxed pointer
+- **Benefits**: Unboxed floats without heap allocation, complementing tagged pointer optimization
+
+#### BorrowRef Naming (was GenRef) ✅
+- **Change**: GenRef renamed to BorrowRef for clarity
+- **Rationale**: "BorrowRef" better describes IPGE-validated borrowed references
+- **Implementation**: Uses IPGE (In-Place Generational Evolution) for deterministic UAF detection
+
+### New Files Created
+| File | Purpose |
+|------|---------|
+| `pkg/analysis/pool.go` | Pool allocation eligibility analysis |
+| `pkg/analysis/pool_test.go` | Pool analysis tests |
+| `pkg/analysis/ownership_test.go` | Ownership modes tests |
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `pkg/analysis/ownership.go` | Added Lobster ownership modes, consumption tracking |
+| `pkg/codegen/runtime.go` | Added `reuse_as_box`, `reuse_as_closure`, pool runtime, NaN-boxing |
+| `pkg/codegen/stats.go` | Added pool allocation statistics |
+| `pkg/codegen/codegen.go` | Updated to use `ConsumeOwnership` and track stats |
+
+### Stats Tracking Added
+- `PoolAllocations`: Allocations in thread-local pool
+- `PoolEligible`: Variables eligible for pool allocation
+- `PoolEscaped`: Pool values that had to escape to heap
+
+### Acceptance Criteria
+- [x] Lobster ownership modes track consumed values
+- [x] Perceus reuse extended to boxes and closures
+- [x] Pool eligibility analysis integrates escape/purity/ownership
+- [x] NaN-boxing runtime generated
+- [x] All analysis and codegen tests pass
+
+---
+
 ## Phase 8: Minor Gaps ✅
 
 **Status**: COMPLETED

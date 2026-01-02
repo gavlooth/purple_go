@@ -5,12 +5,10 @@ import (
 	"purple_go/pkg/ast"
 )
 
-// ParamOwnership extends OwnershipClass for function parameters
-// Note: Uses existing OwnershipClass from ownership.go
-// Additional ownership concepts for function summaries:
+// Additional ownership concepts for function summaries
+// Note: OwnerConsumed is now defined in ownership.go
 const (
-	OwnerConsumed OwnershipClass = iota + 100 // Callee takes ownership (freed by callee)
-	OwnerFresh                                // Newly allocated by callee
+	OwnerFresh OwnershipClass = iota + 100 // Newly allocated by callee
 )
 
 // ParamSummary describes how a function uses a parameter

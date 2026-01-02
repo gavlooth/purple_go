@@ -14,17 +14,22 @@ const (
 	OwnerTransferred                // Ownership transferred to callee/field
 	OwnerShared                     // Shared ownership - use reference counting
 	OwnerWeak                       // Weak reference - do not count
+	OwnerConsumed                   // Consumed by callee - callee takes ownership
 )
 
 // OwnershipInfo holds ownership information for a variable
 type OwnershipInfo struct {
 	VarName         string
 	Class           OwnershipClass
-	DefinedAt       int            // Program point where defined
-	TransferredAt   int            // Program point where ownership transferred (-1 if not)
-	TransferredTo   string         // Name of variable/field that received ownership
-	SourceField     string         // If this came from a field access
-	SourceFieldWeak bool           // True if source field is weak
+	DefinedAt       int    // Program point where defined
+	TransferredAt   int    // Program point where ownership transferred (-1 if not)
+	TransferredTo   string // Name of variable/field that received ownership
+	ConsumedAt      int    // Program point where consumed by callee (-1 if not)
+	ConsumedBy      string // Function that consumed the value
+	SourceField     string // If this came from a field access
+	SourceFieldWeak bool   // True if source field is weak
+	IsPure          bool   // True if used only in pure context (can skip RC)
+	UseCount        int    // Number of times this variable is used
 }
 
 // OwnershipContext holds ownership analysis state
@@ -84,6 +89,7 @@ func (ctx *OwnershipContext) DefineOwned(name string) {
 		Class:         OwnerLocal,
 		DefinedAt:     ctx.nextPoint(),
 		TransferredAt: -1,
+		ConsumedAt:    -1,
 	}
 }
 
@@ -94,6 +100,19 @@ func (ctx *OwnershipContext) DefineBorrowed(name string) {
 		Class:         OwnerBorrowed,
 		DefinedAt:     ctx.nextPoint(),
 		TransferredAt: -1,
+		ConsumedAt:    -1,
+	}
+}
+
+// DefineConsumed defines a variable that will be consumed (ownership taken by callee)
+func (ctx *OwnershipContext) DefineConsumed(name string, consumer string) {
+	ctx.Owners[name] = &OwnershipInfo{
+		VarName:       name,
+		Class:         OwnerLocal, // Starts owned, will be consumed
+		DefinedAt:     ctx.nextPoint(),
+		TransferredAt: -1,
+		ConsumedAt:    -1,
+		ConsumedBy:    consumer, // Will be consumed by this function
 	}
 }
 
@@ -114,6 +133,7 @@ func (ctx *OwnershipContext) DefineFromFieldAccess(name, typeName, fieldName str
 		Class:           class,
 		DefinedAt:       ctx.nextPoint(),
 		TransferredAt:   -1,
+		ConsumedAt:      -1,
 		SourceField:     fieldName,
 		SourceFieldWeak: isWeak,
 	}
@@ -151,6 +171,11 @@ func (ctx *OwnershipContext) ShouldFree(name string) bool {
 		return false
 	}
 
+	// Consumed values are freed by callee
+	if info.ConsumedAt >= 0 {
+		return false
+	}
+
 	switch info.Class {
 	case OwnerLocal:
 		return true // Locally owned, not transferred
@@ -160,6 +185,160 @@ func (ctx *OwnershipContext) ShouldFree(name string) bool {
 		return false // Not our responsibility
 	default:
 		return false
+	}
+}
+
+// ConsumeOwnership marks a variable as consumed by a callee
+// The callee takes ownership - caller should not inc_ref or dec_ref
+func (ctx *OwnershipContext) ConsumeOwnership(name, consumer string) {
+	if info := ctx.Owners[name]; info != nil {
+		if info.Class == OwnerLocal || info.Class == OwnerShared {
+			info.ConsumedAt = ctx.nextPoint()
+			info.ConsumedBy = consumer
+		}
+	}
+}
+
+// IsConsumed returns true if the variable was consumed by a callee
+func (ctx *OwnershipContext) IsConsumed(name string) bool {
+	if info := ctx.Owners[name]; info != nil {
+		return info.ConsumedAt >= 0
+	}
+	return false
+}
+
+// GetConsumer returns the function that consumed the variable
+func (ctx *OwnershipContext) GetConsumer(name string) string {
+	if info := ctx.Owners[name]; info != nil {
+		return info.ConsumedBy
+	}
+	return ""
+}
+
+// NeedsIncRef returns true if the variable needs inc_ref before passing to callee
+// Lobster-style: borrowed and consumed params skip inc_ref
+func (ctx *OwnershipContext) NeedsIncRef(name string, paramOwnership OwnershipClass) bool {
+	// Borrowed params: callee just reads, no RC needed
+	if paramOwnership == OwnerBorrowed {
+		return false
+	}
+	// Consumed params: ownership transfers, no inc_ref needed
+	if paramOwnership == OwnerConsumed {
+		return false
+	}
+	// Pure context: skip RC
+	if info := ctx.Owners[name]; info != nil && info.IsPure {
+		return false
+	}
+	// Shared params: need inc_ref so callee can keep reference
+	return paramOwnership == OwnerShared
+}
+
+// NeedsDecRef returns true if the variable needs dec_ref at scope exit
+// Lobster-style: consumed and transferred skip dec_ref
+func (ctx *OwnershipContext) NeedsDecRef(name string) bool {
+	info := ctx.Owners[name]
+	if info == nil {
+		return false
+	}
+
+	// Already consumed - callee will free
+	if info.ConsumedAt >= 0 {
+		return false
+	}
+
+	// Pure context - skip RC
+	if info.IsPure {
+		return false
+	}
+
+	switch info.Class {
+	case OwnerLocal:
+		return true
+	case OwnerShared:
+		return true
+	case OwnerBorrowed, OwnerTransferred, OwnerWeak:
+		return false
+	default:
+		return false
+	}
+}
+
+// MarkAsPure marks a variable as used in pure context (skip RC)
+func (ctx *OwnershipContext) MarkAsPure(name string) {
+	if info := ctx.Owners[name]; info != nil {
+		info.IsPure = true
+	}
+}
+
+// IncrementUseCount increments the use count for a variable
+func (ctx *OwnershipContext) IncrementUseCount(name string) {
+	if info := ctx.Owners[name]; info != nil {
+		info.UseCount++
+	}
+}
+
+// GetUseCount returns the use count for a variable
+func (ctx *OwnershipContext) GetUseCount(name string) int {
+	if info := ctx.Owners[name]; info != nil {
+		return info.UseCount
+	}
+	return 0
+}
+
+// IsSingleUse returns true if the variable is used exactly once
+// Single-use values can skip RC (Lobster-style linear ownership)
+func (ctx *OwnershipContext) IsSingleUse(name string) bool {
+	if info := ctx.Owners[name]; info != nil {
+		return info.UseCount == 1
+	}
+	return false
+}
+
+// OwnershipMode represents Lobster-style ownership modes for codegen
+type OwnershipMode int
+
+const (
+	ModeOwned    OwnershipMode = iota // Caller owns, must free
+	ModeBorrowed                      // Temporary access, no RC
+	ModeConsumed                      // Ownership transfers to callee
+)
+
+// GetOwnershipMode returns the effective Lobster-style ownership mode
+func (ctx *OwnershipContext) GetOwnershipMode(name string) OwnershipMode {
+	info := ctx.Owners[name]
+	if info == nil {
+		return ModeOwned // Default to owned (safe)
+	}
+
+	// Already consumed
+	if info.ConsumedAt >= 0 {
+		return ModeConsumed
+	}
+
+	switch info.Class {
+	case OwnerBorrowed:
+		return ModeBorrowed
+	case OwnerTransferred:
+		return ModeConsumed
+	case OwnerWeak:
+		return ModeBorrowed // Weak is similar to borrowed for RC purposes
+	default:
+		return ModeOwned
+	}
+}
+
+// OwnershipModeString returns string representation of ownership mode
+func OwnershipModeString(m OwnershipMode) string {
+	switch m {
+	case ModeOwned:
+		return "owned"
+	case ModeBorrowed:
+		return "borrowed"
+	case ModeConsumed:
+		return "consumed"
+	default:
+		return "unknown"
 	}
 }
 
@@ -366,6 +545,8 @@ func OwnershipClassString(c OwnershipClass) string {
 		return "shared"
 	case OwnerWeak:
 		return "weak"
+	case OwnerConsumed:
+		return "consumed"
 	default:
 		return "unknown"
 	}

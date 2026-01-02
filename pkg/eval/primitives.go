@@ -1002,6 +1002,33 @@ func PrimIsProcess(args, menv *ast.Value) *ast.Value {
 	return ast.Nil
 }
 
+// PrimIsThread implements thread? primitive
+func PrimIsThread(args, menv *ast.Value) *ast.Value {
+	a := getOneArg(args)
+	if a != nil && ast.IsThread(a) {
+		return SymT
+	}
+	return ast.Nil
+}
+
+// PrimIsAtom implements atom? primitive
+func PrimIsAtom(args, menv *ast.Value) *ast.Value {
+	a := getOneArg(args)
+	if a != nil && ast.IsAtom(a) {
+		return SymT
+	}
+	return ast.Nil
+}
+
+// PrimIsGreenChan implements green-chan? primitive
+func PrimIsGreenChan(args, menv *ast.Value) *ast.Value {
+	a := getOneArg(args)
+	if a != nil && ast.IsGreenChan(a) {
+		return SymT
+	}
+	return ast.Nil
+}
+
 // PrimProcessState implements process-state primitive
 func PrimProcessState(args, menv *ast.Value) *ast.Value {
 	a := getOneArg(args)
@@ -1251,6 +1278,10 @@ func DefaultEnv() *ast.Value {
 	env = EnvExtend(env, ast.NewSym("process?"), ast.NewPrim(PrimIsProcess))
 	env = EnvExtend(env, ast.NewSym("process-state"), ast.NewPrim(PrimProcessState))
 	env = EnvExtend(env, ast.NewSym("process-result"), ast.NewPrim(PrimProcessResult))
+	// Thread/Atom/GreenChan predicates
+	env = EnvExtend(env, ast.NewSym("thread?"), ast.NewPrim(PrimIsThread))
+	env = EnvExtend(env, ast.NewSym("atom?"), ast.NewPrim(PrimIsAtom))
+	env = EnvExtend(env, ast.NewSym("green-chan?"), ast.NewPrim(PrimIsGreenChan))
 	// Introspection operations
 	env = EnvExtend(env, ast.NewSym("ctr-tag"), ast.NewPrim(PrimCtrTag))
 	env = EnvExtend(env, ast.NewSym("ctr-arg"), ast.NewPrim(PrimCtrArg))

@@ -17,6 +17,38 @@ The goal is to emit **ANSI C99 + POSIX** code:
 - **POSIX pthreads** for thread synchronization (`pthread_mutex_t`, `pthread_rwlock_t`)
 - Compile with: `gcc -std=c99 -pthread` or `clang -std=c99 -pthread`
 
+### CRITICAL: Go is NOT Involved in Runtime/Interpretation
+
+**Go is ONLY used for the compiler toolchain** (parsing, analysis, code generation).
+Go must NEVER be involved in:
+- Program execution/interpretation
+- Runtime operations
+- JIT execution paths
+- Any hot code paths
+
+```
+WRONG: Generated code calls back into Go functions
+WRONG: Interpreter in Go evaluates user code at runtime
+WRONG: JIT that requires Go runtime for execution
+RIGHT: Go compiler emits standalone C code → gcc/clang → native binary
+RIGHT: JIT emits C → compiles → caches native code (no Go in hot path)
+RIGHT: Runtime is pure C with no Go dependencies
+```
+
+### JIT + Runtime Cache Strategy
+
+To avoid Go in hot paths:
+1. **AOT Compilation**: Compile Purple → C → native binary (preferred)
+2. **JIT with C Cache**: Emit C code → compile once → cache `.so`/`.dylib` → dlopen
+3. **Bytecode + C VM**: Compile to bytecode → interpret in C VM (no Go)
+
+The Go-based `eval` is for:
+- Development/testing only
+- REPL convenience during development
+- NOT for production execution
+
+Production execution paths must be **pure C** with zero Go involvement.
+
 You can use other algorithms along ASAP as long as they don't do "stop the world". So mark/sweep and traditional garbage collection is out of the question
 as well as "cyclic collection" algorithms that stop the world (either all or most of them are)
 ```
@@ -43,6 +75,15 @@ RIGHT: Compiler injects free_obj(x) at compile time based on static analysis
 4. **Capture Tracking** (compile-time)
    - Identifies variables captured by lambdas/closures
    - These variables must NOT be freed in parent scope
+
+5. **Automatic Back-Edge Detection** (compile-time) - CORE ASAP
+   - Compiler analyzes type graph to detect potential cycles
+   - Back-edge fields auto-detected via heuristics (`parent`, `prev`, `back`, etc.)
+   - DFS cycle detection as fallback
+   - Detected back-edges become weak references (no RC, no ownership)
+   - **No user annotation required** - fully automatic
+   - User CAN override with `:weak` annotation but it's optional
+   - This is CORE ASAP because it's automatic with zero language restrictions
 
 ### What Scanners Are For
 

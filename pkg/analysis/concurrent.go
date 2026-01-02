@@ -678,6 +678,241 @@ static void spawn_goroutine(Obj* closure, Obj** captured, int count) {
 `
 }
 
+// GenerateAtomRuntime generates Clojure-style atom operations
+func (g *ConcurrencyCodeGenerator) GenerateAtomRuntime() string {
+	return `/* === Atom (Atomic Reference) Operations === */
+
+typedef struct Atom Atom;
+struct Atom {
+    Obj* value;
+    pthread_mutex_t lock;
+};
+
+/* Create an atom */
+static Obj* make_atom(Obj* initial) {
+    Atom* a = malloc(sizeof(Atom));
+    if (!a) return NULL;
+
+    a->value = initial;
+    if (initial) inc_ref(initial);
+    pthread_mutex_init(&a->lock, NULL);
+
+    Obj* obj = malloc(sizeof(Obj));
+    if (!obj) {
+        if (initial) dec_ref(initial);
+        free(a);
+        return NULL;
+    }
+    obj->mark = 1;
+    obj->scc_id = -1;
+    obj->is_pair = 0;
+    obj->scan_tag = 0;
+    obj->tag = TAG_ATOM;
+    obj->gen_obj = NULL;
+    obj->ptr = a;
+
+    return obj;
+}
+
+static Atom* atom_payload(Obj* atom_obj) {
+    if (!atom_obj || atom_obj->tag != TAG_ATOM) return NULL;
+    return (Atom*)atom_obj->ptr;
+}
+
+/* Dereference atom (read current value) */
+static Obj* atom_deref(Obj* atom_obj) {
+    Atom* a = atom_payload(atom_obj);
+    if (!a) return NULL;
+
+    pthread_mutex_lock(&a->lock);
+    Obj* val = a->value;
+    if (val) inc_ref(val);
+    pthread_mutex_unlock(&a->lock);
+
+    return val;
+}
+
+/* Reset atom to new value */
+static Obj* atom_reset(Obj* atom_obj, Obj* new_val) {
+    Atom* a = atom_payload(atom_obj);
+    if (!a) return NULL;
+
+    pthread_mutex_lock(&a->lock);
+    Obj* old = a->value;
+    a->value = new_val;
+    if (new_val) inc_ref(new_val);
+    if (old) dec_ref(old);
+    pthread_mutex_unlock(&a->lock);
+
+    if (new_val) inc_ref(new_val);
+    return new_val;
+}
+
+/* Swap atom value using function */
+static Obj* atom_swap(Obj* atom_obj, Obj* fn) {
+    Atom* a = atom_payload(atom_obj);
+    if (!a || !fn) return NULL;
+
+    pthread_mutex_lock(&a->lock);
+    Obj* old = a->value;
+
+    /* Call function with current value */
+    Obj* args[1] = { old };
+    Obj* new_val = call_closure(fn, args, 1);
+
+    a->value = new_val;
+    if (old) dec_ref(old);
+
+    pthread_mutex_unlock(&a->lock);
+
+    if (new_val) inc_ref(new_val);
+    return new_val;
+}
+
+/* Compare-and-set */
+static Obj* atom_cas(Obj* atom_obj, Obj* expected, Obj* new_val) {
+    Atom* a = atom_payload(atom_obj);
+    if (!a) return mk_int(0);
+
+    pthread_mutex_lock(&a->lock);
+    bool success = (a->value == expected);
+    if (success) {
+        Obj* old = a->value;
+        a->value = new_val;
+        if (new_val) inc_ref(new_val);
+        if (old) dec_ref(old);
+    }
+    pthread_mutex_unlock(&a->lock);
+
+    return mk_int(success ? 1 : 0);
+}
+
+/* Free atom */
+static void free_atom_obj(Obj* atom_obj) {
+    Atom* a = atom_payload(atom_obj);
+    if (!a) return;
+
+    if (a->value) dec_ref(a->value);
+    pthread_mutex_destroy(&a->lock);
+    free(a);
+    if (atom_obj) atom_obj->ptr = NULL;
+}
+`
+}
+
+// GenerateThreadRuntime generates thread spawning with join support
+func (g *ConcurrencyCodeGenerator) GenerateThreadRuntime() string {
+	return `/* === Thread Operations (with join support) === */
+
+typedef struct ThreadHandle ThreadHandle;
+struct ThreadHandle {
+    pthread_t thread;
+    Obj* result;
+    bool done;
+    pthread_mutex_t lock;
+    pthread_cond_t cond;
+};
+
+typedef struct ThreadArg ThreadArg;
+struct ThreadArg {
+    Obj* closure;
+    ThreadHandle* handle;
+};
+
+/* Thread entry point */
+static void* thread_entry(void* arg) {
+    ThreadArg* ta = (ThreadArg*)arg;
+
+    /* Call the closure */
+    Obj* result = NULL;
+    if (ta->closure) {
+        result = call_closure(ta->closure, NULL, 0);
+        dec_ref(ta->closure);
+    }
+
+    /* Store result and signal completion */
+    pthread_mutex_lock(&ta->handle->lock);
+    ta->handle->result = result;
+    ta->handle->done = true;
+    pthread_cond_signal(&ta->handle->cond);
+    pthread_mutex_unlock(&ta->handle->lock);
+
+    free(ta);
+    return NULL;
+}
+
+/* Spawn a thread (returns handle for joining) */
+static Obj* spawn_thread(Obj* closure) {
+    ThreadHandle* h = malloc(sizeof(ThreadHandle));
+    if (!h) return NULL;
+
+    h->result = NULL;
+    h->done = false;
+    pthread_mutex_init(&h->lock, NULL);
+    pthread_cond_init(&h->cond, NULL);
+
+    ThreadArg* arg = malloc(sizeof(ThreadArg));
+    if (!arg) {
+        free(h);
+        return NULL;
+    }
+
+    arg->closure = closure;
+    if (closure) inc_ref(closure);
+    arg->handle = h;
+
+    pthread_create(&h->thread, NULL, thread_entry, arg);
+
+    /* Wrap handle in Obj */
+    Obj* obj = malloc(sizeof(Obj));
+    if (!obj) return NULL;
+    obj->mark = 1;
+    obj->scc_id = -1;
+    obj->is_pair = 0;
+    obj->scan_tag = 0;
+    obj->tag = TAG_THREAD;
+    obj->gen_obj = NULL;
+    obj->ptr = h;
+
+    return obj;
+}
+
+static ThreadHandle* thread_payload(Obj* thread_obj) {
+    if (!thread_obj || thread_obj->tag != TAG_THREAD) return NULL;
+    return (ThreadHandle*)thread_obj->ptr;
+}
+
+/* Join thread and get result */
+static Obj* thread_join(Obj* thread_obj) {
+    ThreadHandle* h = thread_payload(thread_obj);
+    if (!h) return NULL;
+
+    pthread_mutex_lock(&h->lock);
+    while (!h->done) {
+        pthread_cond_wait(&h->cond, &h->lock);
+    }
+    Obj* result = h->result;
+    if (result) inc_ref(result);
+    pthread_mutex_unlock(&h->lock);
+
+    return result;
+}
+
+/* Free thread handle */
+static void free_thread_obj(Obj* thread_obj) {
+    ThreadHandle* h = thread_payload(thread_obj);
+    if (!h) return;
+
+    pthread_join(h->thread, NULL);
+    if (h->result) dec_ref(h->result);
+    pthread_mutex_destroy(&h->lock);
+    pthread_cond_destroy(&h->cond);
+    free(h);
+    if (thread_obj) thread_obj->ptr = NULL;
+}
+`
+}
+
 // GenerateConcurrencyRuntime generates all concurrency runtime code
 func (g *ConcurrencyCodeGenerator) GenerateConcurrencyRuntime() string {
 	return `/* ========== Concurrency Runtime ========== */
@@ -686,5 +921,5 @@ func (g *ConcurrencyCodeGenerator) GenerateConcurrencyRuntime() string {
 #include <pthread.h>
 #include <stdbool.h>
 
-` + g.GenerateAtomicRC() + "\n" + g.GenerateChannelRuntime() + "\n" + g.GenerateGoroutineRuntime()
+` + g.GenerateAtomicRC() + "\n" + g.GenerateChannelRuntime() + "\n" + g.GenerateGoroutineRuntime() + "\n" + g.GenerateAtomRuntime() + "\n" + g.GenerateThreadRuntime()
 }

@@ -328,7 +328,7 @@ func exprToC(expr *ast.Value) string {
 		return expr.Str
 	}
 	if ast.IsInt(expr) {
-		return fmt.Sprintf("mk_int(%d)", expr.Int)
+		return fmt.Sprintf("mk_int_unboxed(%d)", expr.Int)
 	}
 	return "NULL"
 }

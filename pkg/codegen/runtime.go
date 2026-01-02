@@ -8,29 +8,122 @@ import (
 	"purple_go/pkg/analysis"
 )
 
+// RuntimeConfig specifies what runtime features to emit based on analysis results.
+// The compiler auto-decides - no user flags needed.
+type RuntimeConfig struct {
+	// Core (always true)
+	EmitCore bool // Obj struct, tagged pointers, constructors, free_obj/free_tree
+
+	// Analysis-driven features
+	EmitClosures    bool // Lambdas/closures present
+	EmitBorrowRef   bool // Closures capture variables (UAF safety)
+	EmitPool        bool // Non-escaping temporaries detected
+	EmitNaNBox      bool // Float operations present
+	EmitPerceus     bool // Reuse opportunities found
+	EmitSCC         bool // Frozen cycles detected
+	EmitSymmetric   bool // Mutable cycles detected
+	EmitConcurrency bool // go/chan primitives used
+	EmitDPS         bool // DPS-eligible functions found
+	EmitArena       bool // Arena-suitable patterns found
+	EmitRegions     bool // Region-based safety needed
+	EmitConstraints bool // Debug constraint refs (usually false)
+	EmitDeferred    bool // Deferred RC needed (rare)
+}
+
+// NewRuntimeConfigFromAnalysis creates a RuntimeConfig based on analysis results.
+// This is where the compiler auto-decides what runtime features to emit.
+func NewRuntimeConfigFromAnalysis(
+	hasClosures bool,
+	hasCapturedVars bool,
+	hasNonEscapingTemps bool,
+	hasFloats bool,
+	hasReuseOpportunities bool,
+	hasCycles bool,
+	hasFrozenCycles bool,
+	hasConcurrency bool,
+	hasDPSEligible bool,
+) *RuntimeConfig {
+	return &RuntimeConfig{
+		EmitCore:        true, // Always
+		EmitClosures:    hasClosures,
+		EmitBorrowRef:   hasCapturedVars,
+		EmitPool:        hasNonEscapingTemps,
+		EmitNaNBox:      hasFloats,
+		EmitPerceus:     hasReuseOpportunities,
+		EmitSCC:         hasFrozenCycles,
+		EmitSymmetric:   hasCycles && !hasFrozenCycles,
+		EmitConcurrency: hasConcurrency,
+		EmitDPS:         hasDPSEligible,
+		EmitArena:       false, // Opt-in only
+		EmitRegions:     false, // Superseded by BorrowRef
+		EmitConstraints: false, // Debug only
+		EmitDeferred:    false, // Contradicts ASAP
+	}
+}
+
+// DefaultRuntimeConfig returns config with all features enabled (for compatibility)
+func DefaultRuntimeConfig() *RuntimeConfig {
+	return &RuntimeConfig{
+		EmitCore:        true,
+		EmitClosures:    true,
+		EmitBorrowRef:   true,
+		EmitPool:        true,
+		EmitNaNBox:      true,
+		EmitPerceus:     true,
+		EmitSCC:         true,
+		EmitSymmetric:   true,
+		EmitConcurrency: true,
+		EmitDPS:         true,
+		EmitArena:       true,
+		EmitRegions:     true,
+		EmitConstraints: true,
+		EmitDeferred:    true,
+	}
+}
+
 // RuntimeGenerator generates the C99 runtime code
 type RuntimeGenerator struct {
 	w        io.Writer
 	registry *TypeRegistry
+	config   *RuntimeConfig
 }
 
-// NewRuntimeGenerator creates a new runtime generator
+// NewRuntimeGenerator creates a new runtime generator with default config (all features)
 func NewRuntimeGenerator(w io.Writer, registry *TypeRegistry) *RuntimeGenerator {
-	return &RuntimeGenerator{w: w, registry: registry}
+	return &RuntimeGenerator{w: w, registry: registry, config: DefaultRuntimeConfig()}
+}
+
+// NewRuntimeGeneratorWithConfig creates a runtime generator with specific config
+func NewRuntimeGeneratorWithConfig(w io.Writer, registry *TypeRegistry, config *RuntimeConfig) *RuntimeGenerator {
+	return &RuntimeGenerator{w: w, registry: registry, config: config}
 }
 
 func (g *RuntimeGenerator) emit(format string, args ...interface{}) {
-	fmt.Fprintf(g.w, format, args...)
+	if len(args) == 0 {
+		io.WriteString(g.w, format)
+	} else {
+		fmt.Fprintf(g.w, format, args...)
+	}
+}
+
+// emitRaw writes raw C code without any format interpretation
+// Use this for C code containing % (modulo, printf formats, etc.)
+func (g *RuntimeGenerator) emitRaw(s string) {
+	io.WriteString(g.w, s)
 }
 
 // GenerateHeader generates the main runtime header
 func (g *RuntimeGenerator) GenerateHeader() {
     g.emit(`/* Purple + ASAP C Compiler Output */
-/* Primary Strategy: ASAP + ISMM 2024 (Deeply Immutable Cycles) */
+/* Primary Strategy: ASAP (compile-time free insertion) */
 /* Generated ANSI C99 + POSIX Code */
+/* Go is NOT involved in runtime - pure C execution */
 
 /* Enable POSIX.1-2001 for pthread_rwlock_t and related functions */
 #define _POSIX_C_SOURCE 200112L
+
+/* Runtime features auto-selected by compiler based on program analysis */
+/* No user flags needed - compiler emits only what's required */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -43,11 +136,11 @@ func (g *RuntimeGenerator) GenerateHeader() {
 /* Forward declarations */
 typedef struct Obj Obj;
 typedef struct GenObj GenObj;
-typedef struct GenRef GenRef;
+typedef struct BorrowRef BorrowRef;
 typedef struct Closure Closure;
 void invalidate_weak_refs_for(void* target);
-static GenRef* genref_from_obj(Obj* obj, const char* source_desc);
-static void genref_invalidate_obj(Obj* obj);
+static BorrowRef* borrow_create(Obj* obj, const char* source_desc);
+static void borrow_invalidate_obj(Obj* obj);
 static Obj* call_closure(Obj* clos, Obj** args, int arg_count);
 static void closure_release(Closure* c);
 static void release_user_obj(Obj* x);
@@ -82,6 +175,34 @@ static Obj* prim_sym(Obj* x);
 static Obj* obj_car(Obj* p);
 static Obj* obj_cdr(Obj* p);
 
+/* I/O primitive forward declarations */
+static Obj* prim_display(Obj* x);
+static Obj* prim_print(Obj* x);
+static Obj* prim_newline(void);
+
+/* List operation forward declarations */
+static Obj* list_append(Obj* a, Obj* b);
+static Obj* list_filter(Obj* fn, Obj* xs);
+static Obj* list_reverse(Obj* xs);
+
+/* Type introspection forward declarations */
+static Obj* ctr_tag(Obj* x);
+static Obj* ctr_arg(Obj* x, Obj* idx);
+
+/* Character primitive forward declarations */
+static Obj* char_to_int(Obj* c);
+static Obj* int_to_char(Obj* n);
+
+/* Float primitive forward declarations */
+static Obj* int_to_float(Obj* n);
+static Obj* float_to_int(Obj* f);
+static Obj* prim_floor(Obj* f);
+static Obj* prim_ceil(Obj* f);
+
+/* Higher-order function forward declarations */
+static Obj* prim_apply(Obj* fn, Obj* args);
+static Obj* prim_compose(Obj* f, Obj* g);
+
 /* Core tags for runtime values */
 typedef enum {
     TAG_INT = 1,
@@ -92,10 +213,78 @@ typedef enum {
     TAG_BOX,
     TAG_CLOSURE,
     TAG_CHANNEL,
-    TAG_ERROR
+    TAG_ERROR,
+    TAG_ATOM,
+    TAG_THREAD
 } ObjTag;
 
 #define TAG_USER_BASE 1000
+
+/* ========== Tagged Pointers (Multi-Type Immediates) ========== */
+/*
+ * 3-bit tag scheme for immediate values (no heap allocation):
+ *
+ * Low 3 bits | Type        | Payload
+ * -----------|-------------|------------------
+ *    000     | Heap ptr    | 64-bit pointer (aligned)
+ *    001     | Integer     | 61-bit signed int
+ *    010     | Character   | 21-bit Unicode codepoint
+ *    011     | Boolean     | 1-bit (0=false, 1=true)
+ */
+#define IMM_TAG_MASK     0x7ULL
+#define IMM_TAG_PTR      0x0ULL   /* Heap pointer (must be 8-byte aligned) */
+#define IMM_TAG_INT      0x1ULL   /* Immediate integer */
+#define IMM_TAG_CHAR     0x2ULL   /* Immediate character */
+#define IMM_TAG_BOOL     0x3ULL   /* Immediate boolean */
+
+/* Extract tag from value */
+#define GET_IMM_TAG(p)   (((uintptr_t)(p)) & IMM_TAG_MASK)
+
+/* Check immediate types */
+#define IS_IMMEDIATE(p)      (GET_IMM_TAG(p) != IMM_TAG_PTR)
+#define IS_IMMEDIATE_INT(p)  (GET_IMM_TAG(p) == IMM_TAG_INT)
+#define IS_IMMEDIATE_CHAR(p) (GET_IMM_TAG(p) == IMM_TAG_CHAR)
+#define IS_IMMEDIATE_BOOL(p) (GET_IMM_TAG(p) == IMM_TAG_BOOL)
+#define IS_BOXED(p)          (GET_IMM_TAG(p) == IMM_TAG_PTR && (p) != NULL)
+
+/* Immediate Integers */
+#define MAKE_INT_IMM(n)      ((Obj*)(((uintptr_t)(n) << 3) | IMM_TAG_INT))
+#define INT_IMM_VALUE(p)     ((long)((intptr_t)(p) >> 3))
+
+/* Backward compatibility */
+#define MAKE_IMMEDIATE(n)    MAKE_INT_IMM(n)
+#define IMMEDIATE_VALUE(p)   INT_IMM_VALUE(p)
+
+/* Immediate Booleans */
+#define PURPLE_FALSE         ((Obj*)(((uintptr_t)0 << 3) | IMM_TAG_BOOL))
+#define PURPLE_TRUE          ((Obj*)(((uintptr_t)1 << 3) | IMM_TAG_BOOL))
+
+#define IS_FALSE(p)          ((p) == PURPLE_FALSE || (p) == NULL)
+#define IS_TRUE(p)           ((p) == PURPLE_TRUE)
+
+/* Immediate Characters */
+#define MAKE_CHAR_IMM(c)     ((Obj*)(((uintptr_t)(c) << 3) | IMM_TAG_CHAR))
+#define CHAR_IMM_VALUE(p)    ((long)(((uintptr_t)(p)) >> 3))
+
+/* Unboxed constructors */
+static inline Obj* mk_int_unboxed(long i) { return MAKE_INT_IMM(i); }
+static inline Obj* mk_char_unboxed(long c) { return MAKE_CHAR_IMM(c); }
+static inline Obj* mk_bool(int b) { return b ? PURPLE_TRUE : PURPLE_FALSE; }
+
+/* IPGE: In-Place Generational Evolution */
+#define IPGE_MULTIPLIER  0x5851f42D4C957F2DULL
+#define IPGE_INCREMENT   0x1442695040888963ULL
+
+static inline uint64_t ipge_evolve(uint64_t gen) {
+    return (gen * IPGE_MULTIPLIER) + IPGE_INCREMENT;
+}
+
+static uint64_t _ipge_seed = 0x123456789ABCDEF0ULL;
+
+static inline uint64_t _next_generation(void) {
+    _ipge_seed = ipge_evolve(_ipge_seed);
+    return _ipge_seed;
+}
 `)
 
 	if g.registry != nil {
@@ -108,12 +297,13 @@ typedef enum {
 	g.emit(`
 /* Core object type */
 typedef struct Obj {
-    int mark;           /* Reference count or mark bit */
-    int scc_id;         /* SCC identifier (-1 if not in SCC) */
-    int is_pair;        /* 1 if pair, 0 if not */
-    unsigned int scan_tag;  /* Scanner mark (separate from RC) */
-    int tag;            /* ObjTag */
-    GenObj* gen_obj;    /* Optional generational header (lazy) */
+    uint64_t generation;    /* IPGE generation ID for memory safety */
+    int mark;               /* Reference count or mark bit */
+    int tag;                /* ObjTag */
+    int is_pair;            /* 1 if pair, 0 if not */
+    int scc_id;             /* SCC identifier (-1 if not in SCC) */
+    unsigned int scan_tag : 31;  /* Scanner mark (separate from RC) */
+    unsigned int tethered : 1;   /* Scope tethering bit (Vale-style) */
     union {
         long i;
         double f;
@@ -121,6 +311,114 @@ typedef struct Obj {
         void* ptr;
     };
 } Obj;
+/* Size: 40 bytes */
+
+/* ========== Scope Tethering (Vale-style) ========== */
+/*
+ * When borrowing a reference in a scope, mark it "tethered".
+ * While tethered, skip generation checks - the object is guaranteed
+ * to stay alive for the duration of the scope.
+ */
+
+/* Tether an object (on borrow) */
+static inline void tether_obj(Obj* obj) {
+    if (obj && !IS_IMMEDIATE(obj)) {
+        obj->tethered = 1;
+    }
+}
+
+/* Untether an object (on scope exit) */
+static inline void untether_obj(Obj* obj) {
+    if (obj && !IS_IMMEDIATE(obj)) {
+        obj->tethered = 0;
+    }
+}
+
+/* Check if object is tethered */
+static inline int is_tethered(Obj* obj) {
+    if (!obj || IS_IMMEDIATE(obj)) return 0;
+    return obj->tethered;
+}
+
+/* Fast deref with tether check - skips gen validation if tethered */
+static inline Obj* tethered_deref(Obj* obj, uint64_t expected_gen) {
+    if (!obj) return NULL;
+    if (IS_IMMEDIATE(obj)) return obj;
+    if (obj->tethered) return obj;  /* Fast path: skip gen check */
+    return (obj->generation == expected_gen) ? obj : NULL;
+}
+
+/* Tethered borrowed reference - combines ptr + expected gen */
+typedef struct TetheredRef {
+    Obj* ptr;
+    uint64_t gen;
+} TetheredRef;
+
+/* Create tethered reference (tethers the object) */
+static inline TetheredRef tether_borrow(Obj* obj) {
+    TetheredRef ref = { obj, 0 };
+    if (obj && !IS_IMMEDIATE(obj)) {
+        ref.gen = obj->generation;
+        obj->tethered = 1;
+    }
+    return ref;
+}
+
+/* Release tethered reference (untethers the object) */
+static inline void tether_release(TetheredRef ref) {
+    if (ref.ptr && !IS_IMMEDIATE(ref.ptr)) {
+        ref.ptr->tethered = 0;
+    }
+}
+
+/* Deref tethered reference - always succeeds while tethered */
+static inline Obj* tether_deref(TetheredRef ref) {
+    return ref.ptr;  /* No check needed - tethered */
+}
+
+/* Safe integer extraction - works for all immediate types */
+static inline long obj_to_int(Obj* p) {
+    if (IS_IMMEDIATE_INT(p)) return INT_IMM_VALUE(p);
+    if (IS_IMMEDIATE_BOOL(p)) return p == PURPLE_TRUE ? 1 : 0;
+    if (IS_IMMEDIATE_CHAR(p)) return CHAR_IMM_VALUE(p);
+    return p ? p->i : 0;
+}
+
+/* Safe tag extraction - works for all immediate types */
+static inline int obj_tag(Obj* p) {
+    if (p == NULL) return 0;
+    if (IS_IMMEDIATE_INT(p)) return TAG_INT;
+    if (IS_IMMEDIATE_CHAR(p)) return TAG_CHAR;
+    if (IS_IMMEDIATE_BOOL(p)) return TAG_INT;  /* Booleans are int-like */
+    return p->tag;
+}
+
+/* Check if value is an integer (boxed or immediate) */
+static inline int is_int(Obj* p) {
+    if (IS_IMMEDIATE_INT(p) || IS_IMMEDIATE_BOOL(p)) return 1;
+    return p && p->tag == TAG_INT;
+}
+
+/* Check if value is a character (boxed or immediate) */
+static inline int is_char_val(Obj* p) {
+    if (IS_IMMEDIATE_CHAR(p)) return 1;
+    return p && p->tag == TAG_CHAR;
+}
+
+/* Boolean extraction */
+static inline int obj_to_bool(Obj* p) {
+    if (IS_IMMEDIATE_BOOL(p)) return p == PURPLE_TRUE;
+    if (IS_IMMEDIATE_INT(p)) return INT_IMM_VALUE(p) != 0;
+    if (p == NULL) return 0;
+    return 1;  /* Non-null boxed values are truthy */
+}
+
+/* Character extraction */
+static inline long obj_to_char(Obj* p) {
+    if (IS_IMMEDIATE_CHAR(p)) return CHAR_IMM_VALUE(p);
+    if (p && p->tag == TAG_CHAR) return p->i;
+    return 0;
+}
 
 /* Dynamic Free List */
 typedef struct FreeNode {
@@ -137,6 +435,7 @@ Obj STACK_POOL[STACK_POOL_SIZE];
 int STACK_PTR = 0;
 
 static int is_stack_obj(Obj* x) {
+    if (!x || IS_IMMEDIATE(x)) return 0;  /* Immediates aren't stack objects */
     uintptr_t px = (uintptr_t)x;
     uintptr_t start = (uintptr_t)&STACK_POOL[0];
     uintptr_t end = (uintptr_t)&STACK_POOL[STACK_POOL_SIZE];
@@ -144,7 +443,7 @@ static int is_stack_obj(Obj* x) {
 }
 
 static int is_nil(Obj* x) {
-    return x == NULL;
+    return x == NULL;  /* Immediates are never nil */
 }
 
 `)
@@ -156,12 +455,12 @@ func (g *RuntimeGenerator) GenerateConstructors() {
 Obj* mk_int(long i) {
     Obj* x = malloc(sizeof(Obj));
     if (!x) return NULL;
+    x->generation = _next_generation();
     x->mark = 1;
-    x->scc_id = -1;
-    x->is_pair = 0;
-    x->scan_tag = 0;
     x->tag = TAG_INT;
-    x->gen_obj = NULL;
+    x->is_pair = 0;
+    x->scc_id = -1;
+    x->scan_tag = 0;
     x->i = i;
     return x;
 }
@@ -169,30 +468,30 @@ Obj* mk_int(long i) {
 Obj* mk_float(double f) {
     Obj* x = malloc(sizeof(Obj));
     if (!x) return NULL;
+    x->generation = _next_generation();
     x->mark = 1;
-    x->scc_id = -1;
-    x->is_pair = 0;
-    x->scan_tag = 0;
     x->tag = TAG_FLOAT;
-    x->gen_obj = NULL;
+    x->is_pair = 0;
+    x->scc_id = -1;
+    x->scan_tag = 0;
     x->f = f;
     return x;
 }
 
 double get_float(Obj* x) {
-    if (!x) return 0.0;
+    if (!x || IS_IMMEDIATE(x)) return 0.0;
     return x->f;
 }
 
 Obj* mk_char(long c) {
     Obj* x = malloc(sizeof(Obj));
     if (!x) return NULL;
+    x->generation = _next_generation();
     x->mark = 1;
-    x->scc_id = -1;
-    x->is_pair = 0;
-    x->scan_tag = 0;
     x->tag = TAG_CHAR;
-    x->gen_obj = NULL;
+    x->is_pair = 0;
+    x->scc_id = -1;
+    x->scan_tag = 0;
     x->i = c;
     return x;
 }
@@ -200,12 +499,12 @@ Obj* mk_char(long c) {
 Obj* mk_pair(Obj* a, Obj* b) {
     Obj* x = malloc(sizeof(Obj));
     if (!x) return NULL;
+    x->generation = _next_generation();
     x->mark = 1;
-    x->scc_id = -1;
-    x->is_pair = 1;
-    x->scan_tag = 0;
     x->tag = TAG_PAIR;
-    x->gen_obj = NULL;
+    x->is_pair = 1;
+    x->scc_id = -1;
+    x->scan_tag = 0;
     /* Move semantics: ownership transfers to pair, no inc_ref needed */
     /* Caller must inc_ref before calling if they want to keep a reference */
     x->a = a;
@@ -216,12 +515,12 @@ Obj* mk_pair(Obj* a, Obj* b) {
 Obj* mk_sym(const char* s) {
     Obj* x = malloc(sizeof(Obj));
     if (!x) return NULL;
+    x->generation = _next_generation();
     x->mark = 1;
-    x->scc_id = -1;
-    x->is_pair = 0;
-    x->scan_tag = 0;
     x->tag = TAG_SYM;
-    x->gen_obj = NULL;
+    x->is_pair = 0;
+    x->scc_id = -1;
+    x->scan_tag = 0;
     if (s) {
         size_t len = strlen(s);
         char* copy = malloc(len + 1);
@@ -240,13 +539,13 @@ Obj* mk_sym(const char* s) {
 Obj* mk_box(Obj* v) {
     Obj* x = malloc(sizeof(Obj));
     if (!x) return NULL;
+    x->generation = _next_generation();
     x->mark = 1;
-    x->scc_id = -1;
-    x->is_pair = 0;
-    x->scan_tag = 0;
     x->tag = TAG_BOX;
-    x->gen_obj = NULL;
-    if (v) inc_ref(v);
+    x->is_pair = 0;
+    x->scc_id = -1;
+    x->scan_tag = 0;
+    if (v && !IS_IMMEDIATE(v)) inc_ref(v);
     x->ptr = v;
     return x;
 }
@@ -266,12 +565,12 @@ void box_set(Obj* b, Obj* v) {
 Obj* mk_error(const char* msg) {
     Obj* x = malloc(sizeof(Obj));
     if (!x) return NULL;
+    x->generation = _next_generation();
     x->mark = 1;
-    x->scc_id = -1;
-    x->is_pair = 0;
-    x->scan_tag = 0;
     x->tag = TAG_ERROR;
-    x->gen_obj = NULL;
+    x->is_pair = 0;
+    x->scc_id = -1;
+    x->scan_tag = 0;
     if (msg) {
         size_t len = strlen(msg);
         char* copy = malloc(len + 1);
@@ -290,12 +589,12 @@ Obj* mk_error(const char* msg) {
 Obj* mk_int_stack(long i) {
     if (STACK_PTR < STACK_POOL_SIZE) {
         Obj* x = &STACK_POOL[STACK_PTR++];
+        x->generation = _next_generation();
         x->mark = 0;
-        x->scc_id = -1;
-        x->is_pair = 0;
-        x->scan_tag = 0;
         x->tag = TAG_INT;
-        x->gen_obj = NULL;
+        x->is_pair = 0;
+        x->scc_id = -1;
+        x->scan_tag = 0;
         x->i = i;
         return x;
     }
@@ -339,7 +638,7 @@ static void release_children(Obj* x) {
 
 /* TREE: Direct free (ASAP) */
 void free_tree(Obj* x) {
-    if (!x) return;
+    if (!x || IS_IMMEDIATE(x)) return;  /* Immediates can't be freed */
     if (is_stack_obj(x)) return;
     switch (x->tag) {
     case TAG_PAIR:
@@ -362,27 +661,27 @@ void free_tree(Obj* x) {
         }
         break;
     }
-    genref_invalidate_obj(x);
+    x->generation = ipge_evolve(x->generation);  /* IPGE: invalidate refs */
     invalidate_weak_refs_for(x);
     free(x);
 }
 
 /* DAG: Reference counting */
 void dec_ref(Obj* x) {
-    if (!x) return;
+    if (!x || IS_IMMEDIATE(x)) return;  /* Immediates have no refcount */
     if (is_stack_obj(x)) return;
     if (x->mark < 0) return;
     x->mark--;
     if (x->mark <= 0) {
         release_children(x);
-        genref_invalidate_obj(x);
+        x->generation = ipge_evolve(x->generation);  /* IPGE: invalidate refs */
         invalidate_weak_refs_for(x);
         free(x);
     }
 }
 
 void inc_ref(Obj* x) {
-    if (!x) return;
+    if (!x || IS_IMMEDIATE(x)) return;  /* Immediates have no refcount */
     if (is_stack_obj(x)) return;
     if (x->mark < 0) { x->mark = 1; return; }
     x->mark++;
@@ -391,11 +690,11 @@ void inc_ref(Obj* x) {
 /* RC Optimization: Direct free for proven-unique references (Lobster-style) */
 /* When compile-time analysis proves a reference is the only one, skip RC check */
 void free_unique(Obj* x) {
-    if (!x) return;
+    if (!x || IS_IMMEDIATE(x)) return;  /* Immediates can't be freed */
     if (is_stack_obj(x)) return;
     /* Proven unique at compile time - no RC check needed */
     release_children(x);
-    genref_invalidate_obj(x);
+    x->generation = ipge_evolve(x->generation);  /* IPGE: invalidate refs */
     invalidate_weak_refs_for(x);
     free(x);
 }
@@ -406,14 +705,14 @@ void free_unique(Obj* x) {
 
 /* Free list operations */
 void free_obj(Obj* x) {
-    if (!x) return;
+    if (!x || IS_IMMEDIATE(x)) return;  /* Immediates can't be freed */
     if (is_stack_obj(x)) return;
     if (x->mark < 0) return;
     x->mark = -1;
+    x->generation = ipge_evolve(x->generation);  /* IPGE: invalidate refs early */
     FreeNode* n = malloc(sizeof(FreeNode));
     if (!n) {
         release_children(x);
-        genref_invalidate_obj(x);
         invalidate_weak_refs_for(x);
         free(x);
         return;
@@ -430,7 +729,7 @@ void flush_freelist(void) {
         FREE_HEAD = n->next;
         if (n->obj->mark < 0) {
             release_children(n->obj);
-            genref_invalidate_obj(n->obj);
+            /* IPGE: generation already evolved in free_obj */
             invalidate_weak_refs_for(n->obj);
             free(n->obj);
         }
@@ -449,55 +748,61 @@ void deferred_release(Obj* x) {
 
 // GenerateArithmetic generates arithmetic operations
 func (g *RuntimeGenerator) GenerateArithmetic() {
-	g.emit(`/* Arithmetic Operations */
+	g.emitRaw(`/* Arithmetic Operations */
 static double num_to_double(Obj* x) {
     if (!x) return 0.0;
+    if (IS_IMMEDIATE_INT(x)) return (double)INT_IMM_VALUE(x);
+    if (IS_IMMEDIATE_BOOL(x)) return x == PURPLE_TRUE ? 1.0 : 0.0;
+    if (IS_IMMEDIATE_CHAR(x)) return (double)CHAR_IMM_VALUE(x);
     if (x->tag == TAG_FLOAT) return x->f;
     return (double)x->i;
 }
 
 static int num_is_float(Obj* x) {
-    return x && x->tag == TAG_FLOAT;
+    if (!x || IS_IMMEDIATE(x)) return 0;  /* Immediates are never float */
+    return x->tag == TAG_FLOAT;
 }
 
 Obj* add(Obj* a, Obj* b) {
-    if (!a || !b) return mk_int(0);
+    if (!a || !b) return mk_int_unboxed(0);
     if (num_is_float(a) || num_is_float(b)) {
         return mk_float(num_to_double(a) + num_to_double(b));
     }
-    return mk_int(a->i + b->i);
+    return mk_int_unboxed(obj_to_int(a) + obj_to_int(b));
 }
 
 Obj* sub(Obj* a, Obj* b) {
-    if (!a || !b) return mk_int(0);
+    if (!a || !b) return mk_int_unboxed(0);
     if (num_is_float(a) || num_is_float(b)) {
         return mk_float(num_to_double(a) - num_to_double(b));
     }
-    return mk_int(a->i - b->i);
+    return mk_int_unboxed(obj_to_int(a) - obj_to_int(b));
 }
 
 Obj* mul(Obj* a, Obj* b) {
-    if (!a || !b) return mk_int(0);
+    if (!a || !b) return mk_int_unboxed(0);
     if (num_is_float(a) || num_is_float(b)) {
         return mk_float(num_to_double(a) * num_to_double(b));
     }
-    return mk_int(a->i * b->i);
+    return mk_int_unboxed(obj_to_int(a) * obj_to_int(b));
 }
 
 Obj* div_op(Obj* a, Obj* b) {
-    if (!a || !b) return mk_int(0);
+    if (!a || !b) return mk_int_unboxed(0);
     if (num_is_float(a) || num_is_float(b)) {
         double denom = num_to_double(b);
         if (denom == 0.0) return mk_float(0.0);
         return mk_float(num_to_double(a) / denom);
     }
-    if (b->i == 0) return mk_int(0);
-    return mk_int(a->i / b->i);
+    long bi = obj_to_int(b);
+    if (bi == 0) return mk_int_unboxed(0);
+    return mk_int_unboxed(obj_to_int(a) / bi);
 }
 
 Obj* mod_op(Obj* a, Obj* b) {
-    if (!a || !b || b->i == 0) return mk_int(0);
-    return mk_int(a->i %% b->i);
+    long bi = obj_to_int(b);
+    if (!a || !b || bi == 0) return mk_int_unboxed(0);
+    return mk_int_unboxed(obj_to_int(a) % bi);
 }
 
 `)
@@ -505,55 +810,62 @@ Obj* mod_op(Obj* a, Obj* b) {
 
 // GenerateComparison generates comparison operations
 func (g *RuntimeGenerator) GenerateComparison() {
-	g.emit(`/* Comparison Operations */
+	g.emitRaw(`/* Comparison Operations */
 Obj* eq_op(Obj* a, Obj* b) {
-    if (!a && !b) return mk_int(1);
-    if (!a || !b) return mk_int(0);
-    if (a->tag == TAG_FLOAT || b->tag == TAG_FLOAT) {
-        return mk_int(num_to_double(a) == num_to_double(b) ? 1 : 0);
+    /* Handle pointer equality first (works for immediates) */
+    if (a == b) return PURPLE_TRUE;
+    if (!a && !b) return PURPLE_TRUE;
+    if (!a || !b) return PURPLE_FALSE;
+    if (num_is_float(a) || num_is_float(b)) {
+        return mk_bool(num_to_double(a) == num_to_double(b));
     }
-    return mk_int(a->i == b->i ? 1 : 0);
+    return mk_bool(obj_to_int(a) == obj_to_int(b));
 }
 
 Obj* lt_op(Obj* a, Obj* b) {
-    if (!a || !b) return mk_int(0);
-    if (a->tag == TAG_FLOAT || b->tag == TAG_FLOAT) {
-        return mk_int(num_to_double(a) < num_to_double(b) ? 1 : 0);
+    if (!a || !b) return PURPLE_FALSE;
+    if (num_is_float(a) || num_is_float(b)) {
+        return mk_bool(num_to_double(a) < num_to_double(b));
     }
-    return mk_int(a->i < b->i ? 1 : 0);
+    return mk_bool(obj_to_int(a) < obj_to_int(b));
 }
 
 Obj* gt_op(Obj* a, Obj* b) {
-    if (!a || !b) return mk_int(0);
-    if (a->tag == TAG_FLOAT || b->tag == TAG_FLOAT) {
-        return mk_int(num_to_double(a) > num_to_double(b) ? 1 : 0);
+    if (!a || !b) return PURPLE_FALSE;
+    if (num_is_float(a) || num_is_float(b)) {
+        return mk_bool(num_to_double(a) > num_to_double(b));
     }
-    return mk_int(a->i > b->i ? 1 : 0);
+    return mk_bool(obj_to_int(a) > obj_to_int(b));
 }
 
 Obj* le_op(Obj* a, Obj* b) {
-    if (!a || !b) return mk_int(0);
-    if (a->tag == TAG_FLOAT || b->tag == TAG_FLOAT) {
-        return mk_int(num_to_double(a) <= num_to_double(b) ? 1 : 0);
+    if (!a || !b) return PURPLE_FALSE;
+    if (num_is_float(a) || num_is_float(b)) {
+        return mk_bool(num_to_double(a) <= num_to_double(b));
     }
-    return mk_int(a->i <= b->i ? 1 : 0);
+    return mk_bool(obj_to_int(a) <= obj_to_int(b));
 }
 
 Obj* ge_op(Obj* a, Obj* b) {
-    if (!a || !b) return mk_int(0);
-    if (a->tag == TAG_FLOAT || b->tag == TAG_FLOAT) {
-        return mk_int(num_to_double(a) >= num_to_double(b) ? 1 : 0);
+    if (!a || !b) return PURPLE_FALSE;
+    if (num_is_float(a) || num_is_float(b)) {
+        return mk_bool(num_to_double(a) >= num_to_double(b));
     }
-    return mk_int(a->i >= b->i ? 1 : 0);
+    return mk_bool(obj_to_int(a) >= obj_to_int(b));
 }
 
 Obj* not_op(Obj* a) {
-    if (!a) return mk_int(1);
-    return mk_int(a->i == 0 ? 1 : 0);
+    if (!a) return PURPLE_TRUE;
+    if (IS_IMMEDIATE_BOOL(a)) return a == PURPLE_TRUE ? PURPLE_FALSE : PURPLE_TRUE;
+    if (IS_IMMEDIATE_INT(a)) return INT_IMM_VALUE(a) == 0 ? PURPLE_TRUE : PURPLE_FALSE;
+    return mk_bool(obj_to_int(a) == 0);
 }
 
 static int is_truthy(Obj* x) {
     if (!x) return 0;
+    if (IS_IMMEDIATE_BOOL(x)) return x == PURPLE_TRUE;
+    if (IS_IMMEDIATE_INT(x)) return INT_IMM_VALUE(x) != 0;
+    if (IS_IMMEDIATE_CHAR(x)) return CHAR_IMM_VALUE(x) != 0;
     switch (x->tag) {
     case TAG_INT:
         return x->i != 0;
@@ -579,18 +891,258 @@ static Obj* prim_ge(Obj* a, Obj* b) { return ge_op(a, b); }
 static Obj* prim_eq(Obj* a, Obj* b) { return eq_op(a, b); }
 static Obj* prim_not(Obj* a) { return not_op(a); }
 static Obj* prim_abs(Obj* a) {
-    if (!a) return mk_int(0);
+    if (!a) return mk_int_unboxed(0);
+    if (IS_IMMEDIATE_INT(a)) {
+        long v = INT_IMM_VALUE(a);
+        return mk_int_unboxed(v < 0 ? -v : v);
+    }
+    if (IS_IMMEDIATE(a)) return a;  /* Other immediates unchanged */
     if (a->tag == TAG_FLOAT) return mk_float(a->f < 0 ? -a->f : a->f);
-    return mk_int(a->i < 0 ? -a->i : a->i);
+    return mk_int_unboxed(a->i < 0 ? -a->i : a->i);
 }
 
 /* Type predicate wrappers - return Obj* for uniformity */
-static Obj* prim_null(Obj* x) { return mk_int(x == NULL ? 1 : 0); }
-static Obj* prim_pair(Obj* x) { return mk_int(x && x->tag == TAG_PAIR ? 1 : 0); }
-static Obj* prim_int(Obj* x) { return mk_int(x && x->tag == TAG_INT ? 1 : 0); }
-static Obj* prim_float(Obj* x) { return mk_int(x && x->tag == TAG_FLOAT ? 1 : 0); }
-static Obj* prim_char(Obj* x) { return mk_int(x && x->tag == TAG_CHAR ? 1 : 0); }
-static Obj* prim_sym(Obj* x) { return mk_int(x && x->tag == TAG_SYM ? 1 : 0); }
+static Obj* prim_null(Obj* x) { return mk_bool(x == NULL); }
+static Obj* prim_pair(Obj* x) {
+    if (!x || IS_IMMEDIATE(x)) return PURPLE_FALSE;
+    return mk_bool(x->tag == TAG_PAIR);
+}
+static Obj* prim_int(Obj* x) {
+    if (IS_IMMEDIATE_INT(x) || IS_IMMEDIATE_BOOL(x)) return PURPLE_TRUE;
+    return mk_bool(x && x->tag == TAG_INT);
+}
+static Obj* prim_float(Obj* x) {
+    if (!x || IS_IMMEDIATE(x)) return PURPLE_FALSE;
+    return mk_bool(x->tag == TAG_FLOAT);
+}
+static Obj* prim_char(Obj* x) {
+    if (IS_IMMEDIATE_CHAR(x)) return PURPLE_TRUE;
+    return mk_bool(x && x->tag == TAG_CHAR);
+}
+static Obj* prim_sym(Obj* x) {
+    if (!x || IS_IMMEDIATE(x)) return PURPLE_FALSE;
+    return mk_bool(x->tag == TAG_SYM);
+}
+
+/* I/O Primitives */
+static void print_obj(Obj* x);  /* forward declaration */
+
+/* Check if a list is a string (all chars) */
+static int is_string_list(Obj* xs) {
+    while (xs && xs->tag == TAG_PAIR) {
+        if (!xs->a || xs->a->tag != TAG_CHAR) return 0;
+        xs = xs->b;
+    }
+    return xs == NULL; /* Must be proper list */
+}
+
+/* Print a string list as a quoted string */
+static void print_string(Obj* xs) {
+    while (xs && xs->tag == TAG_PAIR) {
+        if (xs->a && xs->a->tag == TAG_CHAR) {
+            putchar((char)xs->a->i);
+        }
+        xs = xs->b;
+    }
+}
+
+static void print_list(Obj* xs) {
+    /* Check if this is a string (list of chars) */
+    if (is_string_list(xs)) {
+        print_string(xs);
+        return;
+    }
+    printf("(");
+    int first = 1;
+    while (xs && xs->tag == TAG_PAIR) {
+        if (!first) printf(" ");
+        first = 0;
+        print_obj(xs->a);
+        xs = xs->b;
+    }
+    if (xs) {
+        printf(" . ");
+        print_obj(xs);
+    }
+    printf(")");
+}
+
+static void print_obj(Obj* x) {
+    if (!x) {
+        printf("()");
+        return;
+    }
+    switch (x->tag) {
+    case TAG_INT:
+        printf("%ld", x->i);
+        break;
+    case TAG_FLOAT:
+        printf("%g", x->f);
+        break;
+    case TAG_CHAR:
+        printf("%c", (char)x->i);
+        break;
+    case TAG_SYM:
+        printf("%s", x->ptr ? (char*)x->ptr : "nil");
+        break;
+    case TAG_PAIR:
+        print_list(x);
+        break;
+    case TAG_CLOSURE:
+        printf("#<closure>");
+        break;
+    case TAG_BOX:
+        printf("#<box>");
+        break;
+    case TAG_CHANNEL:
+        printf("#<channel>");
+        break;
+    default:
+        printf("#<object:%d>", x->tag);
+        break;
+    }
+}
+
+static Obj* prim_display(Obj* x) {
+    print_obj(x);
+    return NULL;
+}
+
+static Obj* prim_print(Obj* x) {
+    print_obj(x);
+    printf("\n");
+    return NULL;
+}
+
+static Obj* prim_newline(void) {
+    printf("\n");
+    return NULL;
+}
+
+/* Type introspection */
+static Obj* ctr_tag(Obj* x) {
+    if (!x) return mk_sym("nil");
+    switch (x->tag) {
+    case TAG_INT: return mk_sym("int");
+    case TAG_FLOAT: return mk_sym("float");
+    case TAG_CHAR: return mk_sym("char");
+    case TAG_SYM: return mk_sym("sym");
+    case TAG_PAIR: return mk_sym("cell");
+    case TAG_BOX: return mk_sym("box");
+    case TAG_CLOSURE: return mk_sym("closure");
+    case TAG_CHANNEL: return mk_sym("channel");
+    case TAG_ATOM: return mk_sym("atom");
+    case TAG_THREAD: return mk_sym("thread");
+    default:
+        if (x->tag >= TAG_USER_BASE) return mk_sym("user");
+        return mk_sym("unknown");
+    }
+}
+
+static Obj* ctr_arg(Obj* x, Obj* idx) {
+    if (!x || !idx) return NULL;
+    long i = idx->i;
+    switch (x->tag) {
+    case TAG_PAIR:
+        if (i == 0) return x->a;
+        if (i == 1) return x->b;
+        return NULL;
+    case TAG_BOX:
+        if (i == 0) return (Obj*)x->ptr;
+        return NULL;
+    default:
+        return NULL;
+    }
+}
+
+/* Character primitives */
+static Obj* char_to_int(Obj* c) {
+    if (IS_IMMEDIATE_CHAR(c)) return mk_int_unboxed(CHAR_IMM_VALUE(c));
+    if (!c || c->tag != TAG_CHAR) return mk_int_unboxed(0);
+    return mk_int_unboxed(c->i);
+}
+
+static Obj* int_to_char(Obj* n) {
+    if (!n) return mk_char_unboxed(0);
+    return mk_char_unboxed(obj_to_int(n));
+}
+
+/* Float primitives */
+static Obj* int_to_float(Obj* n) {
+    if (!n) return mk_float(0.0);
+    return mk_float(num_to_double(n));
+}
+
+static Obj* float_to_int(Obj* f) {
+    if (!f) return mk_int_unboxed(0);
+    if (IS_IMMEDIATE(f)) return mk_int_unboxed(obj_to_int(f));
+    return mk_int_unboxed((long)(f->tag == TAG_FLOAT ? f->f : f->i));
+}
+
+static Obj* prim_floor(Obj* f) {
+    if (!f) return mk_int_unboxed(0);
+    if (IS_IMMEDIATE(f)) return mk_int_unboxed(obj_to_int(f));  /* Already integer */
+    if (f->tag == TAG_FLOAT) {
+        double v = f->f;
+        return mk_float(v >= 0 ? (long)v : (long)v - (v != (long)v ? 1 : 0));
+    }
+    return mk_int_unboxed(f->i);
+}
+
+static Obj* prim_ceil(Obj* f) {
+    if (!f) return mk_int_unboxed(0);
+    if (IS_IMMEDIATE(f)) return mk_int_unboxed(obj_to_int(f));  /* Already integer */
+    if (f->tag == TAG_FLOAT) {
+        double v = f->f;
+        return mk_float(v >= 0 ? (long)v + (v != (long)v ? 1 : 0) : (long)v);
+    }
+    return mk_int_unboxed(f->i);
+}
+
+/* Higher-order function primitives */
+static Obj* prim_apply(Obj* fn, Obj* args) {
+    if (!fn) return NULL;
+    /* Count args */
+    int n = 0;
+    Obj* p = args;
+    while (p && p->tag == TAG_PAIR) { n++; p = p->b; }
+
+    /* Build args array */
+    Obj** arr = n > 0 ? malloc(n * sizeof(Obj*)) : NULL;
+    p = args;
+    for (int i = 0; i < n; i++) {
+        arr[i] = p->a;
+        p = p->b;
+    }
+
+    Obj* result = call_closure(fn, arr, n);
+    if (arr) free(arr);
+    return result;
+}
+
+/* Compose: (compose f g) returns a function that applies g then f */
+static Obj* compose_wrapper(Obj** captures, Obj** args, int n);
+
+static Obj* prim_compose(Obj* f, Obj* g) {
+    if (!f || !g) return NULL;
+    Obj** caps = malloc(2 * sizeof(Obj*));
+    caps[0] = f; inc_ref(f);
+    caps[1] = g; inc_ref(g);
+    return mk_closure(compose_wrapper, caps, NULL, 2, 1);
+}
+
+static Obj* compose_wrapper(Obj** captures, Obj** args, int n) {
+    if (n < 1 || !captures) return NULL;
+    Obj* f = captures[0];
+    Obj* g = captures[1];
+    /* Apply g first */
+    Obj* intermediate = call_closure(g, args, n);
+    /* Then apply f */
+    Obj* final_args[1] = { intermediate };
+    Obj* result = call_closure(f, final_args, 1);
+    dec_ref(intermediate);
+    return result;
+}
 
 `)
 }
@@ -659,6 +1211,91 @@ Obj* list_fold(Obj* fn, Obj* init, Obj* xs) {
         acc = call_closure(fn, args, 2);
         xs = xs->b;
     }
+    return acc;
+}
+
+Obj* list_append(Obj* a, Obj* b) {
+    if (!a || a->tag != TAG_PAIR) return b;
+    /* Build a copy of list a, then append b */
+    Obj* head = NULL;
+    Obj* tail = NULL;
+    while (a && a->tag == TAG_PAIR) {
+        Obj* node = mk_pair(a->a, NULL);
+        if (node->a) inc_ref(node->a);
+        if (!head) {
+            head = node;
+        } else {
+            tail->b = node;
+        }
+        tail = node;
+        a = a->b;
+    }
+    if (tail) {
+        tail->b = b;
+        if (b) inc_ref(b);
+    } else {
+        head = b;
+        if (b) inc_ref(b);
+    }
+    return head;
+}
+
+Obj* list_filter(Obj* fn, Obj* xs) {
+    if (!fn) return NULL;
+    Obj* head = NULL;
+    Obj* tail = NULL;
+    while (xs && xs->tag == TAG_PAIR) {
+        Obj* args[1];
+        args[0] = xs->a;
+        Obj* keep = call_closure(fn, args, 1);
+        /* Non-NULL and non-zero means keep */
+        int should_keep = keep && (keep->tag != TAG_INT || keep->i != 0);
+        if (keep) dec_ref(keep);
+        if (should_keep) {
+            Obj* node = mk_pair(xs->a, NULL);
+            if (xs->a) inc_ref(xs->a);
+            if (!head) {
+                head = node;
+            } else {
+                tail->b = node;
+            }
+            tail = node;
+        }
+        xs = xs->b;
+    }
+    return head;
+}
+
+Obj* list_reverse(Obj* xs) {
+    Obj* result = NULL;
+    while (xs && xs->tag == TAG_PAIR) {
+        Obj* node = mk_pair(xs->a, result);
+        if (xs->a) inc_ref(xs->a);
+        result = node;
+        xs = xs->b;
+    }
+    return result;
+}
+
+Obj* list_foldr(Obj* fn, Obj* init, Obj* xs) {
+    /* foldr f init (x:xs) = f x (foldr f init xs) */
+    if (!fn) return init;
+    if (!xs || xs->tag != TAG_PAIR) return init;
+    /* Recursive approach - build stack then apply */
+    Obj* reversed = list_reverse(xs);
+    Obj* acc = init;
+    if (init) inc_ref(init);
+    Obj* p = reversed;
+    while (p && p->tag == TAG_PAIR) {
+        Obj* args[2];
+        args[0] = p->a;
+        args[1] = acc;
+        Obj* new_acc = call_closure(fn, args, 2);
+        dec_ref(acc);
+        acc = new_acc;
+        p = p->b;
+    }
+    dec_ref(reversed);
     return acc;
 }
 
@@ -904,7 +1541,9 @@ func (g *RuntimeGenerator) GenerateUserTypeScanners() {
 
 // GenerateArenaRuntime generates arena allocation runtime with externals support
 func (g *RuntimeGenerator) GenerateArenaRuntime() {
-	g.emit(`/* Arena Allocator (Bulk Allocation/Deallocation) */
+	g.emit(`
+
+/* Arena Allocator (Bulk Allocation/Deallocation) */
 /* For cyclic data that doesn't escape function scope */
 /* Enhanced with external pointer tracking */
 
@@ -1036,12 +1675,12 @@ void arena_reset(Arena* a) {
 Obj* arena_mk_int(Arena* a, long i) {
     Obj* x = arena_alloc(a, sizeof(Obj));
     if (!x) return NULL;
+    x->generation = _next_generation();
     x->mark = -2;  /* Special mark for arena-allocated */
-    x->scc_id = -1;
-    x->is_pair = 0;
-    x->scan_tag = 0;
     x->tag = TAG_INT;
-    x->gen_obj = NULL;
+    x->is_pair = 0;
+    x->scc_id = -1;
+    x->scan_tag = 0;
     x->i = i;
     return x;
 }
@@ -1049,23 +1688,26 @@ Obj* arena_mk_int(Arena* a, long i) {
 Obj* arena_mk_pair(Arena* a, Obj* car, Obj* cdr) {
     Obj* x = arena_alloc(a, sizeof(Obj));
     if (!x) return NULL;
+    x->generation = _next_generation();
     x->mark = -2;  /* Special mark for arena-allocated */
-    x->scc_id = -1;
-    x->is_pair = 1;
-    x->scan_tag = 0;
     x->tag = TAG_PAIR;
-    x->gen_obj = NULL;
+    x->is_pair = 1;
+    x->scc_id = -1;
+    x->scan_tag = 0;
     x->a = car;
     x->b = cdr;
     return x;
 }
+
 
 `)
 }
 
 // GeneratePerceusRuntime generates Perceus reuse analysis runtime
 func (g *RuntimeGenerator) GeneratePerceusRuntime() {
-	g.emit(`/* Perceus Reuse Analysis Runtime */
+	g.emit(`
+
+/* Perceus Reuse Analysis Runtime */
 Obj* try_reuse(Obj* old, size_t size) {
     if (old && old->mark == 1) {
         /* Reusing: release children if this was a pair */
@@ -1084,12 +1726,12 @@ Obj* try_reuse(Obj* old, size_t size) {
 Obj* reuse_as_int(Obj* old, long value) {
     Obj* obj = try_reuse(old, sizeof(Obj));
     if (!obj) return NULL;
+    obj->generation = _next_generation();
     obj->mark = 1;
-    obj->scc_id = -1;
-    obj->is_pair = 0;
-    obj->scan_tag = 0;
     obj->tag = TAG_INT;
-    obj->gen_obj = NULL;
+    obj->is_pair = 0;
+    obj->scc_id = -1;
+    obj->scan_tag = 0;
     obj->i = value;
     return obj;
 }
@@ -1097,23 +1739,75 @@ Obj* reuse_as_int(Obj* old, long value) {
 Obj* reuse_as_pair(Obj* old, Obj* a, Obj* b) {
     Obj* obj = try_reuse(old, sizeof(Obj));
     if (!obj) return NULL;
+    obj->generation = _next_generation();
     obj->mark = 1;
-    obj->scc_id = -1;
-    obj->is_pair = 1;
-    obj->scan_tag = 0;
     obj->tag = TAG_PAIR;
-    obj->gen_obj = NULL;
+    obj->is_pair = 1;
+    obj->scc_id = -1;
+    obj->scan_tag = 0;
     obj->a = a;
     obj->b = b;
     return obj;
 }
+
+Obj* reuse_as_box(Obj* old, Obj* value) {
+    Obj* obj = try_reuse(old, sizeof(Obj));
+    if (!obj) return NULL;
+    obj->generation = _next_generation();
+    obj->mark = 1;
+    obj->tag = TAG_BOX;
+    obj->is_pair = 0;
+    obj->scc_id = -1;
+    obj->scan_tag = 0;
+    obj->ptr = value;
+    return obj;
+}
+
+Obj* reuse_as_closure(Obj* old, ClosureFn fn, Obj** captures, BorrowRef** refs, int count, int arity) {
+    Obj* obj = try_reuse(old, sizeof(Obj));
+    if (!obj) return NULL;
+    obj->generation = _next_generation();
+    obj->mark = 1;
+    obj->tag = TAG_CLOSURE;
+    obj->is_pair = 0;
+    obj->scc_id = -1;
+    obj->scan_tag = 0;
+
+    Closure* c = malloc(sizeof(Closure));
+    if (!c) { free(obj); return NULL; }
+    c->fn = fn;
+    c->captures = captures;
+    c->capture_refs = refs;
+    c->capture_count = count;
+    c->arity = arity;
+    obj->ptr = c;
+    return obj;
+}
+
+/* Check if object can be reused (unique reference) */
+static inline int can_reuse(Obj* obj) {
+    if (!obj || IS_IMMEDIATE(obj)) return 0;
+    return obj->mark == 1;  /* Reference count of 1 means unique */
+}
+
+/* Consume for potential reuse - returns object if reusable, frees otherwise */
+static inline Obj* consume_for_reuse(Obj* obj) {
+    if (can_reuse(obj)) {
+        return obj;  /* Caller can reuse this memory */
+    }
+    if (obj && !IS_IMMEDIATE(obj)) dec_ref(obj);
+    return NULL;
+}
+
 
 `)
 }
 
 // GenerateSCCRuntime generates SCC-based reference counting runtime (ISMM 2024)
 func (g *RuntimeGenerator) GenerateSCCRuntime() {
-	g.emit(`/* SCC-Based Reference Counting (ISMM 2024) */
+	g.emitRaw(`
+
+/* SCC-Based Reference Counting (ISMM 2024) */
 /* For frozen (deeply immutable) cyclic structures */
 /* Uses Tarjan's algorithm for O(n) SCC detection */
 
@@ -1263,10 +1957,10 @@ static void tarjan_strongconnect(Obj* v, TarjanState* state,
     /* Use scan_tag field to store Tarjan index for this node */
     int v_idx = state->current_index++;
     v->scan_tag = (unsigned int)v_idx;
-    state->index[v_idx %% state->capacity] = v_idx;
-    state->lowlink[v_idx %% state->capacity] = v_idx;
+    state->index[v_idx % state->capacity] = v_idx;
+    state->lowlink[v_idx % state->capacity] = v_idx;
     state->stack[state->stack_top++] = v;
-    state->on_stack[v_idx %% state->capacity] = 1;
+    state->on_stack[v_idx % state->capacity] = 1;
 
     /* Visit children */
     if (v->is_pair) {
@@ -1279,28 +1973,28 @@ static void tarjan_strongconnect(Obj* v, TarjanState* state,
             if (w_idx == 0) {
                 /* Not visited yet */
                 tarjan_strongconnect(w, state, on_scc);
-                int w_low = state->lowlink[w->scan_tag %% state->capacity];
-                if (w_low < state->lowlink[v_idx %% state->capacity]) {
-                    state->lowlink[v_idx %% state->capacity] = w_low;
+                int w_low = state->lowlink[w->scan_tag % state->capacity];
+                if (w_low < state->lowlink[v_idx % state->capacity]) {
+                    state->lowlink[v_idx % state->capacity] = w_low;
                 }
-            } else if (state->on_stack[w_idx %% state->capacity]) {
+            } else if (state->on_stack[w_idx % state->capacity]) {
                 /* w is on stack */
-                if (state->index[w_idx %% state->capacity] < state->lowlink[v_idx %% state->capacity]) {
-                    state->lowlink[v_idx %% state->capacity] = state->index[w_idx %% state->capacity];
+                if (state->index[w_idx % state->capacity] < state->lowlink[v_idx % state->capacity]) {
+                    state->lowlink[v_idx % state->capacity] = state->index[w_idx % state->capacity];
                 }
             }
         }
     }
 
     /* Check if v is root of SCC */
-    if (state->lowlink[v_idx %% state->capacity] == state->index[v_idx %% state->capacity]) {
+    if (state->lowlink[v_idx % state->capacity] == state->index[v_idx % state->capacity]) {
         Obj* scc_members[256];
         int scc_size = 0;
         Obj* w;
         do {
             w = state->stack[--state->stack_top];
             int w_idx = (int)w->scan_tag;
-            state->on_stack[w_idx %% state->capacity] = 0;
+            state->on_stack[w_idx % state->capacity] = 0;
             if (scc_size < 256) {
                 scc_members[scc_size++] = w;
             }
@@ -1338,12 +2032,15 @@ void detect_and_freeze_sccs(Obj* root) {
     tarjan_free(state);
 }
 
+
 `)
 }
 
 // GenerateDeferredRuntime generates deferred reference counting runtime
 func (g *RuntimeGenerator) GenerateDeferredRuntime() {
-	g.emit(`/* Deferred Reference Counting */
+	g.emit(`
+
+/* Deferred Reference Counting */
 /* For mutable cyclic structures - bounded O(k) processing per safe point */
 /* Based on Deutsch & Bobrow (1976) and CactusRef-style local detection */
 
@@ -1452,13 +2149,16 @@ void set_deferred_batch_size(int size) {
     }
 }
 
+
 `)
 }
 
 // GenerateSymmetricRuntime generates symmetric reference counting runtime
 // This is the preferred method for handling unbroken cycles - more memory efficient than arenas
 func (g *RuntimeGenerator) GenerateSymmetricRuntime() {
-	g.emit(`/* Symmetric Reference Counting (Hybrid Memory Strategy) */
+	g.emit(`
+
+/* Symmetric Reference Counting (Hybrid Memory Strategy) */
 /* Key insight: Treat scope as an object that participates in ownership graph */
 /* External refs: From live scopes/roots */
 /* Internal refs: Within the object graph */
@@ -1652,6 +2352,7 @@ Obj* sym_get_data(SymObj* obj) {
     return obj ? (Obj*)obj->data : NULL;
 }
 
+
 `)
 }
 
@@ -1797,12 +2498,12 @@ func (g *RuntimeGenerator) GenerateTypeConstructors() {
 
 		g.emit("    Obj* obj = malloc(sizeof(Obj));\n")
 		g.emit("    if (!obj) { free(x); return NULL; }\n")
+		g.emit("    obj->generation = _next_generation();\n")
 		g.emit("    obj->mark = 1;\n")
-		g.emit("    obj->scc_id = -1;\n")
-		g.emit("    obj->is_pair = 0;\n")
-		g.emit("    obj->scan_tag = 0;\n")
 		g.emit("    obj->tag = TAG_USER_%s;\n", typeDef.Name)
-		g.emit("    obj->gen_obj = NULL;\n")
+		g.emit("    obj->is_pair = 0;\n")
+		g.emit("    obj->scc_id = -1;\n")
+		g.emit("    obj->scan_tag = 0;\n")
 		g.emit("    obj->ptr = x;\n")
 		g.emit("    return obj;\n")
 		g.emit("}\n\n")
@@ -1868,6 +2569,7 @@ func (g *RuntimeGenerator) GenerateFieldAccessors() {
 // GenerateRegionRuntime generates region reference functions
 func (g *RuntimeGenerator) GenerateRegionRuntime() {
 	g.emit(`
+
 /* ========== Region References (v0.5.0) ========== */
 /* Vale/Ada/SPARK-style scope hierarchy validation */
 /* O(1) CanReference check via depth comparison */
@@ -2028,13 +2730,15 @@ static void* region_deref(RegionRef* ref) {
     return ref->target->data;
 }
 
+
 `)
 }
 
-// GenerateGenRefRuntime generates generational reference functions
-func (g *RuntimeGenerator) GenerateGenRefRuntime() {
-	g.emit(`
-/* ========== Random Generational References (v0.5.0) ========== */
+// GenerateBorrowRefRuntime generates generational reference functions
+func (g *RuntimeGenerator) GenerateBorrowRefRuntime() {
+	g.emitRaw(`
+
+/* ========== BorrowRef / IPGE (v0.6.0) ========== */
 /* Vale-style use-after-free detection */
 /* Thread-safe via pthread_rwlock (C99 + POSIX) */
 
@@ -2043,9 +2747,9 @@ func (g *RuntimeGenerator) GenerateGenRefRuntime() {
 typedef uint64_t Generation;
 
 typedef struct GenObj GenObj;
-typedef struct GenRef GenRef;
+typedef struct BorrowRef BorrowRef;
 typedef struct GenClosure GenClosure;
-typedef struct GenRefContext GenRefContext;
+typedef struct LegacyGenContext LegacyGenContext;
 
 struct GenObj {
     Generation generation;
@@ -2055,7 +2759,7 @@ struct GenObj {
     pthread_rwlock_t rwlock;
 };
 
-struct GenRef {
+struct BorrowRef {
     GenObj* target;
     Generation remembered_gen;
     const char* source_desc;
@@ -2063,23 +2767,23 @@ struct GenRef {
 
 /* Closure with capture validation */
 struct GenClosure {
-    GenRef** captures;
+    BorrowRef** captures;
     int capture_count;
     void* (*func)(void* ctx);
     void* ctx;
 };
 
-struct GenRefContext {
+struct LegacyGenContext {
     GenObj** objects;
     int object_count;
     int object_capacity;
     pthread_mutex_t mutex;
 };
 
-static GenRefContext* g_genref_ctx = NULL;
+static LegacyGenContext* g_legacy_ctx = NULL;
 
 /* Fast xorshift64 PRNG for generation IDs */
-static Generation genref_random(void) {
+static Generation legacy_random_gen(void) {
     static uint64_t state = 0;
     static pthread_mutex_t prng_mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_lock(&prng_mutex);
@@ -2094,24 +2798,24 @@ static Generation genref_random(void) {
     return result;
 }
 
-static GenRefContext* genref_context_new(void) {
-    GenRefContext* ctx = calloc(1, sizeof(GenRefContext));
+static LegacyGenContext* legacy_context_new(void) {
+    LegacyGenContext* ctx = calloc(1, sizeof(LegacyGenContext));
     if (ctx) {
         pthread_mutex_init(&ctx->mutex, NULL);
     }
     return ctx;
 }
 
-static void genref_init(void) {
-    if (!g_genref_ctx) {
-        g_genref_ctx = genref_context_new();
+static void legacy_init(void) {
+    if (!g_legacy_ctx) {
+        g_legacy_ctx = legacy_context_new();
     }
 }
 
-static GenObj* genref_alloc(GenRefContext* ctx, void* data, void (*destructor)(void*)) {
+static GenObj* legacy_alloc(LegacyGenContext* ctx, void* data, void (*destructor)(void*)) {
     GenObj* obj = calloc(1, sizeof(GenObj));
     if (!obj) return NULL;
-    obj->generation = genref_random();
+    obj->generation = legacy_random_gen();
     obj->data = data;
     obj->destructor = destructor;
     obj->freed = 0;
@@ -2135,7 +2839,7 @@ static GenObj* genref_alloc(GenRefContext* ctx, void* data, void (*destructor)(v
     return obj;
 }
 
-static void genref_free(GenObj* obj) {
+static void legacy_free(GenObj* obj) {
     if (!obj) return;
     pthread_rwlock_wrlock(&obj->rwlock);
     if (obj->freed) {
@@ -2152,18 +2856,18 @@ static void genref_free(GenObj* obj) {
     pthread_rwlock_destroy(&obj->rwlock);
 }
 
-static void genref_release(GenRef* ref) {
+static void borrow_release(BorrowRef* ref) {
     if (ref) free(ref);
 }
 
-static GenRef* genref_create(GenObj* obj, const char* source_desc) {
+static BorrowRef* legacy_create(GenObj* obj, const char* source_desc) {
     if (!obj) return NULL;
     pthread_rwlock_rdlock(&obj->rwlock);
     if (obj->freed || obj->generation == 0) {
         pthread_rwlock_unlock(&obj->rwlock);
         return NULL;
     }
-    GenRef* ref = calloc(1, sizeof(GenRef));
+    BorrowRef* ref = calloc(1, sizeof(BorrowRef));
     if (!ref) {
         pthread_rwlock_unlock(&obj->rwlock);
         return NULL;
@@ -2175,9 +2879,37 @@ static GenRef* genref_create(GenObj* obj, const char* source_desc) {
     return ref;
 }
 
+/* IPGE-style BorrowRef: use inline generation from Obj */
+typedef struct IPGERef {
+    Obj* obj;
+    uint64_t remembered_gen;
+    const char* source_desc;
+} IPGERef;
+
+static BorrowRef* borrow_create_ipge(Obj* obj, uint64_t gen, const char* source_desc) {
+    if (!obj) return NULL;
+    /* Store IPGE ref in BorrowRef struct */
+    BorrowRef* ref = calloc(1, sizeof(BorrowRef) + sizeof(IPGERef));
+    if (!ref) return NULL;
+    IPGERef* ipge = (IPGERef*)(ref + 1);
+    ipge->obj = obj;
+    ipge->remembered_gen = gen;
+    ipge->source_desc = source_desc;
+    ref->target = NULL;  /* Mark as IPGE-style by setting target to NULL */
+    ref->remembered_gen = (uint64_t)(uintptr_t)ipge;  /* Store pointer to IPGERef */
+    ref->source_desc = source_desc;
+    return ref;
+}
+
 /* O(1) validity check - just compare generations (with read lock) */
-static int genref_is_valid(GenRef* ref) {
-    if (!ref || !ref->target) return 0;
+static int borrow_is_valid(BorrowRef* ref) {
+    if (!ref) return 0;
+    /* Check for IPGE-style ref (target is NULL) */
+    if (!ref->target) {
+        IPGERef* ipge = (IPGERef*)(uintptr_t)ref->remembered_gen;
+        if (!ipge || !ipge->obj) return 0;
+        return ipge->remembered_gen == ipge->obj->generation;
+    }
     pthread_rwlock_rdlock(&ref->target->rwlock);
     int valid = ref->remembered_gen == ref->target->generation &&
                 ref->target->generation != 0;
@@ -2185,15 +2917,29 @@ static int genref_is_valid(GenRef* ref) {
     return valid;
 }
 
-static void* genref_deref(GenRef* ref) {
-    if (!ref || !ref->target) {
-        fprintf(stderr, "genref: null reference\n");
+static void* borrow_deref(BorrowRef* ref) {
+    if (!ref) {
+        fprintf(stderr, "borrow: null reference\n");
         return NULL;
+    }
+    /* Check for IPGE-style ref (target is NULL) */
+    if (!ref->target) {
+        IPGERef* ipge = (IPGERef*)(uintptr_t)ref->remembered_gen;
+        if (!ipge || !ipge->obj) {
+            fprintf(stderr, "borrow: null IPGE reference\n");
+            return NULL;
+        }
+        if (ipge->remembered_gen != ipge->obj->generation) {
+            fprintf(stderr, "borrow: use-after-free detected [created at: %s]\n",
+                    ipge->source_desc ? ipge->source_desc : "unknown");
+            return NULL;
+        }
+        return ipge->obj;
     }
     pthread_rwlock_rdlock(&ref->target->rwlock);
     if (ref->remembered_gen != ref->target->generation) {
         pthread_rwlock_unlock(&ref->target->rwlock);
-        fprintf(stderr, "genref: use-after-free detected [created at: %%s]\n",
+        fprintf(stderr, "borrow: use-after-free detected [created at: %s]\n",
                 ref->source_desc ? ref->source_desc : "unknown");
         return NULL;
     }
@@ -2202,24 +2948,26 @@ static void* genref_deref(GenRef* ref) {
     return data;
 }
 
-/* Bind generational header to Obj (lazy) */
-static GenRef* genref_from_obj(Obj* obj, const char* source_desc) {
-    if (!obj) return NULL;
-    genref_init();
-    if (!obj->gen_obj) {
-        obj->gen_obj = genref_alloc(g_genref_ctx, obj, NULL);
-    }
-    return genref_create(obj->gen_obj, source_desc);
+/* BorrowRef get: returns validated Obj* (public API wrapper) */
+Obj* borrow_get(BorrowRef* ref) {
+    return (Obj*)borrow_deref(ref);
 }
 
-static void genref_invalidate_obj(Obj* obj) {
-    if (!obj || !obj->gen_obj) return;
-    genref_free(obj->gen_obj);
-    obj->gen_obj = NULL;
+/* IPGE-style binding: snapshot current generation */
+static BorrowRef* borrow_create(Obj* obj, const char* source_desc) {
+    if (!obj || IS_IMMEDIATE(obj)) return NULL;
+    legacy_init();
+    /* IPGE: Use inline generation for validation */
+    return borrow_create_ipge(obj, obj->generation, source_desc);
+}
+
+static void borrow_invalidate_obj(Obj* obj) {
+    /* IPGE: Generation evolves in free functions, no need for explicit invalidation */
+    (void)obj;
 }
 
 /* Closure support for safe lambda captures */
-static GenClosure* genclosure_new(GenRef** captures, int count, void* (*func)(void*), void* ctx) {
+static GenClosure* genclosure_new(BorrowRef** captures, int count, void* (*func)(void*), void* ctx) {
     GenClosure* c = calloc(1, sizeof(GenClosure));
     if (!c) return NULL;
     c->captures = captures;
@@ -2232,7 +2980,7 @@ static GenClosure* genclosure_new(GenRef** captures, int count, void* (*func)(vo
 static int genclosure_validate(GenClosure* c) {
     if (!c) return 0;
     for (int i = 0; i < c->capture_count; i++) {
-        if (!genref_is_valid(c->captures[i])) {
+        if (!borrow_is_valid(c->captures[i])) {
             return 0;
         }
     }
@@ -2247,32 +2995,33 @@ static void* genclosure_call(GenClosure* c) {
     return c->func ? c->func(c->ctx) : NULL;
 }
 
+
 `)
 }
 
 // GenerateClosureRuntime generates closure support for AST->C compilation
 func (g *RuntimeGenerator) GenerateClosureRuntime() {
-	g.emit(`
+	g.emitRaw(`
 /* ========== Closure Runtime ========== */
 typedef Obj* (*ClosureFn)(Obj** captures, Obj** args, int arg_count);
 
 struct Closure {
     ClosureFn fn;
     Obj** captures;
-    GenRef** capture_refs;
+    BorrowRef** capture_refs;
     int capture_count;
     int arity;
 };
 
-static Obj* mk_closure(ClosureFn fn, Obj** captures, GenRef** refs, int count, int arity) {
+static Obj* mk_closure(ClosureFn fn, Obj** captures, BorrowRef** refs, int count, int arity) {
     Obj* x = malloc(sizeof(Obj));
     if (!x) return NULL;
+    x->generation = _next_generation();
     x->mark = 1;
-    x->scc_id = -1;
-    x->is_pair = 0;
-    x->scan_tag = 0;
     x->tag = TAG_CLOSURE;
-    x->gen_obj = NULL;
+    x->is_pair = 0;
+    x->scc_id = -1;
+    x->scan_tag = 0;
 
     Closure* c = calloc(1, sizeof(Closure));
     if (!c) {
@@ -2294,9 +3043,9 @@ static Obj* mk_closure(ClosureFn fn, Obj** captures, GenRef** refs, int count, i
         memcpy(c->captures, captures, count * sizeof(Obj*));
 
         if (refs) {
-            c->capture_refs = malloc(count * sizeof(GenRef*));
+            c->capture_refs = malloc(count * sizeof(BorrowRef*));
             if (c->capture_refs) {
-                memcpy(c->capture_refs, refs, count * sizeof(GenRef*));
+                memcpy(c->capture_refs, refs, count * sizeof(BorrowRef*));
             }
         } else {
             c->capture_refs = NULL;
@@ -2321,7 +3070,7 @@ static void closure_release(Closure* c) {
             dec_ref(c->captures[i]);
         }
         if (c->capture_refs && c->capture_refs[i]) {
-            genref_release(c->capture_refs[i]);
+            borrow_release(c->capture_refs[i]);
         }
     }
     free(c->captures);
@@ -2332,7 +3081,7 @@ static void closure_release(Closure* c) {
 static int closure_validate(Closure* c) {
     if (!c || !c->capture_refs) return 1;
     for (int i = 0; i < c->capture_count; i++) {
-        if (c->capture_refs[i] && !genref_is_valid(c->capture_refs[i])) {
+        if (c->capture_refs[i] && !borrow_is_valid(c->capture_refs[i])) {
             return 0;
         }
     }
@@ -2347,7 +3096,7 @@ static Obj* call_closure(Obj* clos, Obj** args, int arg_count) {
     Closure* c = (Closure*)clos->ptr;
     if (!c) return NULL;
     if (c->arity >= 0 && arg_count != c->arity) {
-        fprintf(stderr, "call_closure: arity mismatch (expected %%d, got %%d)\n", c->arity, arg_count);
+        fprintf(stderr, "call_closure: arity mismatch (expected %d, got %d)\n", c->arity, arg_count);
         return NULL;
     }
     if (!closure_validate(c)) {
@@ -2362,7 +3111,8 @@ static Obj* call_closure(Obj* clos, Obj** args, int arg_count) {
 
 // GenerateConstraintRuntime generates constraint reference functions
 func (g *RuntimeGenerator) GenerateConstraintRuntime() {
-	g.emit(`
+	g.emitRaw(`
+
 /* ========== Constraint References (v0.5.0) ========== */
 /* Assertion-based safety for complex patterns */
 /* Thread-safe via pthread mutex (C99 + POSIX) */
@@ -2457,12 +3207,12 @@ static int constraint_free(ConstraintObj* obj) {
     pthread_mutex_lock(&obj->mutex);
     if (obj->freed) {
         pthread_mutex_unlock(&obj->mutex);
-        fprintf(stderr, "constraint: double free [owner: %%s]\n", obj->owner ? obj->owner : "unknown");
+        fprintf(stderr, "constraint: double free [owner: %s]\n", obj->owner ? obj->owner : "unknown");
         return -1;
     }
     if (obj->constraint_count > 0) {
         pthread_mutex_unlock(&obj->mutex);
-        fprintf(stderr, "constraint violation: cannot free [owner: %%s] with %%d active constraints\n",
+        fprintf(stderr, "constraint violation: cannot free [owner: %s] with %d active constraints\n",
                 obj->owner ? obj->owner : "unknown", obj->constraint_count);
 #ifdef CONSTRAINT_ASSERT
         abort();
@@ -2500,37 +3250,236 @@ static void* constraint_deref(ConstraintRef* ref) {
     return ref->target->data;
 }
 
+
 `)
 }
 
-// GenerateAll generates the complete runtime
+// GenerateAll generates the complete runtime with ALL features.
+// The runtime is a library for REPL/JIT - all features must be available.
+// Optimization happens at codegen (which functions to CALL), not here.
 func (g *RuntimeGenerator) GenerateAll() {
+	// Core ASAP
 	g.GenerateHeader()
 	g.GenerateWeakRefs()
 	g.GenerateConstructors()
 	g.GenerateMemoryManagement()
-	g.GenerateArenaRuntime()
-	g.GenerateSCCRuntime()
-	g.GenerateDeferredRuntime()
-	g.GenerateSymmetricRuntime()
-	g.GenerateRegionRuntime()
-	g.GenerateGenRefRuntime()
-	g.GenerateClosureRuntime()
-	g.GenerateConstraintRuntime()
 	g.GenerateArithmetic()
 	g.GenerateComparison()
 	g.GenerateListRuntime()
 	g.GenerateScanRuntime()
-	g.GeneratePerceusRuntime()
-	g.GenerateConcurrencyRuntime()
-	g.GenerateDPSRuntime()
 	g.GenerateScanner("List", true)
+
+	// User types
 	g.GenerateUserTypes()
 	g.GenerateTypeReleaseFunctions()
 	g.GenerateTypeConstructors()
 	g.GenerateFieldAccessors()
 	g.GenerateUserTypeScanners()
+
+	// All runtime features - always available
+	g.GenerateArenaRuntime()
+	g.GeneratePoolRuntime()
+	g.GenerateNaNBoxingRuntime()
+	g.GenerateSCCRuntime()
+	g.GenerateDeferredRuntime()
+	g.GenerateSymmetricRuntime()
+	g.GenerateRegionRuntime()
+	g.GenerateBorrowRefRuntime()
+	g.GenerateClosureRuntime()
+	g.GenerateConstraintRuntime()
+	g.GeneratePerceusRuntime()
+	g.GenerateConcurrencyRuntime()
+	g.GenerateDPSRuntime()
 	g.GenerateExceptionRuntime()
+}
+
+// GeneratePoolRuntime generates thread-local pool allocator for temporary values
+func (g *RuntimeGenerator) GeneratePoolRuntime() {
+	g.emitRaw(`
+
+/* ========== Pool Allocator (Bump Allocation) ========== */
+/* Thread-local pool for non-escaping temporary allocations */
+/* O(1) allocation, bulk deallocation at scope exit */
+
+#define POOL_BLOCK_SIZE 4096
+
+typedef struct PoolBlock {
+    char* memory;
+    size_t size;
+    size_t used;
+    struct PoolBlock* next;
+} PoolBlock;
+
+typedef struct Pool {
+    PoolBlock* current;
+    PoolBlock* blocks;
+    size_t block_size;
+    int alloc_count;
+} Pool;
+
+/* Thread-local pool for current function scope */
+static __thread Pool* _current_pool = NULL;
+static __thread int _pool_depth = 0;
+
+Pool* pool_create(void) {
+    Pool* p = malloc(sizeof(Pool));
+    if (!p) return NULL;
+    p->current = NULL;
+    p->blocks = NULL;
+    p->block_size = POOL_BLOCK_SIZE;
+    p->alloc_count = 0;
+    return p;
+}
+
+void* pool_alloc(Pool* p, size_t size) {
+    if (!p) return NULL;
+
+    /* Align to 8 bytes */
+    size = (size + 7) & ~(size_t)7;
+
+    if (!p->current || p->current->used + size > p->current->size) {
+        /* Need new block */
+        size_t block_size = p->block_size;
+        if (size > block_size) block_size = size;
+
+        PoolBlock* b = malloc(sizeof(PoolBlock));
+        if (!b) return NULL;
+        b->memory = malloc(block_size);
+        if (!b->memory) {
+            free(b);
+            return NULL;
+        }
+        b->size = block_size;
+        b->used = 0;
+        b->next = p->blocks;
+        p->blocks = b;
+        p->current = b;
+    }
+
+    void* ptr = p->current->memory + p->current->used;
+    p->current->used += size;
+    p->alloc_count++;
+    return ptr;
+}
+
+/* Pool-allocated object makers */
+Obj* pool_mk_int(Pool* p, long value) {
+    Obj* x = pool_alloc(p, sizeof(Obj));
+    if (!x) return mk_int(value);  /* Fallback to heap */
+    x->generation = _next_generation();
+    x->mark = -2;  /* Special mark: pool-allocated */
+    x->tag = TAG_INT;
+    x->is_pair = 0;
+    x->scc_id = -1;
+    x->scan_tag = 0;
+    x->i = value;
+    return x;
+}
+
+Obj* pool_mk_pair(Pool* p, Obj* a, Obj* b) {
+    Obj* x = pool_alloc(p, sizeof(Obj));
+    if (!x) return mk_pair(a, b);  /* Fallback to heap */
+    x->generation = _next_generation();
+    x->mark = -2;
+    x->tag = TAG_PAIR;
+    x->is_pair = 1;
+    x->scc_id = -1;
+    x->scan_tag = 0;
+    x->a = a;
+    x->b = b;
+    return x;
+}
+
+Obj* pool_mk_box(Pool* p, Obj* value) {
+    Obj* x = pool_alloc(p, sizeof(Obj));
+    if (!x) return mk_box(value);
+    x->generation = _next_generation();
+    x->mark = -2;
+    x->tag = TAG_BOX;
+    x->is_pair = 0;
+    x->scc_id = -1;
+    x->scan_tag = 0;
+    x->ptr = value;
+    return x;
+}
+
+void pool_destroy(Pool* p) {
+    if (!p) return;
+
+    PoolBlock* b = p->blocks;
+    while (b) {
+        PoolBlock* next = b->next;
+        free(b->memory);
+        free(b);
+        b = next;
+    }
+
+    free(p);
+}
+
+void pool_reset(Pool* p) {
+    if (!p) return;
+
+    PoolBlock* b = p->blocks;
+    while (b) {
+        b->used = 0;
+        b = b->next;
+    }
+    p->current = p->blocks;
+    p->alloc_count = 0;
+}
+
+/* Check if object is pool-allocated */
+static inline int is_pool_allocated(Obj* obj) {
+    return obj && !IS_IMMEDIATE(obj) && obj->mark == -2;
+}
+
+/* Deep copy pool-allocated value to heap (for escaping values) */
+Obj* pool_escape_to_heap(Obj* obj) {
+    if (!obj || IS_IMMEDIATE(obj)) return obj;
+    if (!is_pool_allocated(obj)) return obj;  /* Already on heap */
+
+    if (obj->is_pair) {
+        Obj* a_heap = pool_escape_to_heap(obj->a);
+        Obj* b_heap = pool_escape_to_heap(obj->b);
+        return mk_pair(a_heap, b_heap);
+    } else if (obj->tag == TAG_INT) {
+        return mk_int(obj->i);
+    } else if (obj->tag == TAG_FLOAT) {
+        return mk_float(obj->f);
+    } else if (obj->tag == TAG_BOX) {
+        Obj* val_heap = pool_escape_to_heap((Obj*)obj->ptr);
+        return mk_box(val_heap);
+    }
+
+    /* Unknown type - return as-is */
+    return obj;
+}
+
+/* Pool scope management */
+void pool_enter_scope(void) {
+    if (_pool_depth == 0) {
+        _current_pool = pool_create();
+    }
+    _pool_depth++;
+}
+
+void pool_exit_scope(void) {
+    if (_pool_depth > 0) {
+        _pool_depth--;
+        if (_pool_depth == 0 && _current_pool) {
+            pool_destroy(_current_pool);
+            _current_pool = NULL;
+        }
+    }
+}
+
+Pool* pool_current(void) {
+    return _current_pool;
+}
+
+
+`)
 }
 
 // GenerateExceptionRuntime generates exception handling support
@@ -2543,13 +3492,177 @@ func (g *RuntimeGenerator) GenerateExceptionRuntime() {
 func (g *RuntimeGenerator) GenerateConcurrencyRuntime() {
 	ctx := analysis.NewConcurrencyContext()
 	gen := analysis.NewConcurrencyCodeGenerator(ctx)
-	g.emit("%s\n", gen.GenerateConcurrencyRuntime())
+	g.emit(`
+
+%s
+
+`, gen.GenerateConcurrencyRuntime())
 }
 
 // GenerateDPSRuntime generates Destination-Passing Style runtime
 func (g *RuntimeGenerator) GenerateDPSRuntime() {
 	dps := analysis.NewDPSOptimizer()
-	g.emit("%s\n", dps.GenerateDPSRuntime())
+	g.emit(`
+
+%s
+
+`, dps.GenerateDPSRuntime())
+}
+
+// GenerateNaNBoxingRuntime generates NaN-boxing for unboxed floats
+func (g *RuntimeGenerator) GenerateNaNBoxingRuntime() {
+	g.emitRaw(`
+
+/* ========== NaN-Boxing for Unboxed Floats ========== */
+/* Uses IEEE 754 quiet NaN payload bits to store pointers */
+/* Enables unboxed floats while still supporting object pointers */
+
+/*
+ * IEEE 754 Double Layout:
+ *   Quiet NaN:  0 11111111111 1xxx...xxx (51 payload bits)
+ *   We use:     0x7FF8_0000_0000_0000 as NaN prefix
+ *   Payload:    48 bits for pointer (enough for x86-64 canonical addresses)
+ *
+ * Value encoding:
+ *   - Normal floats: any bit pattern that isn't our NaN-boxed format
+ *   - Tagged ints/bools/chars: already use low bits (3-bit tag)
+ *   - Object pointers: NaN-boxed with our prefix
+ */
+
+/* NaN-boxing constants */
+#define NANBOX_PREFIX     0x7FF8000000000000ULL  /* Quiet NaN prefix */
+#define NANBOX_MASK       0xFFFF000000000000ULL  /* High 16 bits */
+#define NANBOX_PTR_MASK   0x0000FFFFFFFFFFFFULL  /* Low 48 bits for pointer */
+
+/* Check if a raw 64-bit value is a NaN-boxed pointer */
+#define IS_NANBOXED_PTR(bits)  (((bits) & NANBOX_MASK) == NANBOX_PREFIX)
+
+/* Extract pointer from NaN-boxed value */
+#define NANBOX_TO_PTR(bits)    ((Obj*)((uintptr_t)((bits) & NANBOX_PTR_MASK)))
+
+/* Create NaN-boxed pointer from Obj* */
+#define PTR_TO_NANBOX(p)       (NANBOX_PREFIX | ((uint64_t)(uintptr_t)(p) & NANBOX_PTR_MASK))
+
+/* Universal value type that can hold float or NaN-boxed pointer */
+typedef union {
+    double f;           /* IEEE 754 double */
+    uint64_t bits;      /* Raw bits for NaN-boxing */
+} NanBoxedValue;
+
+/* Check if value is a real float (not NaN-boxed or immediate) */
+static inline int nanbox_is_float(NanBoxedValue v) {
+    /* If it's our NaN-box prefix, it's a pointer */
+    if (IS_NANBOXED_PTR(v.bits)) return 0;
+    /* If it's a tagged immediate, it's not a float */
+    if (IS_IMMEDIATE(v.bits)) return 0;
+    /* Otherwise it's a float */
+    return 1;
+}
+
+/* Check if value is a NaN-boxed object pointer */
+static inline int nanbox_is_ptr(NanBoxedValue v) {
+    return IS_NANBOXED_PTR(v.bits);
+}
+
+/* Get float value (caller must verify nanbox_is_float first) */
+static inline double nanbox_to_float(NanBoxedValue v) {
+    return v.f;
+}
+
+/* Get object pointer from NaN-boxed value */
+static inline Obj* nanbox_to_obj(NanBoxedValue v) {
+    if (IS_NANBOXED_PTR(v.bits)) {
+        return NANBOX_TO_PTR(v.bits);
+    }
+    if (IS_IMMEDIATE(v.bits)) {
+        return (Obj*)v.bits;  /* Tagged immediate */
+    }
+    return NULL;  /* It's a float, not an object */
+}
+
+/* Create NaN-boxed value from float */
+static inline NanBoxedValue nanbox_from_float(double f) {
+    NanBoxedValue v;
+    v.f = f;
+    return v;
+}
+
+/* Create NaN-boxed value from object pointer */
+static inline NanBoxedValue nanbox_from_obj(Obj* obj) {
+    NanBoxedValue v;
+    if (!obj) {
+        v.bits = 0;
+    } else if (IS_IMMEDIATE((uint64_t)(uintptr_t)obj)) {
+        v.bits = (uint64_t)(uintptr_t)obj;  /* Keep tagged immediate */
+    } else {
+        v.bits = PTR_TO_NANBOX(obj);  /* NaN-box the pointer */
+    }
+    return v;
+}
+
+/* Arithmetic on NaN-boxed floats */
+static inline NanBoxedValue nanbox_add(NanBoxedValue a, NanBoxedValue b) {
+    if (nanbox_is_float(a) && nanbox_is_float(b)) {
+        return nanbox_from_float(a.f + b.f);
+    }
+    /* Handle mixed types - fall back to heap */
+    return nanbox_from_float(0.0);
+}
+
+static inline NanBoxedValue nanbox_sub(NanBoxedValue a, NanBoxedValue b) {
+    if (nanbox_is_float(a) && nanbox_is_float(b)) {
+        return nanbox_from_float(a.f - b.f);
+    }
+    return nanbox_from_float(0.0);
+}
+
+static inline NanBoxedValue nanbox_mul(NanBoxedValue a, NanBoxedValue b) {
+    if (nanbox_is_float(a) && nanbox_is_float(b)) {
+        return nanbox_from_float(a.f * b.f);
+    }
+    return nanbox_from_float(0.0);
+}
+
+static inline NanBoxedValue nanbox_div(NanBoxedValue a, NanBoxedValue b) {
+    if (nanbox_is_float(a) && nanbox_is_float(b) && b.f != 0.0) {
+        return nanbox_from_float(a.f / b.f);
+    }
+    return nanbox_from_float(0.0);
+}
+
+/* Comparison on NaN-boxed values */
+static inline int nanbox_eq(NanBoxedValue a, NanBoxedValue b) {
+    if (nanbox_is_float(a) && nanbox_is_float(b)) {
+        return a.f == b.f;
+    }
+    if (nanbox_is_ptr(a) && nanbox_is_ptr(b)) {
+        return nanbox_to_obj(a) == nanbox_to_obj(b);
+    }
+    return 0;
+}
+
+static inline int nanbox_lt(NanBoxedValue a, NanBoxedValue b) {
+    if (nanbox_is_float(a) && nanbox_is_float(b)) {
+        return a.f < b.f;
+    }
+    return 0;
+}
+
+/* Print NaN-boxed value for debugging */
+static inline void nanbox_print(NanBoxedValue v) {
+    if (nanbox_is_float(v)) {
+        printf("%g", v.f);
+    } else if (nanbox_is_ptr(v)) {
+        Obj* obj = nanbox_to_obj(v);
+        print_obj(obj);
+    } else {
+        printf("<nanbox:0x%llx>", (unsigned long long)v.bits);
+    }
+}
+
+
+
+`)
 }
 
 // GenerateRuntime generates the complete C99 runtime to a string
