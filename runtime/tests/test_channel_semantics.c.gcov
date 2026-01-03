@@ -1,0 +1,162 @@
+        -:    0:Source:test_channel_semantics.c
+        -:    0:Graph:./run_tests_cov-test_main.gcno
+        -:    0:Data:./run_tests_cov-test_main.gcda
+        -:    0:Runs:1
+        -:    1:/* Channel semantics tests (unbuffered behavior) */
+        -:    2:#include "test_framework.h"
+        -:    3:#include <pthread.h>
+        -:    4:#include <time.h>
+        -:    5:#include <unistd.h>
+        -:    6:
+        -:    7:typedef struct {
+        -:    8:    Obj* ch;
+        -:    9:    Obj* val;
+        -:   10:    pthread_mutex_t lock;
+        -:   11:    pthread_cond_t cond;
+        -:   12:    volatile int started;
+        -:   13:    volatile int sent;
+        -:   14:} SendCtx;
+        -:   15:
+function sender_thread called 1 returned 100% blocks executed 100%
+        1:   16:static void* sender_thread(void* arg) {
+        1:   17:    SendCtx* ctx = (SendCtx*)arg;
+        1:   18:    pthread_mutex_lock(&ctx->lock);
+call    0 returned 1
+        1:   19:    ctx->started = 1;
+        1:   20:    pthread_cond_broadcast(&ctx->cond);
+call    0 returned 1
+        1:   21:    pthread_mutex_unlock(&ctx->lock);
+call    0 returned 1
+        1:   22:    channel_send(ctx->ch, ctx->val);
+call    0 returned 1
+        1:   23:    pthread_mutex_lock(&ctx->lock);
+call    0 returned 1
+        1:   24:    ctx->sent = 1;
+        1:   25:    pthread_cond_broadcast(&ctx->cond);
+call    0 returned 1
+        1:   26:    pthread_mutex_unlock(&ctx->lock);
+call    0 returned 1
+        1:   27:    return NULL;
+        -:   28:}
+        -:   29:
+function sleep_ms called 1 returned 100% blocks executed 100%
+        1:   30:static void sleep_ms(long ms) {
+        -:   31:    struct timespec ts;
+        1:   32:    ts.tv_sec = ms / 1000;
+        1:   33:    ts.tv_nsec = (ms % 1000) * 1000000L;
+        1:   34:    nanosleep(&ts, NULL);
+call    0 returned 1
+        1:   35:}
+        -:   36:
+function test_channel_unbuffered_blocks called 1 returned 100% blocks executed 65%
+        1:   37:void test_channel_unbuffered_blocks(void) {
+        1:   38:    Obj* ch = make_channel(0);
+call    0 returned 1
+       1*:   39:    ASSERT_NOT_NULL(ch);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        -:   40:
+        1:   41:    SendCtx ctx = {0};
+        1:   42:    ctx.ch = ch;
+        1:   43:    ctx.val = mk_int_unboxed(7);
+call    0 returned 1
+        1:   44:    pthread_mutex_init(&ctx.lock, NULL);
+call    0 returned 1
+        1:   45:    pthread_cond_init(&ctx.cond, NULL);
+call    0 returned 1
+        -:   46:
+        -:   47:    pthread_t th;
+        1:   48:    pthread_create(&th, NULL, sender_thread, &ctx);
+call    0 returned 1
+        -:   49:
+        -:   50:    /* Wait until sender starts */
+        1:   51:    pthread_mutex_lock(&ctx.lock);
+call    0 returned 1
+        2:   52:    while (!ctx.started) {
+branch  0 taken 1
+branch  1 taken 1 (fallthrough)
+        1:   53:        pthread_cond_wait(&ctx.cond, &ctx.lock);
+call    0 returned 1
+        -:   54:    }
+        -:   55:
+        -:   56:    /* Unbuffered channel should still be blocked before recv */
+       1*:   57:    ASSERT_EQ(ctx.sent, 0);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   58:    pthread_mutex_unlock(&ctx.lock);
+call    0 returned 1
+        -:   59:
+        1:   60:    Obj* received = channel_recv(ch);
+call    0 returned 1
+       1*:   61:    ASSERT_NOT_NULL(received);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   62:    ASSERT_EQ(obj_to_int(received), 7);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        -:   63:
+        -:   64:    /* Wait briefly for sender to complete; fallback to close to avoid hangs */
+        1:   65:    int waited = 0;
+        1:   66:    pthread_mutex_lock(&ctx.lock);
+call    0 returned 1
+        2:   67:    while (!ctx.sent && waited < 200) {
+branch  0 taken 1 (fallthrough)
+branch  1 taken 1
+branch  2 taken 1
+branch  3 taken 0 (fallthrough)
+        1:   68:        pthread_mutex_unlock(&ctx.lock);
+call    0 returned 1
+        1:   69:        sleep_ms(1);
+call    0 returned 1
+        1:   70:        waited++;
+        1:   71:        pthread_mutex_lock(&ctx.lock);
+call    0 returned 1
+        -:   72:    }
+        1:   73:    if (!ctx.sent) {
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+    #####:   74:        pthread_mutex_unlock(&ctx.lock);
+call    0 never executed
+    #####:   75:        channel_close(ch);
+call    0 never executed
+    #####:   76:        pthread_mutex_lock(&ctx.lock);
+call    0 never executed
+        -:   77:    }
+        1:   78:    pthread_mutex_unlock(&ctx.lock);
+call    0 returned 1
+        -:   79:
+        1:   80:    pthread_join(th, NULL);
+call    0 returned 1
+       1*:   81:    ASSERT_EQ(ctx.sent, 1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        -:   82:
+        1:   83:    dec_ref(received);
+call    0 returned 1
+        1:   84:    pthread_mutex_destroy(&ctx.lock);
+call    0 returned 1
+        1:   85:    pthread_cond_destroy(&ctx.cond);
+call    0 returned 1
+        1:   86:    dec_ref(ch);
+call    0 returned 1
+        1:   87:    PASS();
+call    0 returned 1
+        -:   88:}
+        -:   89:
+function run_channel_semantics_tests called 1 returned 100% blocks executed 100%
+        1:   90:void run_channel_semantics_tests(void) {
+        1:   91:    TEST_SUITE("Channel Semantics");
+call    0 returned 1
+        -:   92:
+        1:   93:    TEST("unbuffered send blocks until recv");
+call    0 returned 1
+        1:   94:    test_channel_unbuffered_blocks();
+call    0 returned 1
+        1:   95:}

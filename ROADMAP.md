@@ -1625,3 +1625,104 @@ func TestComplexCycles(t *testing.T) {
 
 ## Phase 8: Stress Testing
 - [ ] 8.1 Edge case tests
+
+## Phase 9: Memory Architecture Enhancements (Post‑11, ASAP‑Compatible)
+
+These are optional extensions that **do not add language restrictions** and
+**do not introduce stop‑the‑world GC**. They align with the ASAP‑first model.
+For detailed sketches, see `docs/UNIFIED_OPTIMIZATION_PLAN.md`.
+
+### 9.1 Linear/Offset Regions for Serialization & FFI
+
+**Goal**: Allow regions to store pointers as offsets (or raw pointers) depending on
+output target (file vs FFI) without per‑object fixups.
+
+**Where to start (codebase)**:
+- `runtime/src/memory/region.c` and `runtime/src/runtime.c` (region lifetime + pointer access)
+- `runtime/src/memory/arena.c` (allocator patterns)
+- `runtime/include/purple.h` (public runtime surface)
+
+**Search terms**: `RegionContext`, `region_enter`, `region_alloc`, `region_ref_deref`,
+`arena_create`, `arena_alloc`
+
+**References**: Vale `LinearRegion` design (`Vale/docs/LinearRegion.md`)
+
+**Tasks**:
+- [ ] 9.1.1 Add `offset_mode` + `adjuster` to region state
+- [ ] 9.1.2 Route pointer stores/loads through `region_store_ptr` / `region_deref_ptr`
+- [ ] 9.1.3 Add tests for serialized buffers and file offsets
+
+### 9.2 Pluggable Region Backends (IRegion‑style)
+
+**Goal**: A small vtable lets the compiler choose arena/RC/pool/unsafe backends
+without user annotations.
+
+**Where to start (codebase)**:
+- `runtime/src/memory/region.c` (region context)
+- `runtime/src/memory/arena.c` (arena backend)
+- `runtime/src/runtime.c` (allocation APIs exposed to generated code)
+
+**Search terms**: `region_alloc`, `arena_alloc`, `dec_ref`, `free_tree`, `gen_*_runtime`
+
+**References**: Vale `IRegion` interface (`Vale/docs/IRegion.md`)
+
+**Tasks**:
+- [ ] 9.2.1 Define a `RegionVTable` (alloc/free/deref/scan)
+- [ ] 9.2.2 Implement arena + RC backends behind the vtable
+- [ ] 9.2.3 Add codegen routing: escape/shape → backend selection
+
+### 9.3 Weak Ref Control Blocks (Merge‑Friendly)
+
+**Goal**: Make weak refs robust across region merges and arena teardown.
+
+**Where to start (codebase)**:
+- `runtime/src/runtime.c` (weak refs + object lifecycle)
+- `runtime/include/purple.h` (weak ref public types)
+- `docs/GENERATIONAL_MEMORY.md` (soundness constraints)
+
+**Search terms**: `Weak`, `weak`, `invalidate_weak`, `BorrowRef`, `gen`
+
+**References**: Vale weak ref options (`Vale/docs/WeakRef.md`)
+
+**Tasks**:
+- [ ] 9.3.1 Add `WeakCB` control block (gen + ptr + weak_count)
+- [ ] 9.3.2 Make weak refs point to control blocks instead of objects
+- [ ] 9.3.3 Invalidate by bumping `gen` + NULLing `ptr`
+
+### 9.4 Transmigration / Isolation on Region Escape
+
+**Goal**: When values escape a temporary region, isolate them so cross‑region borrows
+become invalid without heap‑wide scans.
+
+**Where to start (codebase)**:
+- `csrc/analysis/analysis.c` (shape/escape information)
+- `csrc/codegen/*` (where region boundaries are emitted)
+- `runtime/src/runtime.c` (object headers + traversal utilities)
+
+**Search terms**: `ShapeInfo`, `ESCAPE_`, `release_children`, `scan_`, `free_tree`
+
+**References**: Vale transmigration (`Vale/docs/regions/Transmigration.md`)
+
+**Tasks**:
+- [ ] 9.4.1 Add `transmigrate_*` walkers (generation‑offset or copy‑out)
+- [ ] 9.4.2 Hook into codegen when region‑local data escapes
+- [ ] 9.4.3 Add tests: return from arena/pure region with borrows
+
+### 9.5 External Handle Indexing (FFI + Determinism)
+
+**Goal**: Stable external handles (index+generation) without exposing raw pointers,
+optionally usable for deterministic record/replay.
+
+**Where to start (codebase)**:
+- `runtime/src/runtime.c` (GenRef/IPGE + handle utilities)
+- `runtime/include/purple.h` (public API)
+- `docs/GENERATIONAL_MEMORY.md` and `new_genref.md` (soundness + tagging)
+
+**Search terms**: `BorrowRef`, `ipge_`, `generation`, `Handle`, `tag`
+
+**References**: Vale replayability map (`Vale/docs/PerfectReplayability.md`)
+
+**Tasks**:
+- [ ] 9.5.1 Add `HandleTable` (index+gen → ptr)
+- [ ] 9.5.2 Expose `handle_alloc/get/free` for FFI boundaries
+- [ ] 9.5.3 Optional: map handles deterministically for replay

@@ -1,0 +1,63 @@
+
+func nonEmpty<T>(self &Opt<T>) bool { not self.isEmpty() }
+
+
+abstract func get<T>(virtual opt Opt<T>, msg str) T;
+func get<T>(opt None<T>, msg str) T { panic(msg); }
+func get<T>(opt Some<T>, msg str) T {
+  [value] = opt;
+  return value;
+}
+
+abstract func get<T>(virtual opt &Opt<T>, msg str) &T;
+func get<T>(opt &None<T>, msg str) &T { panic(msg); }
+func get<T>(opt &Some<T>, msg str) &T { return &opt.value; }
+
+func ==<T>(a &Opt<T>, b &Opt<T>) bool
+where func ==(&T, &T)bool {
+  if a.isEmpty() and b.isEmpty() {
+    return true;
+  }
+  if a.isEmpty() != b.isEmpty() {
+    return false;
+  }
+  return a.get() == b.get();
+}
+
+func clone<T>(self &Opt<T>) Opt<T>
+where func clone(&T)T {
+  if self.isEmpty() {
+    return None<T>();
+  }
+  return Some(self.get().clone());
+}
+
+
+func map<R, F, T>(self &Opt<T>, func &F) Opt<R>
+where func(&F, &T)R {
+  if self.isEmpty() {
+    None<R>()
+  } else {
+    Some<R>(func(&self.get()))
+  }
+}
+
+func or<F, T>(self Opt<T>, func F) T
+where func(&F)T, func drop(F)void {
+  if self.isEmpty() {
+    [ ] = (self).as<None<T>>().expect("zork f");
+    return func();
+  } else {
+    return (self).get();
+  }
+}
+
+func or<F, T>(self &Opt<T>, func F) &T
+where func(&F)&T, func drop(F)void {
+  if self.isEmpty() {
+    [ ] = self.as<None<T>>().expect("zork g");
+    return func();
+  } else {
+    return self.get();
+  }
+}

@@ -152,6 +152,31 @@ Validation:
 
 ---
 
+## Backlog: Memory Architecture Enhancements (Post‑11)
+
+These are ASAP‑compatible enhancements (no language restrictions, no STW GC).
+See `ROADMAP.md` Phase 9 and `docs/UNIFIED_OPTIMIZATION_PLAN.md` for sketches.
+
+1) Linear/offset regions for serialization & FFI  
+   - Search terms: `RegionContext`, `region_enter`, `region_alloc`, `region_ref_deref`
+2) Pluggable region backends (IRegion‑style vtable)  
+   - Search terms: `region_alloc`, `arena_alloc`, `free_tree`, `dec_ref`
+3) Weak ref control blocks (merge‑friendly)  
+   - Search terms: `Weak`, `weak`, `invalidate_weak`, `BorrowRef`
+4) Transmigration / isolation on region escape  
+   - Search terms: `ShapeInfo`, `ESCAPE_`, `scan_`, `release_children`
+5) External handle indexing (FFI + determinism)  
+   - Search terms: `BorrowRef`, `ipge_`, `generation`, `Handle`, `tag`
+
+References (Vale docs):
+- `Vale/docs/LinearRegion.md`
+- `Vale/docs/IRegion.md`
+- `Vale/docs/WeakRef.md`
+- `Vale/docs/regions/Transmigration.md`
+- `Vale/docs/PerfectReplayability.md`
+
+---
+
 ## Secondary: Port Missing Features from purple_c_scratch
 
 ### Destination-Passing Style (DPS)

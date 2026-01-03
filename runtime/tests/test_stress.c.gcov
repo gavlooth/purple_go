@@ -1,0 +1,1222 @@
+        -:    0:Source:test_stress.c
+        -:    0:Graph:./run_tests_cov-test_main.gcno
+        -:    0:Data:./run_tests_cov-test_main.gcda
+        -:    0:Runs:1
+        -:    1:/* test_stress.c - Comprehensive stress tests for the runtime */
+        -:    2:#include "test_framework.h"
+        -:    3:#include <time.h>
+        -:    4:
+        -:    5:/* ========== Allocation Stress Tests ========== */
+        -:    6:
+function test_stress_alloc_10k_ints called 0 returned 0% blocks executed 0%
+    #####:    7:void test_stress_alloc_10k_ints(void) {
+        -:    8:    Obj* objs[10000];
+    #####:    9:    for (int i = 0; i < 10000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:   10:        objs[i] = mk_int(i);
+call    0 never executed
+    #####:   11:        ASSERT_NOT_NULL(objs[i]);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+        -:   12:    }
+    #####:   13:    for (int i = 0; i < 10000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:   14:        dec_ref(objs[i]);
+call    0 never executed
+        -:   15:    }
+    #####:   16:    PASS();
+call    0 never executed
+        -:   17:}
+        -:   18:
+function test_stress_alloc_10k_pairs called 0 returned 0% blocks executed 0%
+    #####:   19:void test_stress_alloc_10k_pairs(void) {
+        -:   20:    Obj* pairs[10000];
+    #####:   21:    for (int i = 0; i < 10000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:   22:        pairs[i] = mk_pair(mk_int_unboxed(i), mk_int_unboxed(i + 1));
+call    0 never executed
+call    1 never executed
+call    2 never executed
+    #####:   23:        ASSERT_NOT_NULL(pairs[i]);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+        -:   24:    }
+    #####:   25:    for (int i = 0; i < 10000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:   26:        dec_ref(pairs[i]);
+call    0 never executed
+        -:   27:    }
+    #####:   28:    PASS();
+call    0 never executed
+        -:   29:}
+        -:   30:
+function test_stress_alloc_mixed_types called 0 returned 0% blocks executed 0%
+    #####:   31:void test_stress_alloc_mixed_types(void) {
+    #####:   32:    for (int i = 0; i < 5000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+        -:   33:        Obj* x;
+    #####:   34:        switch (i % 5) {
+branch  0 never executed
+branch  1 never executed
+branch  2 never executed
+branch  3 never executed
+branch  4 never executed
+branch  5 never executed
+    #####:   35:            case 0: x = mk_int(i); break;
+call    0 never executed
+    #####:   36:            case 1: x = mk_float((double)i); break;
+call    0 never executed
+    #####:   37:            case 2: x = mk_char(i % 128); break;
+call    0 never executed
+    #####:   38:            case 3: x = mk_pair(mk_int_unboxed(i), NULL); break;
+call    0 never executed
+call    1 never executed
+    #####:   39:            case 4: x = mk_sym("test"); break;
+call    0 never executed
+    #####:   40:            default: x = NULL;
+        -:   41:        }
+    #####:   42:        ASSERT_NOT_NULL(x);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:   43:        dec_ref(x);
+call    0 never executed
+        -:   44:    }
+    #####:   45:    PASS();
+call    0 never executed
+        -:   46:}
+        -:   47:
+function test_stress_alloc_free_cycle called 0 returned 0% blocks executed 0%
+    #####:   48:void test_stress_alloc_free_cycle(void) {
+    #####:   49:    for (int i = 0; i < 10000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:   50:        Obj* x = mk_int(i);
+call    0 never executed
+    #####:   51:        ASSERT_NOT_NULL(x);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:   52:        dec_ref(x);
+call    0 never executed
+        -:   53:    }
+    #####:   54:    PASS();
+call    0 never executed
+        -:   55:}
+        -:   56:
+        -:   57:/* ========== List Stress Tests ========== */
+        -:   58:
+        -:   59:/* Helper to count list length (returns int) */
+function stress_count_list_length called 0 returned 0% blocks executed 0%
+    #####:   60:static int stress_count_list_length(Obj* xs) {
+    #####:   61:    int len = 0;
+    #####:   62:    while (xs && xs->tag == TAG_PAIR) {
+branch  0 never executed (fallthrough)
+branch  1 never executed
+branch  2 never executed
+branch  3 never executed (fallthrough)
+    #####:   63:        len++;
+    #####:   64:        xs = xs->b;
+        -:   65:    }
+    #####:   66:    return len;
+        -:   67:}
+        -:   68:
+function test_stress_list_100k_elements called 0 returned 0% blocks executed 0%
+    #####:   69:void test_stress_list_100k_elements(void) {
+        -:   70:    /* Build list of 100k elements */
+    #####:   71:    Obj* list = NULL;
+    #####:   72:    for (int i = 0; i < 100000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:   73:        list = mk_pair(mk_int_unboxed(i), list);
+call    0 never executed
+call    1 never executed
+        -:   74:    }
+        -:   75:
+        -:   76:    /* Count length */
+    #####:   77:    int len = stress_count_list_length(list);
+call    0 never executed
+    #####:   78:    ASSERT_EQ(len, 100000);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+        -:   79:
+    #####:   80:    dec_ref(list);
+call    0 never executed
+    #####:   81:    PASS();
+call    0 never executed
+        -:   82:}
+        -:   83:
+function test_stress_list_deep_nesting called 0 returned 0% blocks executed 0%
+    #####:   84:void test_stress_list_deep_nesting(void) {
+        -:   85:    /* Create deeply nested list */
+    #####:   86:    Obj* nested = mk_int_unboxed(0);
+call    0 never executed
+    #####:   87:    for (int i = 1; i <= 10000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:   88:        nested = mk_pair(mk_int_unboxed(i), nested);
+call    0 never executed
+call    1 never executed
+        -:   89:    }
+    #####:   90:    ASSERT_NOT_NULL(nested);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:   91:    dec_ref(nested);
+call    0 never executed
+    #####:   92:    PASS();
+call    0 never executed
+        -:   93:}
+        -:   94:
+function test_stress_list_reverse_large called 0 returned 0% blocks executed 0%
+    #####:   95:void test_stress_list_reverse_large(void) {
+        -:   96:    /* Build list */
+    #####:   97:    Obj* list = NULL;
+    #####:   98:    for (int i = 0; i < 10000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:   99:        list = mk_pair(mk_int_unboxed(i), list);
+call    0 never executed
+call    1 never executed
+        -:  100:    }
+        -:  101:
+        -:  102:    /* Reverse it */
+    #####:  103:    Obj* reversed = list_reverse(list);
+call    0 never executed
+    #####:  104:    ASSERT_NOT_NULL(reversed);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+        -:  105:
+        -:  106:    /* Verify first element */
+    #####:  107:    ASSERT_EQ(obj_to_int(reversed->a), 0);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:  108:
+    #####:  109:    dec_ref(list);
+call    0 never executed
+    #####:  110:    dec_ref(reversed);
+call    0 never executed
+    #####:  111:    PASS();
+call    0 never executed
+        -:  112:}
+        -:  113:
+        -:  114:/* ========== Closure Stress Tests ========== */
+        -:  115:
+function stress_identity_fn called 0 returned 0% blocks executed 0%
+    #####:  116:static Obj* stress_identity_fn(Obj** caps, Obj** args, int nargs) {
+        -:  117:    (void)caps;
+    #####:  118:    if (nargs > 0 && args[0]) {
+branch  0 never executed (fallthrough)
+branch  1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+    #####:  119:        inc_ref(args[0]);
+call    0 never executed
+    #####:  120:        return args[0];
+        -:  121:    }
+    #####:  122:    return NULL;
+        -:  123:}
+        -:  124:
+function test_stress_closure_10k_calls called 0 returned 0% blocks executed 0%
+    #####:  125:void test_stress_closure_10k_calls(void) {
+    #####:  126:    Obj* closure = mk_closure(stress_identity_fn, NULL, NULL, 0, 1);
+call    0 never executed
+        -:  127:
+    #####:  128:    for (int i = 0; i < 10000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  129:        Obj* arg = mk_int_unboxed(i);
+call    0 never executed
+    #####:  130:        Obj* args[] = {arg};
+    #####:  131:        Obj* result = call_closure(closure, args, 1);
+call    0 never executed
+    #####:  132:        ASSERT_EQ(obj_to_int(result), i);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+    #####:  133:        dec_ref(result);
+call    0 never executed
+        -:  134:    }
+        -:  135:
+    #####:  136:    dec_ref(closure);
+call    0 never executed
+    #####:  137:    PASS();
+call    0 never executed
+        -:  138:}
+        -:  139:
+function test_stress_closure_create_destroy called 0 returned 0% blocks executed 0%
+    #####:  140:void test_stress_closure_create_destroy(void) {
+    #####:  141:    for (int i = 0; i < 5000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  142:        Obj* closure = mk_closure(stress_identity_fn, NULL, NULL, 0, 1);
+call    0 never executed
+    #####:  143:        ASSERT_NOT_NULL(closure);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  144:        dec_ref(closure);
+call    0 never executed
+        -:  145:    }
+    #####:  146:    PASS();
+call    0 never executed
+        -:  147:}
+        -:  148:
+function test_stress_closure_with_captures called 0 returned 0% blocks executed 0%
+    #####:  149:void test_stress_closure_with_captures(void) {
+    #####:  150:    for (int i = 0; i < 1000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  151:        Obj* caps[3] = {mk_int(i), mk_int(i + 1), mk_int(i + 2)};
+call    0 never executed
+call    1 never executed
+call    2 never executed
+    #####:  152:        Obj* closure = mk_closure(stress_identity_fn, caps, NULL, 3, 1);
+call    0 never executed
+    #####:  153:        ASSERT_NOT_NULL(closure);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  154:        dec_ref(closure);
+call    0 never executed
+    #####:  155:        for (int j = 0; j < 3; j++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  156:            dec_ref(caps[j]);
+call    0 never executed
+        -:  157:        }
+        -:  158:    }
+    #####:  159:    PASS();
+call    0 never executed
+        -:  160:}
+        -:  161:
+        -:  162:/* ========== Arena Stress Tests ========== */
+        -:  163:
+function test_stress_arena_100k_allocs called 0 returned 0% blocks executed 0%
+    #####:  164:void test_stress_arena_100k_allocs(void) {
+    #####:  165:    Arena* a = arena_create();
+call    0 never executed
+    #####:  166:    for (int i = 0; i < 100000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  167:        Obj* x = arena_mk_int(a, i);
+call    0 never executed
+    #####:  168:        ASSERT_NOT_NULL(x);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+        -:  169:    }
+    #####:  170:    arena_destroy(a);
+call    0 never executed
+    #####:  171:    PASS();
+call    0 never executed
+        -:  172:}
+        -:  173:
+function test_stress_arena_reset_cycles called 0 returned 0% blocks executed 0%
+    #####:  174:void test_stress_arena_reset_cycles(void) {
+    #####:  175:    Arena* a = arena_create();
+call    0 never executed
+    #####:  176:    for (int round = 0; round < 1000; round++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  177:        for (int i = 0; i < 100; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  178:            arena_mk_int(a, i + round * 100);
+call    0 never executed
+        -:  179:        }
+    #####:  180:        arena_reset(a);
+call    0 never executed
+        -:  181:    }
+    #####:  182:    arena_destroy(a);
+call    0 never executed
+    #####:  183:    PASS();
+call    0 never executed
+    #####:  184:}
+        -:  185:
+function test_stress_arena_multiple_arenas called 0 returned 0% blocks executed 0%
+    #####:  186:void test_stress_arena_multiple_arenas(void) {
+        -:  187:    Arena* arenas[10];
+    #####:  188:    for (int i = 0; i < 10; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  189:        arenas[i] = arena_create();
+call    0 never executed
+    #####:  190:        for (int j = 0; j < 1000; j++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  191:            arena_mk_int(arenas[i], i * 1000 + j);
+call    0 never executed
+        -:  192:        }
+        -:  193:    }
+    #####:  194:    for (int i = 0; i < 10; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  195:        arena_destroy(arenas[i]);
+call    0 never executed
+        -:  196:    }
+    #####:  197:    PASS();
+call    0 never executed
+    #####:  198:}
+        -:  199:
+        -:  200:/* ========== Reference Counting Stress Tests ========== */
+        -:  201:
+function test_stress_refcount_up_down called 0 returned 0% blocks executed 0%
+    #####:  202:void test_stress_refcount_up_down(void) {
+    #####:  203:    Obj* obj = mk_int(42);
+call    0 never executed
+    #####:  204:    for (int i = 0; i < 10000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  205:        inc_ref(obj);
+call    0 never executed
+        -:  206:    }
+    #####:  207:    for (int i = 0; i < 10000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  208:        dec_ref(obj);
+call    0 never executed
+        -:  209:    }
+    #####:  210:    dec_ref(obj);  /* Final ref */
+call    0 never executed
+    #####:  211:    PASS();
+call    0 never executed
+    #####:  212:}
+        -:  213:
+function test_stress_refcount_shared called 0 returned 0% blocks executed 0%
+    #####:  214:void test_stress_refcount_shared(void) {
+    #####:  215:    Obj* shared = mk_int(42);
+call    0 never executed
+        -:  216:    Obj* containers[100];
+        -:  217:
+    #####:  218:    for (int i = 0; i < 100; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  219:        inc_ref(shared);
+call    0 never executed
+    #####:  220:        containers[i] = mk_pair(shared, NULL);
+call    0 never executed
+        -:  221:    }
+        -:  222:
+    #####:  223:    for (int i = 0; i < 100; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  224:        dec_ref(containers[i]);
+call    0 never executed
+        -:  225:    }
+    #####:  226:    dec_ref(shared);
+call    0 never executed
+    #####:  227:    PASS();
+call    0 never executed
+    #####:  228:}
+        -:  229:
+        -:  230:/* ========== Tagged Pointer Stress Tests ========== */
+        -:  231:
+function test_stress_tagged_100k_ops called 0 returned 0% blocks executed 0%
+    #####:  232:void test_stress_tagged_100k_ops(void) {
+    #####:  233:    for (int i = 0; i < 100000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  234:        Obj* a = mk_int_unboxed(i);
+call    0 never executed
+    #####:  235:        Obj* b = mk_int_unboxed(i + 1);
+call    0 never executed
+    #####:  236:        Obj* sum = add(a, b);
+call    0 never executed
+    #####:  237:        ASSERT_EQ(obj_to_int(sum), 2 * i + 1);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:  238:    }
+    #####:  239:    PASS();
+call    0 never executed
+        -:  240:}
+        -:  241:
+function test_stress_tagged_mixed_boxing called 0 returned 0% blocks executed 0%
+    #####:  242:void test_stress_tagged_mixed_boxing(void) {
+    #####:  243:    for (int i = 0; i < 10000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  244:        Obj* imm = mk_int_unboxed(i);
+call    0 never executed
+    #####:  245:        Obj* boxed = mk_int(i);
+call    0 never executed
+        -:  246:
+    #####:  247:        ASSERT_EQ(obj_to_int(imm), obj_to_int(boxed));
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+call    4 never executed
+call    5 never executed
+call    6 never executed
+        -:  248:
+    #####:  249:        Obj* sum = add(imm, boxed);
+call    0 never executed
+    #####:  250:        ASSERT_EQ(obj_to_int(sum), 2 * i);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:  251:
+    #####:  252:        dec_ref(boxed);
+call    0 never executed
+        -:  253:    }
+    #####:  254:    PASS();
+call    0 never executed
+        -:  255:}
+        -:  256:
+        -:  257:/* ========== SCC Stress Tests ========== */
+        -:  258:
+function test_stress_scc_many_trees called 0 returned 0% blocks executed 0%
+    #####:  259:void test_stress_scc_many_trees(void) {
+    #####:  260:    for (int i = 0; i < 1000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  261:        Obj* tree = mk_pair(
+call    0 never executed
+call    1 never executed
+call    2 never executed
+call    3 never executed
+    #####:  262:            mk_pair(mk_int(i), mk_int(i + 1)),
+call    0 never executed
+    #####:  263:            mk_pair(mk_int(i + 2), mk_int(i + 3))
+call    0 never executed
+call    1 never executed
+        -:  264:        );
+    #####:  265:        detect_and_freeze_sccs(tree);
+call    0 never executed
+    #####:  266:        dec_ref(tree);
+call    0 never executed
+        -:  267:    }
+    #####:  268:    PASS();
+call    0 never executed
+    #####:  269:}
+        -:  270:
+        -:  271:/* ========== Weak Reference Stress Tests ========== */
+        -:  272:
+function test_stress_weak_ref_many called 0 returned 0% blocks executed 0%
+    #####:  273:void test_stress_weak_ref_many(void) {
+        -:  274:    Obj* objs[1000];
+        -:  275:    _InternalWeakRef* refs[1000];
+        -:  276:
+    #####:  277:    for (int i = 0; i < 1000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  278:        objs[i] = mk_int(i);
+call    0 never executed
+    #####:  279:        refs[i] = _mk_weak_ref(objs[i]);
+call    0 never executed
+        -:  280:    }
+        -:  281:
+        -:  282:    /* Free half, check weak refs */
+    #####:  283:    for (int i = 0; i < 500; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  284:        dec_ref(objs[i]);
+call    0 never executed
+    #####:  285:        ASSERT_EQ(refs[i]->alive, 0);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+        -:  286:    }
+        -:  287:
+        -:  288:    /* Other half should still be valid */
+    #####:  289:    for (int i = 500; i < 1000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  290:        ASSERT_EQ(refs[i]->alive, 1);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  291:        dec_ref(objs[i]);
+call    0 never executed
+        -:  292:    }
+    #####:  293:    PASS();
+call    0 never executed
+        -:  294:}
+        -:  295:
+        -:  296:/* ========== BorrowRef Stress Tests ========== */
+        -:  297:
+function test_stress_borrow_many_refs called 0 returned 0% blocks executed 0%
+    #####:  298:void test_stress_borrow_many_refs(void) {
+    #####:  299:    Obj* obj = mk_int(42);
+call    0 never executed
+        -:  300:    BorrowRef* refs[1000];
+        -:  301:
+    #####:  302:    for (int i = 0; i < 1000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  303:        refs[i] = borrow_create(obj, "stress");
+call    0 never executed
+    #####:  304:        ASSERT(borrow_is_valid(refs[i]));
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+        -:  305:    }
+        -:  306:
+    #####:  307:    borrow_invalidate_obj(obj);
+call    0 never executed
+        -:  308:
+    #####:  309:    for (int i = 0; i < 1000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  310:        ASSERT(!borrow_is_valid(refs[i]));
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+    #####:  311:        borrow_release(refs[i]);
+call    0 never executed
+        -:  312:    }
+    #####:  313:    PASS();
+call    0 never executed
+        -:  314:}
+        -:  315:
+        -:  316:/* ========== Deferred RC Stress Tests ========== */
+        -:  317:
+function test_stress_deferred_large_batch called 0 returned 0% blocks executed 0%
+    #####:  318:void test_stress_deferred_large_batch(void) {
+    #####:  319:    flush_deferred();
+call    0 never executed
+    #####:  320:    set_deferred_batch_size(100);
+call    0 never executed
+        -:  321:
+        -:  322:    Obj* objs[10000];
+    #####:  323:    for (int i = 0; i < 10000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  324:        objs[i] = mk_int(i);
+call    0 never executed
+    #####:  325:        inc_ref(objs[i]);
+call    0 never executed
+    #####:  326:        defer_decrement(objs[i]);
+call    0 never executed
+        -:  327:    }
+        -:  328:
+        -:  329:    /* Process all */
+    #####:  330:    while (DEFERRED_CTX.pending_count > 0) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  331:        process_deferred();
+call    0 never executed
+        -:  332:    }
+        -:  333:
+    #####:  334:    for (int i = 0; i < 10000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  335:        dec_ref(objs[i]);
+call    0 never executed
+        -:  336:    }
+    #####:  337:    PASS();
+call    0 never executed
+    #####:  338:}
+        -:  339:
+        -:  340:/* ========== Memory Pattern Stress Tests ========== */
+        -:  341:
+function test_stress_fragmentation called 0 returned 0% blocks executed 0%
+    #####:  342:void test_stress_fragmentation(void) {
+        -:  343:    /* Allocate many objects, free every other one, allocate more */
+        -:  344:    Obj* objs[1000];
+    #####:  345:    for (int i = 0; i < 1000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  346:        objs[i] = mk_int(i);
+call    0 never executed
+        -:  347:    }
+        -:  348:
+        -:  349:    /* Free even indices */
+    #####:  350:    for (int i = 0; i < 1000; i += 2) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  351:        dec_ref(objs[i]);
+call    0 never executed
+    #####:  352:        objs[i] = NULL;
+        -:  353:    }
+        -:  354:
+        -:  355:    /* Allocate again */
+    #####:  356:    for (int i = 0; i < 1000; i += 2) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  357:        objs[i] = mk_int(i + 1000);
+call    0 never executed
+        -:  358:    }
+        -:  359:
+        -:  360:    /* Free all */
+    #####:  361:    for (int i = 0; i < 1000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  362:        if (objs[i]) dec_ref(objs[i]);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+        -:  363:    }
+    #####:  364:    PASS();
+call    0 never executed
+    #####:  365:}
+        -:  366:
+function test_stress_lifo_pattern called 0 returned 0% blocks executed 0%
+    #####:  367:void test_stress_lifo_pattern(void) {
+        -:  368:    /* Stack-like allocation pattern */
+        -:  369:    Obj* stack[1000];
+    #####:  370:    int top = 0;
+        -:  371:
+    #####:  372:    for (int round = 0; round < 100; round++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+        -:  373:        /* Push 10 */
+    #####:  374:        for (int i = 0; i < 10; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  375:            stack[top++] = mk_int(round * 10 + i);
+call    0 never executed
+        -:  376:        }
+        -:  377:        /* Pop 5 */
+    #####:  378:        for (int i = 0; i < 5; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  379:            dec_ref(stack[--top]);
+call    0 never executed
+        -:  380:        }
+        -:  381:    }
+        -:  382:
+        -:  383:    /* Clean up remaining */
+    #####:  384:    while (top > 0) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  385:        dec_ref(stack[--top]);
+call    0 never executed
+        -:  386:    }
+    #####:  387:    PASS();
+call    0 never executed
+    #####:  388:}
+        -:  389:
+function test_stress_fifo_pattern called 0 returned 0% blocks executed 0%
+    #####:  390:void test_stress_fifo_pattern(void) {
+        -:  391:    /* Queue-like allocation pattern */
+        -:  392:    Obj* queue[1000];
+    #####:  393:    int head = 0, tail = 0;
+        -:  394:
+    #####:  395:    for (int round = 0; round < 100; round++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+        -:  396:        /* Enqueue 5 */
+    #####:  397:        for (int i = 0; i < 5; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  398:            queue[tail++ % 1000] = mk_int(round * 5 + i);
+call    0 never executed
+        -:  399:        }
+        -:  400:        /* Dequeue 3 */
+    #####:  401:        for (int i = 0; i < 3 && head < tail; i++) {
+branch  0 never executed (fallthrough)
+branch  1 never executed
+branch  2 never executed
+branch  3 never executed (fallthrough)
+    #####:  402:            dec_ref(queue[head++ % 1000]);
+call    0 never executed
+        -:  403:        }
+        -:  404:    }
+        -:  405:
+        -:  406:    /* Clean up remaining */
+    #####:  407:    while (head < tail) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  408:        dec_ref(queue[head++ % 1000]);
+call    0 never executed
+        -:  409:    }
+    #####:  410:    PASS();
+call    0 never executed
+    #####:  411:}
+        -:  412:
+        -:  413:/* ========== Concurrency Stress Tests ========== */
+        -:  414:
+        -:  415:/* Increment closure for atom_swap - takes 1 arg (old val), returns new val */
+function stress_increment_closure_fn called 0 returned 0% blocks executed 0%
+    #####:  416:static Obj* stress_increment_closure_fn(Obj** caps, Obj** args, int nargs) {
+        -:  417:    (void)caps; (void)nargs;
+    #####:  418:    if (!args || !args[0]) return mk_int(1);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+call    4 never executed
+    #####:  419:    long n = obj_to_int(args[0]);
+call    0 never executed
+    #####:  420:    return mk_int(n + 1);
+call    0 never executed
+        -:  421:}
+        -:  422:
+function stress_counter_increment called 0 returned 0% blocks executed 0%
+    #####:  423:static Obj* stress_counter_increment(Obj** caps, Obj** args, int nargs) {
+        -:  424:    (void)args; (void)nargs;
+    #####:  425:    Obj* atom = caps[0];
+    #####:  426:    Obj* inc_closure = caps[1];
+    #####:  427:    for (int i = 0; i < 100; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  428:        Obj* result = atom_swap(atom, inc_closure);
+call    0 never executed
+    #####:  429:        if (result) dec_ref(result);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+        -:  430:    }
+    #####:  431:    return NULL;
+        -:  432:}
+        -:  433:
+function test_stress_concurrent_atoms called 0 returned 0% blocks executed 0%
+    #####:  434:void test_stress_concurrent_atoms(void) {
+    #####:  435:    Obj* val = mk_int(0);
+call    0 never executed
+    #####:  436:    Obj* atom = make_atom(val);
+call    0 never executed
+    #####:  437:    Obj* inc_closure = mk_closure(stress_increment_closure_fn, NULL, NULL, 0, 1);
+call    0 never executed
+    #####:  438:    Obj* caps[] = {atom, inc_closure};
+        -:  439:
+        -:  440:    Obj* closures[10];
+        -:  441:    Obj* threads[10];
+        -:  442:
+        -:  443:    /* Create worker closures */
+    #####:  444:    for (int i = 0; i < 10; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  445:        closures[i] = mk_closure(stress_counter_increment, caps, NULL, 2, 0);
+call    0 never executed
+        -:  446:    }
+        -:  447:
+        -:  448:    /* Spawn threads */
+    #####:  449:    for (int i = 0; i < 10; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  450:        threads[i] = spawn_thread(closures[i]);
+call    0 never executed
+        -:  451:    }
+        -:  452:
+        -:  453:    /* Join all */
+    #####:  454:    for (int i = 0; i < 10; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  455:        thread_join(threads[i]);
+call    0 never executed
+    #####:  456:        dec_ref(threads[i]);
+call    0 never executed
+    #####:  457:        dec_ref(closures[i]);
+call    0 never executed
+        -:  458:    }
+        -:  459:
+    #####:  460:    Obj* final = atom_deref(atom);
+call    0 never executed
+    #####:  461:    ASSERT_EQ(obj_to_int(final), 1000);  /* 10 threads * 100 increments */
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+    #####:  462:    dec_ref(final);
+call    0 never executed
+    #####:  463:    dec_ref(inc_closure);
+call    0 never executed
+    #####:  464:    dec_ref(atom);
+call    0 never executed
+    #####:  465:    dec_ref(val);
+call    0 never executed
+    #####:  466:    PASS();
+call    0 never executed
+        -:  467:}
+        -:  468:
+function test_stress_channel_throughput called 0 returned 0% blocks executed 0%
+    #####:  469:void test_stress_channel_throughput(void) {
+    #####:  470:    Obj* ch = make_channel(1000);
+call    0 never executed
+        -:  471:
+        -:  472:    /* Send 10000 values */
+    #####:  473:    for (int i = 0; i < 10000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  474:        channel_send(ch, mk_int(i));
+call    0 never executed
+call    1 never executed
+        -:  475:    }
+        -:  476:
+        -:  477:    /* Receive all */
+    #####:  478:    for (int i = 0; i < 10000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  479:        Obj* val = channel_recv(ch);
+call    0 never executed
+    #####:  480:        ASSERT_NOT_NULL(val);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  481:        ASSERT_EQ(obj_to_int(val), i);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+    #####:  482:        dec_ref(val);
+call    0 never executed
+        -:  483:    }
+        -:  484:
+    #####:  485:    dec_ref(ch);
+call    0 never executed
+    #####:  486:    PASS();
+call    0 never executed
+        -:  487:}
+        -:  488:
+        -:  489:/* ========== Comprehensive Integration Stress Test ========== */
+        -:  490:
+function test_stress_integration called 0 returned 0% blocks executed 0%
+    #####:  491:void test_stress_integration(void) {
+        -:  492:    /* Test combining multiple features */
+    #####:  493:    Arena* arena = arena_create();
+call    0 never executed
+        -:  494:
+        -:  495:    /* Create arena-allocated list */
+    #####:  496:    Obj* arena_list = NULL;
+    #####:  497:    for (int i = 0; i < 100; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  498:        arena_list = arena_mk_pair(arena, arena_mk_int(arena, i), arena_list);
+call    0 never executed
+call    1 never executed
+        -:  499:    }
+        -:  500:
+        -:  501:    /* Create heap-allocated structures */
+        -:  502:    Obj* heap_objs[100];
+    #####:  503:    for (int i = 0; i < 100; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  504:        heap_objs[i] = mk_pair(mk_int(i), mk_float((double)i * 1.5));
+call    0 never executed
+call    1 never executed
+call    2 never executed
+        -:  505:    }
+        -:  506:
+        -:  507:    /* Create closures */
+        -:  508:    Obj* closures[10];
+    #####:  509:    for (int i = 0; i < 10; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  510:        closures[i] = mk_closure(stress_identity_fn, NULL, NULL, 0, 1);
+call    0 never executed
+        -:  511:    }
+        -:  512:
+        -:  513:    /* Use closures */
+    #####:  514:    for (int i = 0; i < 10; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  515:        for (int j = 0; j < 100; j++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  516:            Obj* arg = mk_int_unboxed(j);
+call    0 never executed
+    #####:  517:            Obj* args[] = {arg};
+    #####:  518:            Obj* result = call_closure(closures[i], args, 1);
+call    0 never executed
+    #####:  519:            dec_ref(result);
+call    0 never executed
+        -:  520:        }
+        -:  521:    }
+        -:  522:
+        -:  523:    /* Cleanup */
+    #####:  524:    for (int i = 0; i < 10; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  525:        dec_ref(closures[i]);
+call    0 never executed
+        -:  526:    }
+    #####:  527:    for (int i = 0; i < 100; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  528:        dec_ref(heap_objs[i]);
+call    0 never executed
+        -:  529:    }
+    #####:  530:    arena_destroy(arena);
+call    0 never executed
+    #####:  531:    PASS();
+call    0 never executed
+    #####:  532:}
+        -:  533:
+        -:  534:/* ========== Run All Stress Tests ========== */
+        -:  535:
+function run_stress_tests called 0 returned 0% blocks executed 0%
+    #####:  536:void run_stress_tests(void) {
+    #####:  537:    TEST_SUITE("Stress Tests");
+call    0 never executed
+        -:  538:
+    #####:  539:    TEST_SECTION("Allocation");
+call    0 never executed
+    #####:  540:    RUN_TEST(test_stress_alloc_10k_ints);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  541:    RUN_TEST(test_stress_alloc_10k_pairs);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  542:    RUN_TEST(test_stress_alloc_mixed_types);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  543:    RUN_TEST(test_stress_alloc_free_cycle);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  544:
+    #####:  545:    TEST_SECTION("Lists");
+call    0 never executed
+    #####:  546:    RUN_TEST(test_stress_list_100k_elements);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  547:    RUN_TEST(test_stress_list_deep_nesting);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  548:    RUN_TEST(test_stress_list_reverse_large);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  549:
+    #####:  550:    TEST_SECTION("Closures");
+call    0 never executed
+    #####:  551:    RUN_TEST(test_stress_closure_10k_calls);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  552:    RUN_TEST(test_stress_closure_create_destroy);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  553:    RUN_TEST(test_stress_closure_with_captures);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  554:
+    #####:  555:    TEST_SECTION("Arena");
+call    0 never executed
+    #####:  556:    RUN_TEST(test_stress_arena_100k_allocs);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  557:    RUN_TEST(test_stress_arena_reset_cycles);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  558:    RUN_TEST(test_stress_arena_multiple_arenas);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  559:
+    #####:  560:    TEST_SECTION("Reference Counting");
+call    0 never executed
+    #####:  561:    RUN_TEST(test_stress_refcount_up_down);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  562:    RUN_TEST(test_stress_refcount_shared);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  563:
+    #####:  564:    TEST_SECTION("Tagged Pointers");
+call    0 never executed
+    #####:  565:    RUN_TEST(test_stress_tagged_100k_ops);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  566:    RUN_TEST(test_stress_tagged_mixed_boxing);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  567:
+    #####:  568:    TEST_SECTION("SCC");
+call    0 never executed
+    #####:  569:    RUN_TEST(test_stress_scc_many_trees);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  570:
+    #####:  571:    TEST_SECTION("Weak References");
+call    0 never executed
+    #####:  572:    RUN_TEST(test_stress_weak_ref_many);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  573:
+    #####:  574:    TEST_SECTION("BorrowRef");
+call    0 never executed
+    #####:  575:    RUN_TEST(test_stress_borrow_many_refs);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  576:
+    #####:  577:    TEST_SECTION("Deferred RC");
+call    0 never executed
+    #####:  578:    RUN_TEST(test_stress_deferred_large_batch);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  579:
+    #####:  580:    TEST_SECTION("Memory Patterns");
+call    0 never executed
+    #####:  581:    RUN_TEST(test_stress_fragmentation);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  582:    RUN_TEST(test_stress_lifo_pattern);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  583:    RUN_TEST(test_stress_fifo_pattern);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  584:
+    #####:  585:    TEST_SECTION("Concurrency");
+call    0 never executed
+    #####:  586:    RUN_TEST(test_stress_concurrent_atoms);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  587:    RUN_TEST(test_stress_channel_throughput);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  588:
+    #####:  589:    TEST_SECTION("Integration");
+call    0 never executed
+    #####:  590:    RUN_TEST(test_stress_integration);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  591:}

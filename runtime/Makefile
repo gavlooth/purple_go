@@ -19,18 +19,17 @@ BUILDDIR = build
 MAIN_SOURCES = $(wildcard $(SRCDIR)/*.c)
 MAIN_OBJECTS = $(MAIN_SOURCES:$(SRCDIR)/%.c=$(BUILDDIR)/%.o)
 
-# Memory module sources - These are compiler analysis modules, not runtime code
-# They are kept for reference but not compiled into libpurple.a
-# MEMORY_SOURCES = $(wildcard $(SRCDIR)/memory/*.c)
-# MEMORY_OBJECTS = $(MEMORY_SOURCES:$(SRCDIR)/memory/%.c=$(BUILDDIR)/memory/%.o)
+# Memory module sources - slot pool for sound generational references
+MEMORY_SOURCES = $(SRCDIR)/memory/slot_pool.c $(SRCDIR)/memory/handle.c
+MEMORY_OBJECTS = $(BUILDDIR)/memory/slot_pool.o $(BUILDDIR)/memory/handle.o
 
 # Utility module sources - useful helpers for the runtime
 UTIL_SOURCES = $(wildcard $(SRCDIR)/util/*.c)
 UTIL_OBJECTS = $(UTIL_SOURCES:$(SRCDIR)/util/%.c=$(BUILDDIR)/util/%.o)
 
-# All source files (excluding memory and util modules for now)
-SOURCES = $(MAIN_SOURCES)
-OBJECTS = $(MAIN_OBJECTS)
+# All source files (including memory module for sound generational refs)
+SOURCES = $(MAIN_SOURCES) $(MEMORY_SOURCES)
+OBJECTS = $(MAIN_OBJECTS) $(MEMORY_OBJECTS)
 
 # Output
 STATIC_LIB = libpurple.a
@@ -41,7 +40,7 @@ all: $(BUILDDIR) $(STATIC_LIB)
 
 # Create build directories
 $(BUILDDIR):
-	mkdir -p $(BUILDDIR) $(BUILDDIR)/util
+	mkdir -p $(BUILDDIR) $(BUILDDIR)/util $(BUILDDIR)/memory
 
 # Compile main source files
 $(BUILDDIR)/%.o: $(SRCDIR)/%.c $(INCDIR)/purple.h
@@ -50,6 +49,10 @@ $(BUILDDIR)/%.o: $(SRCDIR)/%.c $(INCDIR)/purple.h
 # Compile utility module files
 $(BUILDDIR)/util/%.o: $(SRCDIR)/util/%.c
 	$(CC) $(CFLAGS) -I$(INCDIR) -I$(SRCDIR) -c $< -o $@
+
+# Compile memory module files (stable slot pool for sound generational refs)
+$(BUILDDIR)/memory/%.o: $(SRCDIR)/memory/%.c $(SRCDIR)/memory/slot_pool.h
+	$(CC) $(CFLAGS) -I$(INCDIR) -I$(SRCDIR) -I$(SRCDIR)/memory -c $< -o $@
 
 # Build static library
 $(STATIC_LIB): $(OBJECTS)

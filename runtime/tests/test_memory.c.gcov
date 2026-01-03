@@ -1,0 +1,1300 @@
+        -:    0:Source:test_memory.c
+        -:    0:Graph:./run_tests_cov-test_main.gcno
+        -:    0:Data:./run_tests_cov-test_main.gcda
+        -:    0:Runs:1
+        -:    1:/* Test Memory Management */
+        -:    2:#include "test_framework.h"
+        -:    3:
+        -:    4:/* === inc_ref / dec_ref tests === */
+        -:    5:
+function test_inc_ref_normal called 1 returned 100% blocks executed 50%
+        1:    6:void test_inc_ref_normal(void) {
+        1:    7:    Obj* x = mk_int(42);
+call    0 returned 1
+       1*:    8:    ASSERT_EQ(x->mark, 1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:    9:    inc_ref(x);
+call    0 returned 1
+       1*:   10:    ASSERT_EQ(x->mark, 2);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   11:    dec_ref(x);
+call    0 returned 1
+       1*:   12:    ASSERT_EQ(x->mark, 1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   13:    dec_ref(x);  /* Should free */
+call    0 returned 1
+        1:   14:    PASS();
+call    0 returned 1
+        -:   15:}
+        -:   16:
+function test_inc_ref_null called 1 returned 100% blocks executed 100%
+        1:   17:void test_inc_ref_null(void) {
+        1:   18:    inc_ref(NULL);  /* Should not crash */
+call    0 returned 1
+        1:   19:    PASS();
+call    0 returned 1
+        1:   20:}
+        -:   21:
+function test_dec_ref_null called 1 returned 100% blocks executed 100%
+        1:   22:void test_dec_ref_null(void) {
+        1:   23:    dec_ref(NULL);  /* Should not crash */
+call    0 returned 1
+        1:   24:    PASS();
+call    0 returned 1
+        1:   25:}
+        -:   26:
+function test_dec_ref_to_zero called 1 returned 100% blocks executed 62%
+        1:   27:void test_dec_ref_to_zero(void) {
+        1:   28:    Obj* x = mk_int(42);
+call    0 returned 1
+       1*:   29:    ASSERT_EQ(x->mark, 1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   30:    dec_ref(x);  /* mark becomes 0, object freed */
+call    0 returned 1
+        -:   31:    /* x is now invalid, can't check */
+        1:   32:    PASS();
+call    0 returned 1
+        -:   33:}
+        -:   34:
+function test_inc_ref_multiple called 1 returned 100% blocks executed 80%
+        1:   35:void test_inc_ref_multiple(void) {
+        1:   36:    Obj* x = mk_int(42);
+call    0 returned 1
+      101:   37:    for (int i = 0; i < 100; i++) {
+branch  0 taken 100
+branch  1 taken 1 (fallthrough)
+      100:   38:        inc_ref(x);
+call    0 returned 100
+        -:   39:    }
+       1*:   40:    ASSERT_EQ(x->mark, 101);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+      102:   41:    for (int i = 0; i < 101; i++) {
+branch  0 taken 101
+branch  1 taken 1 (fallthrough)
+      101:   42:        dec_ref(x);
+call    0 returned 101
+        -:   43:    }
+        1:   44:    PASS();
+call    0 returned 1
+        -:   45:}
+        -:   46:
+function test_ref_stack_obj called 1 returned 100% blocks executed 54%
+        1:   47:void test_ref_stack_obj(void) {
+        1:   48:    int old_ptr = STACK_PTR;
+        1:   49:    Obj* x = mk_int_stack(42);
+call    0 returned 1
+        1:   50:    int initial_mark = x->mark;
+        -:   51:
+        -:   52:    /* inc_ref and dec_ref should be no-ops for stack objects */
+        1:   53:    inc_ref(x);
+call    0 returned 1
+       1*:   54:    ASSERT_EQ(x->mark, initial_mark);  /* Unchanged */
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   55:    dec_ref(x);
+call    0 returned 1
+       1*:   56:    ASSERT_EQ(x->mark, initial_mark);  /* Unchanged */
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        -:   57:
+        1:   58:    STACK_PTR = old_ptr;
+        1:   59:    PASS();
+call    0 returned 1
+        -:   60:}
+        -:   61:
+        -:   62:/* === is_stack_obj tests === */
+        -:   63:
+function test_is_stack_obj_true called 1 returned 100% blocks executed 71%
+        1:   64:void test_is_stack_obj_true(void) {
+        1:   65:    int old_ptr = STACK_PTR;
+        1:   66:    Obj* x = mk_int_stack(42);
+call    0 returned 1
+       1*:   67:    ASSERT(is_stack_obj(x));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:   68:    STACK_PTR = old_ptr;
+        1:   69:    PASS();
+call    0 returned 1
+        -:   70:}
+        -:   71:
+function test_is_stack_obj_false called 1 returned 100% blocks executed 75%
+        1:   72:void test_is_stack_obj_false(void) {
+        1:   73:    Obj* x = mk_int(42);
+call    0 returned 1
+       1*:   74:    ASSERT(!is_stack_obj(x));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:   75:    dec_ref(x);
+call    0 returned 1
+        1:   76:    PASS();
+call    0 returned 1
+        -:   77:}
+        -:   78:
+function test_is_stack_obj_null called 1 returned 100% blocks executed 67%
+        1:   79:void test_is_stack_obj_null(void) {
+       1*:   80:    ASSERT(!is_stack_obj(NULL));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:   81:    PASS();
+call    0 returned 1
+        -:   82:}
+        -:   83:
+        -:   84:/* === is_nil tests === */
+        -:   85:
+function test_is_nil_null called 1 returned 100% blocks executed 67%
+        1:   86:void test_is_nil_null(void) {
+       1*:   87:    ASSERT(is_nil(NULL));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:   88:    PASS();
+call    0 returned 1
+        -:   89:}
+        -:   90:
+function test_is_nil_non_null called 1 returned 100% blocks executed 75%
+        1:   91:void test_is_nil_non_null(void) {
+        1:   92:    Obj* x = mk_int(42);
+call    0 returned 1
+       1*:   93:    ASSERT(!is_nil(x));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:   94:    dec_ref(x);
+call    0 returned 1
+        1:   95:    PASS();
+call    0 returned 1
+        -:   96:}
+        -:   97:
+        -:   98:/* === free_obj / free_tree tests === */
+        -:   99:
+function test_free_obj_normal called 1 returned 100% blocks executed 100%
+        1:  100:void test_free_obj_normal(void) {
+        1:  101:    Obj* x = mk_int(42);
+call    0 returned 1
+        1:  102:    free_obj(x);
+call    0 returned 1
+        -:  103:    /* Object is in free list, will be freed on flush */
+        1:  104:    flush_freelist();
+call    0 returned 1
+        1:  105:    PASS();
+call    0 returned 1
+        1:  106:}
+        -:  107:
+function test_free_obj_null called 1 returned 100% blocks executed 100%
+        1:  108:void test_free_obj_null(void) {
+        1:  109:    free_obj(NULL);  /* Should not crash */
+call    0 returned 1
+        1:  110:    PASS();
+call    0 returned 1
+        1:  111:}
+        -:  112:
+function test_free_tree_single called 1 returned 100% blocks executed 100%
+        1:  113:void test_free_tree_single(void) {
+        1:  114:    Obj* x = mk_int(42);
+call    0 returned 1
+        1:  115:    free_tree(x);
+call    0 returned 1
+        1:  116:    PASS();
+call    0 returned 1
+        1:  117:}
+        -:  118:
+function test_free_tree_pair called 1 returned 100% blocks executed 100%
+        1:  119:void test_free_tree_pair(void) {
+        1:  120:    Obj* a = mk_int(1);
+call    0 returned 1
+        1:  121:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  122:    Obj* p = mk_pair(a, b);
+call    0 returned 1
+        1:  123:    free_tree(p);
+call    0 returned 1
+        1:  124:    PASS();
+call    0 returned 1
+        1:  125:}
+        -:  126:
+function test_free_tree_nested called 1 returned 100% blocks executed 100%
+        1:  127:void test_free_tree_nested(void) {
+        1:  128:    Obj* a = mk_int(1);
+call    0 returned 1
+        1:  129:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  130:    Obj* c = mk_int(3);
+call    0 returned 1
+        1:  131:    Obj* d = mk_int(4);
+call    0 returned 1
+        1:  132:    Obj* p1 = mk_pair(a, b);
+call    0 returned 1
+        1:  133:    Obj* p2 = mk_pair(c, d);
+call    0 returned 1
+        1:  134:    Obj* outer = mk_pair(p1, p2);
+call    0 returned 1
+        1:  135:    free_tree(outer);
+call    0 returned 1
+        1:  136:    PASS();
+call    0 returned 1
+        1:  137:}
+        -:  138:
+function test_free_tree_null called 1 returned 100% blocks executed 100%
+        1:  139:void test_free_tree_null(void) {
+        1:  140:    free_tree(NULL);  /* Should not crash */
+call    0 returned 1
+        1:  141:    PASS();
+call    0 returned 1
+        1:  142:}
+        -:  143:
+function test_free_tree_deep called 1 returned 100% blocks executed 100%
+        1:  144:void test_free_tree_deep(void) {
+        -:  145:    /* Create a deeply nested list */
+        1:  146:    Obj* list = NULL;
+      101:  147:    for (int i = 0; i < 100; i++) {
+branch  0 taken 100
+branch  1 taken 1 (fallthrough)
+      100:  148:        Obj* elem = mk_int(i);
+call    0 returned 100
+      100:  149:        list = mk_pair(elem, list);
+call    0 returned 100
+        -:  150:    }
+        1:  151:    free_tree(list);
+call    0 returned 1
+        1:  152:    PASS();
+call    0 returned 1
+        1:  153:}
+        -:  154:
+        -:  155:/* === free_unique tests === */
+        -:  156:
+function test_free_unique_normal called 1 returned 100% blocks executed 100%
+        1:  157:void test_free_unique_normal(void) {
+        1:  158:    Obj* x = mk_int(42);
+call    0 returned 1
+        1:  159:    free_unique(x);
+call    0 returned 1
+        1:  160:    PASS();
+call    0 returned 1
+        1:  161:}
+        -:  162:
+function test_free_unique_null called 1 returned 100% blocks executed 100%
+        1:  163:void test_free_unique_null(void) {
+        1:  164:    free_unique(NULL);
+call    0 returned 1
+        1:  165:    PASS();
+call    0 returned 1
+        1:  166:}
+        -:  167:
+function test_free_unique_pair called 1 returned 100% blocks executed 100%
+        1:  168:void test_free_unique_pair(void) {
+        1:  169:    Obj* a = mk_int(1);
+call    0 returned 1
+        1:  170:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  171:    Obj* p = mk_pair(a, b);
+call    0 returned 1
+        1:  172:    free_unique(p);
+call    0 returned 1
+        1:  173:    PASS();
+call    0 returned 1
+        1:  174:}
+        -:  175:
+        -:  176:/* === flush_freelist tests === */
+        -:  177:
+function test_flush_freelist_empty called 1 returned 100% blocks executed 100%
+        1:  178:void test_flush_freelist_empty(void) {
+        -:  179:    /* Ensure free list is empty */
+        1:  180:    flush_freelist();
+call    0 returned 1
+        -:  181:    /* Flush again - should be no-op */
+        1:  182:    flush_freelist();
+call    0 returned 1
+        1:  183:    PASS();
+call    0 returned 1
+        1:  184:}
+        -:  185:
+function test_flush_freelist_single called 1 returned 100% blocks executed 100%
+        1:  186:void test_flush_freelist_single(void) {
+        1:  187:    Obj* x = mk_int(42);
+call    0 returned 1
+        1:  188:    free_obj(x);
+call    0 returned 1
+        1:  189:    flush_freelist();
+call    0 returned 1
+        1:  190:    PASS();
+call    0 returned 1
+        1:  191:}
+        -:  192:
+function test_flush_freelist_multiple called 1 returned 100% blocks executed 100%
+        1:  193:void test_flush_freelist_multiple(void) {
+       11:  194:    for (int i = 0; i < 10; i++) {
+branch  0 taken 10
+branch  1 taken 1 (fallthrough)
+       10:  195:        Obj* x = mk_int(i);
+call    0 returned 10
+       10:  196:        free_obj(x);
+call    0 returned 10
+        -:  197:    }
+        1:  198:    flush_freelist();
+call    0 returned 1
+        1:  199:    PASS();
+call    0 returned 1
+        1:  200:}
+        -:  201:
+        -:  202:/* === Deferred reference counting tests === */
+        -:  203:
+function test_defer_decrement_normal called 1 returned 100% blocks executed 60%
+        1:  204:void test_defer_decrement_normal(void) {
+        1:  205:    Obj* x = mk_int(42);
+call    0 returned 1
+        1:  206:    inc_ref(x);  /* refcount = 2 */
+call    0 returned 1
+        1:  207:    defer_decrement(x);
+call    0 returned 1
+        -:  208:    /* x still alive until flush */
+       1*:  209:    ASSERT_EQ(x->mark, 2);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  210:    flush_deferred();
+call    0 returned 1
+       1*:  211:    ASSERT_EQ(x->mark, 1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  212:    dec_ref(x);
+call    0 returned 1
+        1:  213:    PASS();
+call    0 returned 1
+        -:  214:}
+        -:  215:
+function test_defer_decrement_coalesce called 1 returned 100% blocks executed 80%
+        1:  216:void test_defer_decrement_coalesce(void) {
+        1:  217:    Obj* x = mk_int(42);
+call    0 returned 1
+        1:  218:    inc_ref(x);
+call    0 returned 1
+        1:  219:    inc_ref(x);
+call    0 returned 1
+        1:  220:    inc_ref(x);  /* refcount = 4 */
+call    0 returned 1
+        -:  221:
+        1:  222:    defer_decrement(x);
+call    0 returned 1
+        1:  223:    defer_decrement(x);  /* Should coalesce */
+call    0 returned 1
+        -:  224:
+        1:  225:    flush_deferred();
+call    0 returned 1
+       1*:  226:    ASSERT_EQ(x->mark, 2);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  227:    dec_ref(x);
+call    0 returned 1
+        1:  228:    dec_ref(x);
+call    0 returned 1
+        1:  229:    PASS();
+call    0 returned 1
+        -:  230:}
+        -:  231:
+function test_safe_point_below_threshold called 1 returned 100% blocks executed 100%
+        1:  232:void test_safe_point_below_threshold(void) {
+        -:  233:    /* Safe point should be fast when nothing pending */
+        1:  234:    safe_point();
+call    0 returned 1
+        1:  235:    PASS();
+call    0 returned 1
+        1:  236:}
+        -:  237:
+function test_safe_point_above_threshold called 1 returned 100% blocks executed 100%
+        1:  238:void test_safe_point_above_threshold(void) {
+        -:  239:    /* Create many deferred decrements */
+        -:  240:    Obj* objs[100];
+      101:  241:    for (int i = 0; i < 100; i++) {
+branch  0 taken 100
+branch  1 taken 1 (fallthrough)
+      100:  242:        objs[i] = mk_int(i);
+call    0 returned 100
+      100:  243:        inc_ref(objs[i]);  /* Ensure they survive */
+call    0 returned 100
+      100:  244:        defer_decrement(objs[i]);
+call    0 returned 100
+        -:  245:    }
+        -:  246:
+        -:  247:    /* Safe point should process some */
+        1:  248:    safe_point();
+call    0 returned 1
+        -:  249:
+        -:  250:    /* Cleanup */
+        1:  251:    flush_deferred();
+call    0 returned 1
+      101:  252:    for (int i = 0; i < 100; i++) {
+branch  0 taken 100
+branch  1 taken 1 (fallthrough)
+      100:  253:        dec_ref(objs[i]);
+call    0 returned 100
+        -:  254:    }
+        1:  255:    PASS();
+call    0 returned 1
+        1:  256:}
+        -:  257:
+        -:  258:/* === Box operations tests === */
+        -:  259:
+function test_box_get_normal called 1 returned 100% blocks executed 73%
+        1:  260:void test_box_get_normal(void) {
+        1:  261:    Obj* v = mk_int(42);
+call    0 returned 1
+        1:  262:    Obj* b = mk_box(v);
+call    0 returned 1
+        1:  263:    Obj* got = box_get(b);
+call    0 returned 1
+       1*:  264:    ASSERT_EQ(got, v);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  265:    dec_ref(b);
+call    0 returned 1
+        1:  266:    dec_ref(v);
+call    0 returned 1
+        1:  267:    PASS();
+call    0 returned 1
+        -:  268:}
+        -:  269:
+function test_box_get_empty called 1 returned 100% blocks executed 75%
+        1:  270:void test_box_get_empty(void) {
+        1:  271:    Obj* b = mk_box(NULL);
+call    0 returned 1
+        1:  272:    Obj* got = box_get(b);
+call    0 returned 1
+       1*:  273:    ASSERT_NULL(got);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  274:    dec_ref(b);
+call    0 returned 1
+        1:  275:    PASS();
+call    0 returned 1
+        -:  276:}
+        -:  277:
+function test_box_get_null_box called 1 returned 100% blocks executed 67%
+        1:  278:void test_box_get_null_box(void) {
+        1:  279:    Obj* got = box_get(NULL);
+call    0 returned 1
+       1*:  280:    ASSERT_NULL(got);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  281:    PASS();
+call    0 returned 1
+        -:  282:}
+        -:  283:
+function test_box_get_wrong_tag called 1 returned 100% blocks executed 75%
+        1:  284:void test_box_get_wrong_tag(void) {
+        1:  285:    Obj* x = mk_int(42);
+call    0 returned 1
+        1:  286:    Obj* got = box_get(x);  /* x is not a box */
+call    0 returned 1
+       1*:  287:    ASSERT_NULL(got);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  288:    dec_ref(x);
+call    0 returned 1
+        1:  289:    PASS();
+call    0 returned 1
+        -:  290:}
+        -:  291:
+function test_box_set_normal called 1 returned 100% blocks executed 73%
+        1:  292:void test_box_set_normal(void) {
+        1:  293:    Obj* v1 = mk_int(1);
+call    0 returned 1
+        1:  294:    Obj* v2 = mk_int(2);
+call    0 returned 1
+        1:  295:    Obj* b = mk_box(v1);
+call    0 returned 1
+        -:  296:
+        1:  297:    box_set(b, v2);
+call    0 returned 1
+       1*:  298:    ASSERT_EQ(box_get(b), v2);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        -:  299:
+        1:  300:    dec_ref(b);
+call    0 returned 1
+        1:  301:    dec_ref(v1);
+call    0 returned 1
+        1:  302:    dec_ref(v2);
+call    0 returned 1
+        1:  303:    PASS();
+call    0 returned 1
+        -:  304:}
+        -:  305:
+function test_box_set_null_value called 1 returned 100% blocks executed 82%
+        1:  306:void test_box_set_null_value(void) {
+        1:  307:    Obj* v = mk_int(42);
+call    0 returned 1
+        1:  308:    Obj* b = mk_box(v);
+call    0 returned 1
+        -:  309:
+        1:  310:    box_set(b, NULL);
+call    0 returned 1
+       1*:  311:    ASSERT_NULL(box_get(b));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        -:  312:
+        1:  313:    dec_ref(b);
+call    0 returned 1
+        1:  314:    dec_ref(v);
+call    0 returned 1
+        1:  315:    PASS();
+call    0 returned 1
+        -:  316:}
+        -:  317:
+function test_box_set_null_box called 1 returned 100% blocks executed 100%
+        1:  318:void test_box_set_null_box(void) {
+        1:  319:    Obj* v = mk_int(42);
+call    0 returned 1
+        1:  320:    box_set(NULL, v);  /* Should not crash */
+call    0 returned 1
+        1:  321:    dec_ref(v);
+call    0 returned 1
+        1:  322:    PASS();
+call    0 returned 1
+        1:  323:}
+        -:  324:
+        -:  325:/* === Pair access tests === */
+        -:  326:
+function test_obj_car_normal called 1 returned 100% blocks executed 75%
+        1:  327:void test_obj_car_normal(void) {
+        1:  328:    Obj* a = mk_int(1);
+call    0 returned 1
+        1:  329:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  330:    Obj* p = mk_pair(a, b);
+call    0 returned 1
+        1:  331:    Obj* car = obj_car(p);
+call    0 returned 1
+       1*:  332:    ASSERT_EQ(car, a);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  333:    dec_ref(car);
+call    0 returned 1
+        -:  334:    /* free_tree recursively frees the pair and its children */
+        1:  335:    free_tree(p);
+call    0 returned 1
+        1:  336:    PASS();
+call    0 returned 1
+        -:  337:}
+        -:  338:
+function test_obj_cdr_normal called 1 returned 100% blocks executed 75%
+        1:  339:void test_obj_cdr_normal(void) {
+        1:  340:    Obj* a = mk_int(1);
+call    0 returned 1
+        1:  341:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  342:    Obj* p = mk_pair(a, b);
+call    0 returned 1
+        1:  343:    Obj* cdr = obj_cdr(p);
+call    0 returned 1
+       1*:  344:    ASSERT_EQ(cdr, b);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  345:    dec_ref(cdr);
+call    0 returned 1
+        -:  346:    /* free_tree recursively frees the pair and its children */
+        1:  347:    free_tree(p);
+call    0 returned 1
+        1:  348:    PASS();
+call    0 returned 1
+        -:  349:}
+        -:  350:
+function test_obj_car_null called 1 returned 100% blocks executed 67%
+        1:  351:void test_obj_car_null(void) {
+        1:  352:    Obj* result = obj_car(NULL);
+call    0 returned 1
+       1*:  353:    ASSERT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  354:    PASS();
+call    0 returned 1
+        -:  355:}
+        -:  356:
+function test_obj_cdr_null called 1 returned 100% blocks executed 67%
+        1:  357:void test_obj_cdr_null(void) {
+        1:  358:    Obj* result = obj_cdr(NULL);
+call    0 returned 1
+       1*:  359:    ASSERT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  360:    PASS();
+call    0 returned 1
+        -:  361:}
+        -:  362:
+function test_obj_car_non_pair called 1 returned 100% blocks executed 75%
+        1:  363:void test_obj_car_non_pair(void) {
+        1:  364:    Obj* x = mk_int(42);
+call    0 returned 1
+        1:  365:    Obj* result = obj_car(x);
+call    0 returned 1
+       1*:  366:    ASSERT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  367:    dec_ref(x);
+call    0 returned 1
+        1:  368:    PASS();
+call    0 returned 1
+        -:  369:}
+        -:  370:
+function test_obj_cdr_non_pair called 1 returned 100% blocks executed 75%
+        1:  371:void test_obj_cdr_non_pair(void) {
+        1:  372:    Obj* x = mk_int(42);
+call    0 returned 1
+        1:  373:    Obj* result = obj_cdr(x);
+call    0 returned 1
+       1*:  374:    ASSERT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  375:    dec_ref(x);
+call    0 returned 1
+        1:  376:    PASS();
+call    0 returned 1
+        -:  377:}
+        -:  378:
+        -:  379:/* === release_children tests === */
+        -:  380:
+function test_release_children_pair called 1 returned 100% blocks executed 68%
+        1:  381:void test_release_children_pair(void) {
+        1:  382:    Obj* a = mk_int(1);
+call    0 returned 1
+        1:  383:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  384:    inc_ref(a);
+call    0 returned 1
+        1:  385:    inc_ref(b);
+call    0 returned 1
+        1:  386:    Obj* p = mk_pair(a, b);
+call    0 returned 1
+        -:  387:
+        1:  388:    release_children(p);
+call    0 returned 1
+       1*:  389:    ASSERT_EQ(a->mark, 1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  390:    ASSERT_EQ(b->mark, 1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        -:  391:
+        1:  392:    p->a = NULL;
+        1:  393:    p->b = NULL;
+        1:  394:    dec_ref(p);
+call    0 returned 1
+        1:  395:    dec_ref(a);
+call    0 returned 1
+        1:  396:    dec_ref(b);
+call    0 returned 1
+        1:  397:    PASS();
+call    0 returned 1
+        -:  398:}
+        -:  399:
+function test_release_children_box called 1 returned 100% blocks executed 73%
+        1:  400:void test_release_children_box(void) {
+        1:  401:    Obj* v = mk_int(9);
+call    0 returned 1
+        1:  402:    Obj* b = mk_box(v);
+call    0 returned 1
+        -:  403:
+        1:  404:    release_children(b);
+call    0 returned 1
+       1*:  405:    ASSERT_EQ(v->mark, 1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        -:  406:
+        1:  407:    b->ptr = NULL;
+        1:  408:    dec_ref(b);
+call    0 returned 1
+        1:  409:    dec_ref(v);
+call    0 returned 1
+        1:  410:    PASS();
+call    0 returned 1
+        -:  411:}
+        -:  412:
+function mem_return_1 called 0 returned 0% blocks executed 0%
+    #####:  413:static Obj* mem_return_1(Obj** caps, Obj** args, int nargs) {
+        -:  414:    (void)caps; (void)args; (void)nargs;
+    #####:  415:    return mk_int(1);
+call    0 never executed
+        -:  416:}
+        -:  417:
+function test_release_children_closure called 1 returned 100% blocks executed 75%
+        1:  418:void test_release_children_closure(void) {
+        1:  419:    Obj* cap = mk_int(7);
+call    0 returned 1
+        1:  420:    Obj* caps[1] = {cap};
+        1:  421:    Obj* clos = mk_closure(mem_return_1, caps, NULL, 1, 0);
+call    0 returned 1
+        -:  422:
+        1:  423:    release_children(clos);
+call    0 returned 1
+       1*:  424:    ASSERT_EQ(cap->mark, 1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        -:  425:
+        1:  426:    clos->ptr = NULL;
+        1:  427:    dec_ref(clos);
+call    0 returned 1
+        1:  428:    dec_ref(cap);
+call    0 returned 1
+        1:  429:    PASS();
+call    0 returned 1
+        -:  430:}
+        -:  431:
+function test_release_children_sym_error called 1 returned 100% blocks executed 100%
+        1:  432:void test_release_children_sym_error(void) {
+        1:  433:    Obj* s = mk_sym("sym");
+call    0 returned 1
+        1:  434:    Obj* e = mk_error("err");
+call    0 returned 1
+        -:  435:
+        1:  436:    release_children(s);
+call    0 returned 1
+        1:  437:    release_children(e);
+call    0 returned 1
+        -:  438:
+        1:  439:    s->ptr = NULL;
+        1:  440:    e->ptr = NULL;
+        1:  441:    dec_ref(s);
+call    0 returned 1
+        1:  442:    dec_ref(e);
+call    0 returned 1
+        1:  443:    PASS();
+call    0 returned 1
+        1:  444:}
+        -:  445:
+function test_release_children_channel called 1 returned 100% blocks executed 75%
+        1:  446:void test_release_children_channel(void) {
+        1:  447:    Obj* ch = make_channel(1);
+call    0 returned 1
+        1:  448:    release_children(ch);
+call    0 returned 1
+       1*:  449:    ASSERT_NULL(ch->ptr);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  450:    dec_ref(ch);
+call    0 returned 1
+        1:  451:    PASS();
+call    0 returned 1
+        -:  452:}
+        -:  453:
+function test_release_children_atom called 1 returned 100% blocks executed 80%
+        1:  454:void test_release_children_atom(void) {
+        1:  455:    Obj* init = mk_int(3);
+call    0 returned 1
+        1:  456:    Obj* a = make_atom(init);
+call    0 returned 1
+        1:  457:    dec_ref(init);
+call    0 returned 1
+        1:  458:    release_children(a);
+call    0 returned 1
+       1*:  459:    ASSERT_NULL(a->ptr);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  460:    dec_ref(a);
+call    0 returned 1
+        1:  461:    PASS();
+call    0 returned 1
+        -:  462:}
+        -:  463:
+function mem_thread_fn called 1 returned 100% blocks executed 100%
+        1:  464:static Obj* mem_thread_fn(Obj** caps, Obj** args, int nargs) {
+        -:  465:    (void)caps; (void)args; (void)nargs;
+        1:  466:    return mk_int(1);
+call    0 returned 1
+        -:  467:}
+        -:  468:
+function test_release_children_thread called 1 returned 100% blocks executed 80%
+        1:  469:void test_release_children_thread(void) {
+        1:  470:    Obj* clos = mk_closure(mem_thread_fn, NULL, NULL, 0, 0);
+call    0 returned 1
+        1:  471:    Obj* th = spawn_thread(clos);
+call    0 returned 1
+        1:  472:    release_children(th);
+call    0 returned 1
+       1*:  473:    ASSERT_NULL(th->ptr);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  474:    dec_ref(th);
+call    0 returned 1
+        1:  475:    dec_ref(clos);
+call    0 returned 1
+        1:  476:    PASS();
+call    0 returned 1
+        -:  477:}
+        -:  478:
+function test_free_tree_immediate called 1 returned 100% blocks executed 62%
+        1:  479:void test_free_tree_immediate(void) {
+        1:  480:    Obj* imm = mk_int_unboxed(42);
+call    0 returned 1
+        1:  481:    free_tree(imm);  /* Should be no-op */
+call    0 returned 1
+       1*:  482:    ASSERT_EQ(INT_IMM_VALUE(imm), 42);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  483:    PASS();
+call    0 returned 1
+        -:  484:}
+        -:  485:
+        -:  486:/* === Run all memory tests === */
+        -:  487:
+function run_memory_tests called 1 returned 100% blocks executed 60%
+        1:  488:void run_memory_tests(void) {
+        1:  489:    TEST_SUITE("Memory Management");
+call    0 returned 1
+        -:  490:
+        -:  491:    /* inc_ref / dec_ref */
+       1*:  492:    RUN_TEST(test_inc_ref_normal);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  493:    RUN_TEST(test_inc_ref_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  494:    RUN_TEST(test_dec_ref_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  495:    RUN_TEST(test_dec_ref_to_zero);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  496:    RUN_TEST(test_inc_ref_multiple);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  497:    RUN_TEST(test_ref_stack_obj);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  498:
+        -:  499:    /* is_stack_obj */
+       1*:  500:    RUN_TEST(test_is_stack_obj_true);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  501:    RUN_TEST(test_is_stack_obj_false);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  502:    RUN_TEST(test_is_stack_obj_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  503:
+        -:  504:    /* is_nil */
+       1*:  505:    RUN_TEST(test_is_nil_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  506:    RUN_TEST(test_is_nil_non_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  507:
+        -:  508:    /* free_obj / free_tree */
+       1*:  509:    RUN_TEST(test_free_obj_normal);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  510:    RUN_TEST(test_free_obj_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  511:    RUN_TEST(test_free_tree_single);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  512:    RUN_TEST(test_free_tree_pair);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  513:    RUN_TEST(test_free_tree_nested);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  514:    RUN_TEST(test_free_tree_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  515:    RUN_TEST(test_free_tree_deep);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  516:
+        -:  517:    /* free_unique */
+       1*:  518:    RUN_TEST(test_free_unique_normal);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  519:    RUN_TEST(test_free_unique_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  520:    RUN_TEST(test_free_unique_pair);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  521:
+        -:  522:    /* flush_freelist */
+       1*:  523:    RUN_TEST(test_flush_freelist_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  524:    RUN_TEST(test_flush_freelist_single);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  525:    RUN_TEST(test_flush_freelist_multiple);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  526:
+        -:  527:    /* Deferred RC */
+       1*:  528:    RUN_TEST(test_defer_decrement_normal);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  529:    RUN_TEST(test_defer_decrement_coalesce);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  530:    RUN_TEST(test_safe_point_below_threshold);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  531:    RUN_TEST(test_safe_point_above_threshold);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  532:
+        -:  533:    /* Box operations */
+       1*:  534:    RUN_TEST(test_box_get_normal);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  535:    RUN_TEST(test_box_get_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  536:    RUN_TEST(test_box_get_null_box);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  537:    RUN_TEST(test_box_get_wrong_tag);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  538:    RUN_TEST(test_box_set_normal);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  539:    RUN_TEST(test_box_set_null_value);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  540:    RUN_TEST(test_box_set_null_box);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  541:
+        -:  542:    /* Pair access */
+       1*:  543:    RUN_TEST(test_obj_car_normal);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  544:    RUN_TEST(test_obj_cdr_normal);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  545:    RUN_TEST(test_obj_car_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  546:    RUN_TEST(test_obj_cdr_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  547:    RUN_TEST(test_obj_car_non_pair);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  548:    RUN_TEST(test_obj_cdr_non_pair);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  549:
+        1:  550:    TEST_SECTION("release_children");
+call    0 returned 1
+       1*:  551:    RUN_TEST(test_release_children_pair);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  552:    RUN_TEST(test_release_children_box);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  553:    RUN_TEST(test_release_children_closure);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  554:    RUN_TEST(test_release_children_sym_error);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  555:    RUN_TEST(test_release_children_channel);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  556:    RUN_TEST(test_release_children_atom);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  557:    RUN_TEST(test_release_children_thread);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  558:    RUN_TEST(test_free_tree_immediate);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        1:  559:}

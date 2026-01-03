@@ -1,0 +1,1473 @@
+        -:    0:Source:test_concurrency.c
+        -:    0:Graph:./run_tests_cov-test_main.gcno
+        -:    0:Data:./run_tests_cov-test_main.gcda
+        -:    0:Runs:1
+        -:    1:/* test_concurrency.c - Channel, atom, and thread tests */
+        -:    2:#include "test_framework.h"
+        -:    3:#include <unistd.h>
+        -:    4:
+        -:    5:/* ========== Channel Creation Tests ========== */
+        -:    6:
+function test_make_channel_unbuffered called 0 returned 0% blocks executed 0%
+    #####:    7:void test_make_channel_unbuffered(void) {
+    #####:    8:    Obj* ch = make_channel(0);
+call    0 never executed
+    #####:    9:    ASSERT_NOT_NULL(ch);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:   10:    ASSERT_EQ(ch->tag, TAG_CHANNEL);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:   11:    dec_ref(ch);
+call    0 never executed
+    #####:   12:    PASS();
+call    0 never executed
+        -:   13:}
+        -:   14:
+function test_make_channel_buffered called 0 returned 0% blocks executed 0%
+    #####:   15:void test_make_channel_buffered(void) {
+    #####:   16:    Obj* ch = make_channel(10);
+call    0 never executed
+    #####:   17:    ASSERT_NOT_NULL(ch);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:   18:    ASSERT_EQ(ch->tag, TAG_CHANNEL);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:   19:    dec_ref(ch);
+call    0 never executed
+    #####:   20:    PASS();
+call    0 never executed
+        -:   21:}
+        -:   22:
+function test_make_channel_large_buffer called 0 returned 0% blocks executed 0%
+    #####:   23:void test_make_channel_large_buffer(void) {
+    #####:   24:    Obj* ch = make_channel(1000);
+call    0 never executed
+    #####:   25:    ASSERT_NOT_NULL(ch);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:   26:    dec_ref(ch);
+call    0 never executed
+    #####:   27:    PASS();
+call    0 never executed
+        -:   28:}
+        -:   29:
+        -:   30:/* ========== Channel Send/Receive Tests ========== */
+        -:   31:
+function test_channel_send_receive_basic called 0 returned 0% blocks executed 0%
+    #####:   32:void test_channel_send_receive_basic(void) {
+    #####:   33:    Obj* ch = make_channel(1);
+call    0 never executed
+    #####:   34:    Obj* val = mk_int(42);
+call    0 never executed
+        -:   35:
+        -:   36:    /* Send */
+    #####:   37:    int sent = channel_send(ch, val);
+call    0 never executed
+    #####:   38:    ASSERT(sent);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+        -:   39:
+        -:   40:    /* Receive */
+    #####:   41:    Obj* received = channel_recv(ch);
+call    0 never executed
+    #####:   42:    ASSERT_NOT_NULL(received);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:   43:    ASSERT_EQ(obj_to_int(received), 42);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:   44:
+    #####:   45:    dec_ref(received);
+call    0 never executed
+    #####:   46:    dec_ref(ch);
+call    0 never executed
+    #####:   47:    PASS();
+call    0 never executed
+        -:   48:}
+        -:   49:
+function test_channel_send_multiple called 0 returned 0% blocks executed 0%
+    #####:   50:void test_channel_send_multiple(void) {
+    #####:   51:    Obj* ch = make_channel(5);
+call    0 never executed
+        -:   52:
+    #####:   53:    for (int i = 0; i < 5; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:   54:        Obj* val = mk_int(i);
+call    0 never executed
+    #####:   55:        int sent = channel_send(ch, val);
+call    0 never executed
+    #####:   56:        ASSERT(sent);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+        -:   57:    }
+        -:   58:
+    #####:   59:    for (int i = 0; i < 5; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:   60:        Obj* received = channel_recv(ch);
+call    0 never executed
+    #####:   61:        ASSERT_NOT_NULL(received);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:   62:        ASSERT_EQ(obj_to_int(received), i);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+    #####:   63:        dec_ref(received);
+call    0 never executed
+        -:   64:    }
+        -:   65:
+    #####:   66:    dec_ref(ch);
+call    0 never executed
+    #####:   67:    PASS();
+call    0 never executed
+        -:   68:}
+        -:   69:
+function test_channel_send_immediate called 0 returned 0% blocks executed 0%
+    #####:   70:void test_channel_send_immediate(void) {
+    #####:   71:    Obj* ch = make_channel(1);
+call    0 never executed
+    #####:   72:    Obj* val = mk_int_unboxed(99);
+call    0 never executed
+        -:   73:
+    #####:   74:    int sent = channel_send(ch, val);
+call    0 never executed
+    #####:   75:    ASSERT(sent);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+        -:   76:
+    #####:   77:    Obj* received = channel_recv(ch);
+call    0 never executed
+    #####:   78:    ASSERT_EQ(obj_to_int(received), 99);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:   79:
+    #####:   80:    dec_ref(ch);
+call    0 never executed
+    #####:   81:    PASS();
+call    0 never executed
+        -:   82:}
+        -:   83:
+        -:   84:/* ========== Channel Close Tests ========== */
+        -:   85:
+function test_channel_close called 0 returned 0% blocks executed 0%
+    #####:   86:void test_channel_close(void) {
+    #####:   87:    Obj* ch = make_channel(1);
+call    0 never executed
+    #####:   88:    channel_close(ch);
+call    0 never executed
+        -:   89:    /* After close, send should fail */
+    #####:   90:    Obj* val = mk_int(42);
+call    0 never executed
+    #####:   91:    int sent = channel_send(ch, val);
+call    0 never executed
+    #####:   92:    ASSERT(!sent);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:   93:    dec_ref(val);
+call    0 never executed
+    #####:   94:    dec_ref(ch);
+call    0 never executed
+    #####:   95:    PASS();
+call    0 never executed
+        -:   96:}
+        -:   97:
+function test_channel_close_null called 0 returned 0% blocks executed 0%
+    #####:   98:void test_channel_close_null(void) {
+    #####:   99:    channel_close(NULL);  /* Should not crash */
+call    0 never executed
+    #####:  100:    PASS();
+call    0 never executed
+    #####:  101:}
+        -:  102:
+        -:  103:/* ========== Channel Edge Cases ========== */
+        -:  104:
+function test_channel_send_null called 0 returned 0% blocks executed 0%
+    #####:  105:void test_channel_send_null(void) {
+    #####:  106:    Obj* ch = make_channel(1);
+call    0 never executed
+    #####:  107:    int sent = channel_send(ch, NULL);
+call    0 never executed
+    #####:  108:    ASSERT(sent);  /* NULL is a valid value */
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  109:    Obj* received = channel_recv(ch);
+call    0 never executed
+    #####:  110:    ASSERT_NULL(received);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  111:    dec_ref(ch);
+call    0 never executed
+    #####:  112:    PASS();
+call    0 never executed
+        -:  113:}
+        -:  114:
+function test_channel_recv_from_closed_empty called 0 returned 0% blocks executed 0%
+    #####:  115:void test_channel_recv_from_closed_empty(void) {
+    #####:  116:    Obj* ch = make_channel(1);
+call    0 never executed
+    #####:  117:    channel_close(ch);
+call    0 never executed
+    #####:  118:    Obj* received = channel_recv(ch);
+call    0 never executed
+    #####:  119:    ASSERT_NULL(received);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  120:    dec_ref(ch);
+call    0 never executed
+    #####:  121:    PASS();
+call    0 never executed
+        -:  122:}
+        -:  123:
+        -:  124:/* ========== Atom Creation Tests ========== */
+        -:  125:
+function test_make_atom called 0 returned 0% blocks executed 0%
+    #####:  126:void test_make_atom(void) {
+    #####:  127:    Obj* val = mk_int(42);
+call    0 never executed
+    #####:  128:    Obj* atom = make_atom(val);
+call    0 never executed
+    #####:  129:    ASSERT_NOT_NULL(atom);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  130:    ASSERT_EQ(atom->tag, TAG_ATOM);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  131:    dec_ref(atom);
+call    0 never executed
+    #####:  132:    dec_ref(val);
+call    0 never executed
+    #####:  133:    PASS();
+call    0 never executed
+        -:  134:}
+        -:  135:
+function test_make_atom_null called 0 returned 0% blocks executed 0%
+    #####:  136:void test_make_atom_null(void) {
+    #####:  137:    Obj* atom = make_atom(NULL);
+call    0 never executed
+    #####:  138:    ASSERT_NOT_NULL(atom);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  139:    dec_ref(atom);
+call    0 never executed
+    #####:  140:    PASS();
+call    0 never executed
+        -:  141:}
+        -:  142:
+function test_make_atom_immediate called 0 returned 0% blocks executed 0%
+    #####:  143:void test_make_atom_immediate(void) {
+    #####:  144:    Obj* val = mk_int_unboxed(99);
+call    0 never executed
+    #####:  145:    Obj* atom = make_atom(val);
+call    0 never executed
+    #####:  146:    ASSERT_NOT_NULL(atom);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  147:    dec_ref(atom);
+call    0 never executed
+    #####:  148:    PASS();
+call    0 never executed
+        -:  149:}
+        -:  150:
+        -:  151:/* ========== Atom Deref Tests ========== */
+        -:  152:
+function test_atom_deref called 0 returned 0% blocks executed 0%
+    #####:  153:void test_atom_deref(void) {
+    #####:  154:    Obj* val = mk_int(42);
+call    0 never executed
+    #####:  155:    Obj* atom = make_atom(val);
+call    0 never executed
+    #####:  156:    Obj* deref = atom_deref(atom);
+call    0 never executed
+    #####:  157:    ASSERT_NOT_NULL(deref);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  158:    ASSERT_EQ(obj_to_int(deref), 42);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+    #####:  159:    dec_ref(deref);
+call    0 never executed
+    #####:  160:    dec_ref(atom);
+call    0 never executed
+    #####:  161:    dec_ref(val);
+call    0 never executed
+    #####:  162:    PASS();
+call    0 never executed
+        -:  163:}
+        -:  164:
+function test_atom_deref_null_atom called 0 returned 0% blocks executed 0%
+    #####:  165:void test_atom_deref_null_atom(void) {
+    #####:  166:    Obj* deref = atom_deref(NULL);
+call    0 never executed
+    #####:  167:    ASSERT_NULL(deref);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  168:    PASS();
+call    0 never executed
+        -:  169:}
+        -:  170:
+function test_atom_deref_immediate called 0 returned 0% blocks executed 0%
+    #####:  171:void test_atom_deref_immediate(void) {
+    #####:  172:    Obj* val = mk_int_unboxed(77);
+call    0 never executed
+    #####:  173:    Obj* atom = make_atom(val);
+call    0 never executed
+    #####:  174:    Obj* deref = atom_deref(atom);
+call    0 never executed
+    #####:  175:    ASSERT_EQ(obj_to_int(deref), 77);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+    #####:  176:    dec_ref(atom);
+call    0 never executed
+    #####:  177:    PASS();
+call    0 never executed
+        -:  178:}
+        -:  179:
+        -:  180:/* ========== Atom Reset Tests ========== */
+        -:  181:
+function test_atom_reset called 0 returned 0% blocks executed 0%
+    #####:  182:void test_atom_reset(void) {
+    #####:  183:    Obj* val1 = mk_int(10);
+call    0 never executed
+    #####:  184:    Obj* val2 = mk_int(20);
+call    0 never executed
+    #####:  185:    Obj* atom = make_atom(val1);
+call    0 never executed
+        -:  186:
+    #####:  187:    Obj* result = atom_reset(atom, val2);
+call    0 never executed
+    #####:  188:    ASSERT_NOT_NULL(result);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  189:    ASSERT_EQ(obj_to_int(result), 20);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:  190:
+    #####:  191:    Obj* current = atom_deref(atom);
+call    0 never executed
+    #####:  192:    ASSERT_EQ(obj_to_int(current), 20);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:  193:
+    #####:  194:    dec_ref(result);
+call    0 never executed
+    #####:  195:    dec_ref(current);
+call    0 never executed
+    #####:  196:    dec_ref(val1);
+call    0 never executed
+    #####:  197:    dec_ref(val2);
+call    0 never executed
+    #####:  198:    dec_ref(atom);
+call    0 never executed
+    #####:  199:    PASS();
+call    0 never executed
+        -:  200:}
+        -:  201:
+function test_atom_reset_null_atom called 0 returned 0% blocks executed 0%
+    #####:  202:void test_atom_reset_null_atom(void) {
+    #####:  203:    Obj* val = mk_int(42);
+call    0 never executed
+    #####:  204:    Obj* old = atom_reset(NULL, val);
+call    0 never executed
+    #####:  205:    ASSERT_NULL(old);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  206:    dec_ref(val);
+call    0 never executed
+    #####:  207:    PASS();
+call    0 never executed
+        -:  208:}
+        -:  209:
+function test_atom_reset_to_null called 0 returned 0% blocks executed 0%
+    #####:  210:void test_atom_reset_to_null(void) {
+    #####:  211:    Obj* val = mk_int(42);
+call    0 never executed
+    #####:  212:    Obj* atom = make_atom(val);
+call    0 never executed
+        -:  213:
+    #####:  214:    Obj* result = atom_reset(atom, NULL);
+call    0 never executed
+    #####:  215:    ASSERT_NULL(result);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+        -:  216:
+    #####:  217:    Obj* current = atom_deref(atom);
+call    0 never executed
+    #####:  218:    ASSERT_NULL(current);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+        -:  219:
+    #####:  220:    dec_ref(val);
+call    0 never executed
+    #####:  221:    dec_ref(atom);
+call    0 never executed
+    #####:  222:    PASS();
+call    0 never executed
+        -:  223:}
+        -:  224:
+        -:  225:/* ========== Atom Swap Tests ========== */
+        -:  226:
+        -:  227:/* Swap function - takes old val, returns new val (closure form) */
+function conc_increment_closure_fn called 0 returned 0% blocks executed 0%
+    #####:  228:static Obj* conc_increment_closure_fn(Obj** caps, Obj** args, int nargs) {
+        -:  229:    (void)caps; (void)nargs;
+    #####:  230:    if (!args || !args[0]) return mk_int(1);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+call    4 never executed
+    #####:  231:    long n = obj_to_int(args[0]);
+call    0 never executed
+    #####:  232:    return mk_int(n + 1);
+call    0 never executed
+        -:  233:}
+        -:  234:
+function test_atom_swap called 0 returned 0% blocks executed 0%
+    #####:  235:void test_atom_swap(void) {
+    #####:  236:    Obj* val = mk_int(10);
+call    0 never executed
+    #####:  237:    Obj* atom = make_atom(val);
+call    0 never executed
+        -:  238:
+        -:  239:    /* atom_swap takes a closure */
+    #####:  240:    Obj* inc_closure = mk_closure(conc_increment_closure_fn, NULL, NULL, 0, 1);
+call    0 never executed
+    #####:  241:    Obj* result = atom_swap(atom, inc_closure);
+call    0 never executed
+    #####:  242:    ASSERT_NOT_NULL(result);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  243:    ASSERT_EQ(obj_to_int(result), 11);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:  244:
+    #####:  245:    Obj* current = atom_deref(atom);
+call    0 never executed
+    #####:  246:    ASSERT_EQ(obj_to_int(current), 11);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:  247:
+    #####:  248:    dec_ref(result);
+call    0 never executed
+    #####:  249:    dec_ref(current);
+call    0 never executed
+    #####:  250:    dec_ref(inc_closure);
+call    0 never executed
+    #####:  251:    dec_ref(atom);
+call    0 never executed
+    #####:  252:    dec_ref(val);
+call    0 never executed
+    #####:  253:    PASS();
+call    0 never executed
+        -:  254:}
+        -:  255:
+function test_atom_swap_null_atom called 0 returned 0% blocks executed 0%
+    #####:  256:void test_atom_swap_null_atom(void) {
+    #####:  257:    Obj* inc_closure = mk_closure(conc_increment_closure_fn, NULL, NULL, 0, 1);
+call    0 never executed
+    #####:  258:    Obj* result = atom_swap(NULL, inc_closure);
+call    0 never executed
+    #####:  259:    ASSERT_NULL(result);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  260:    dec_ref(inc_closure);
+call    0 never executed
+    #####:  261:    PASS();
+call    0 never executed
+        -:  262:}
+        -:  263:
+function test_atom_swap_null_fn called 0 returned 0% blocks executed 0%
+    #####:  264:void test_atom_swap_null_fn(void) {
+    #####:  265:    Obj* val = mk_int(42);
+call    0 never executed
+    #####:  266:    Obj* atom = make_atom(val);
+call    0 never executed
+    #####:  267:    Obj* result = atom_swap(atom, NULL);
+call    0 never executed
+    #####:  268:    ASSERT_NULL(result);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  269:    dec_ref(val);
+call    0 never executed
+    #####:  270:    dec_ref(atom);
+call    0 never executed
+    #####:  271:    PASS();
+call    0 never executed
+        -:  272:}
+        -:  273:
+function test_atom_swap_multiple called 0 returned 0% blocks executed 0%
+    #####:  274:void test_atom_swap_multiple(void) {
+    #####:  275:    Obj* val = mk_int(0);
+call    0 never executed
+    #####:  276:    Obj* atom = make_atom(val);
+call    0 never executed
+    #####:  277:    Obj* inc_closure = mk_closure(conc_increment_closure_fn, NULL, NULL, 0, 1);
+call    0 never executed
+        -:  278:
+    #####:  279:    for (int i = 0; i < 10; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  280:        Obj* result = atom_swap(atom, inc_closure);
+call    0 never executed
+    #####:  281:        ASSERT_EQ(obj_to_int(result), i + 1);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+    #####:  282:        dec_ref(result);
+call    0 never executed
+        -:  283:    }
+        -:  284:
+    #####:  285:    Obj* final = atom_deref(atom);
+call    0 never executed
+    #####:  286:    ASSERT_EQ(obj_to_int(final), 10);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+    #####:  287:    dec_ref(final);
+call    0 never executed
+    #####:  288:    dec_ref(inc_closure);
+call    0 never executed
+    #####:  289:    dec_ref(atom);
+call    0 never executed
+    #####:  290:    dec_ref(val);
+call    0 never executed
+    #####:  291:    PASS();
+call    0 never executed
+        -:  292:}
+        -:  293:
+        -:  294:/* ========== Atom Compare and Swap Tests ========== */
+        -:  295:
+function test_atom_cas_success called 0 returned 0% blocks executed 0%
+    #####:  296:void test_atom_cas_success(void) {
+    #####:  297:    Obj* val = mk_int(10);
+call    0 never executed
+    #####:  298:    Obj* atom = make_atom(val);
+call    0 never executed
+        -:  299:
+    #####:  300:    Obj* expected = val;
+    #####:  301:    Obj* new_val = mk_int(20);
+call    0 never executed
+        -:  302:
+    #####:  303:    Obj* result = atom_cas(atom, expected, new_val);
+call    0 never executed
+    #####:  304:    ASSERT_NOT_NULL(result);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  305:    ASSERT_EQ(obj_to_int(result), 1);  /* success */
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:  306:
+    #####:  307:    Obj* current = atom_deref(atom);
+call    0 never executed
+    #####:  308:    ASSERT_EQ(obj_to_int(current), 20);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:  309:
+    #####:  310:    dec_ref(result);
+call    0 never executed
+    #####:  311:    dec_ref(current);
+call    0 never executed
+    #####:  312:    dec_ref(new_val);
+call    0 never executed
+    #####:  313:    dec_ref(atom);
+call    0 never executed
+    #####:  314:    dec_ref(val);
+call    0 never executed
+    #####:  315:    PASS();
+call    0 never executed
+        -:  316:}
+        -:  317:
+function test_atom_cas_failure called 0 returned 0% blocks executed 0%
+    #####:  318:void test_atom_cas_failure(void) {
+    #####:  319:    Obj* val = mk_int(10);
+call    0 never executed
+    #####:  320:    Obj* atom = make_atom(val);
+call    0 never executed
+        -:  321:
+    #####:  322:    Obj* expected = mk_int(999);  /* Wrong expected value */
+call    0 never executed
+    #####:  323:    Obj* new_val = mk_int(20);
+call    0 never executed
+        -:  324:
+    #####:  325:    Obj* result = atom_cas(atom, expected, new_val);
+call    0 never executed
+    #####:  326:    ASSERT_NOT_NULL(result);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  327:    ASSERT_EQ(obj_to_int(result), 0);  /* failure */
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:  328:
+    #####:  329:    Obj* current = atom_deref(atom);
+call    0 never executed
+    #####:  330:    ASSERT_EQ(obj_to_int(current), 10);  /* Unchanged */
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:  331:
+    #####:  332:    dec_ref(expected);
+call    0 never executed
+    #####:  333:    dec_ref(new_val);
+call    0 never executed
+    #####:  334:    dec_ref(result);
+call    0 never executed
+    #####:  335:    dec_ref(current);
+call    0 never executed
+    #####:  336:    dec_ref(atom);
+call    0 never executed
+    #####:  337:    dec_ref(val);
+call    0 never executed
+    #####:  338:    PASS();
+call    0 never executed
+        -:  339:}
+        -:  340:
+function test_atom_cas_null_atom called 0 returned 0% blocks executed 0%
+    #####:  341:void test_atom_cas_null_atom(void) {
+    #####:  342:    Obj* expected = mk_int(10);
+call    0 never executed
+    #####:  343:    Obj* new_val = mk_int(20);
+call    0 never executed
+        -:  344:
+    #####:  345:    Obj* result = atom_cas(NULL, expected, new_val);
+call    0 never executed
+    #####:  346:    ASSERT_NOT_NULL(result);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  347:    ASSERT_EQ(obj_to_int(result), 0);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:  348:
+    #####:  349:    dec_ref(expected);
+call    0 never executed
+    #####:  350:    dec_ref(new_val);
+call    0 never executed
+    #####:  351:    dec_ref(result);
+call    0 never executed
+    #####:  352:    PASS();
+call    0 never executed
+        -:  353:}
+        -:  354:
+        -:  355:/* ========== Thread Tests ========== */
+        -:  356:
+function conc_return_42 called 0 returned 0% blocks executed 0%
+    #####:  357:static Obj* conc_return_42(Obj** caps, Obj** args, int nargs) {
+        -:  358:    (void)caps; (void)args; (void)nargs;
+    #####:  359:    return mk_int(42);
+call    0 never executed
+        -:  360:}
+        -:  361:
+function test_spawn_thread called 0 returned 0% blocks executed 0%
+    #####:  362:void test_spawn_thread(void) {
+    #####:  363:    Obj* closure = mk_closure(conc_return_42, NULL, NULL, 0, 0);
+call    0 never executed
+    #####:  364:    Obj* thread = spawn_thread(closure);
+call    0 never executed
+    #####:  365:    ASSERT_NOT_NULL(thread);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  366:    ASSERT_EQ(thread->tag, TAG_THREAD);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+        -:  367:
+    #####:  368:    Obj* result = thread_join(thread);
+call    0 never executed
+    #####:  369:    ASSERT_NOT_NULL(result);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  370:    ASSERT_EQ(obj_to_int(result), 42);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:  371:
+    #####:  372:    dec_ref(result);
+call    0 never executed
+    #####:  373:    dec_ref(thread);
+call    0 never executed
+    #####:  374:    dec_ref(closure);
+call    0 never executed
+    #####:  375:    PASS();
+call    0 never executed
+        -:  376:}
+        -:  377:
+function test_spawn_thread_null called 0 returned 0% blocks executed 0%
+    #####:  378:void test_spawn_thread_null(void) {
+    #####:  379:    Obj* thread = spawn_thread(NULL);
+call    0 never executed
+    #####:  380:    ASSERT_NOT_NULL(thread);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  381:    Obj* result = thread_join(thread);
+call    0 never executed
+    #####:  382:    ASSERT_NULL(result);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  383:    dec_ref(thread);
+call    0 never executed
+    #####:  384:    PASS();
+call    0 never executed
+        -:  385:}
+        -:  386:
+function add_captures called 0 returned 0% blocks executed 0%
+    #####:  387:static Obj* add_captures(Obj** caps, Obj** args, int nargs) {
+        -:  388:    (void)args; (void)nargs;
+    #####:  389:    long a = obj_to_int(caps[0]);
+call    0 never executed
+    #####:  390:    long b = obj_to_int(caps[1]);
+call    0 never executed
+    #####:  391:    return mk_int(a + b);
+call    0 never executed
+        -:  392:}
+        -:  393:
+function test_spawn_thread_with_captures called 0 returned 0% blocks executed 0%
+    #####:  394:void test_spawn_thread_with_captures(void) {
+    #####:  395:    Obj* cap1 = mk_int(30);
+call    0 never executed
+    #####:  396:    Obj* cap2 = mk_int(12);
+call    0 never executed
+    #####:  397:    Obj* caps[] = {cap1, cap2};
+    #####:  398:    Obj* closure = mk_closure(add_captures, caps, NULL, 2, 0);
+call    0 never executed
+        -:  399:
+    #####:  400:    Obj* thread = spawn_thread(closure);
+call    0 never executed
+    #####:  401:    Obj* result = thread_join(thread);
+call    0 never executed
+        -:  402:
+    #####:  403:    ASSERT_EQ(obj_to_int(result), 42);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:  404:
+    #####:  405:    dec_ref(result);
+call    0 never executed
+    #####:  406:    dec_ref(thread);
+call    0 never executed
+    #####:  407:    dec_ref(closure);
+call    0 never executed
+    #####:  408:    dec_ref(cap1);
+call    0 never executed
+    #####:  409:    dec_ref(cap2);
+call    0 never executed
+    #####:  410:    PASS();
+call    0 never executed
+        -:  411:}
+        -:  412:
+        -:  413:/* ========== Thread Join Tests ========== */
+        -:  414:
+function test_thread_join_null called 0 returned 0% blocks executed 0%
+    #####:  415:void test_thread_join_null(void) {
+    #####:  416:    Obj* result = thread_join(NULL);
+call    0 never executed
+    #####:  417:    ASSERT_NULL(result);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  418:    PASS();
+call    0 never executed
+        -:  419:}
+        -:  420:
+function test_thread_join_multiple_times called 0 returned 0% blocks executed 0%
+    #####:  421:void test_thread_join_multiple_times(void) {
+    #####:  422:    Obj* closure = mk_closure(conc_return_42, NULL, NULL, 0, 0);
+call    0 never executed
+    #####:  423:    Obj* thread = spawn_thread(closure);
+call    0 never executed
+        -:  424:
+    #####:  425:    Obj* result1 = thread_join(thread);
+call    0 never executed
+    #####:  426:    ASSERT_EQ(obj_to_int(result1), 42);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:  427:
+        -:  428:    /* Join again - should return cached result */
+    #####:  429:    Obj* result2 = thread_join(thread);
+call    0 never executed
+    #####:  430:    ASSERT_EQ(obj_to_int(result2), 42);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:  431:
+    #####:  432:    dec_ref(result1);
+call    0 never executed
+    #####:  433:    dec_ref(result2);
+call    0 never executed
+    #####:  434:    dec_ref(thread);
+call    0 never executed
+    #####:  435:    dec_ref(closure);
+call    0 never executed
+    #####:  436:    PASS();
+call    0 never executed
+        -:  437:}
+        -:  438:
+        -:  439:/* ========== Concurrent Channel Tests ========== */
+        -:  440:
+function producer_fn called 0 returned 0% blocks executed 0%
+    #####:  441:static Obj* producer_fn(Obj** caps, Obj** args, int nargs) {
+        -:  442:    (void)args; (void)nargs;
+    #####:  443:    Obj* ch = caps[0];
+    #####:  444:    for (int i = 0; i < 10; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  445:        channel_send(ch, mk_int(i));
+call    0 never executed
+call    1 never executed
+        -:  446:    }
+    #####:  447:    return NULL;
+        -:  448:}
+        -:  449:
+function test_concurrent_channel called 0 returned 0% blocks executed 0%
+    #####:  450:void test_concurrent_channel(void) {
+    #####:  451:    Obj* ch = make_channel(10);
+call    0 never executed
+    #####:  452:    Obj* caps[] = {ch};
+    #####:  453:    Obj* closure = mk_closure(producer_fn, caps, NULL, 1, 0);
+call    0 never executed
+        -:  454:
+    #####:  455:    Obj* thread = spawn_thread(closure);
+call    0 never executed
+        -:  456:
+        -:  457:    /* Receive all values */
+    #####:  458:    int sum = 0;
+    #####:  459:    for (int i = 0; i < 10; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  460:        Obj* val = channel_recv(ch);
+call    0 never executed
+    #####:  461:        if (val) {
+branch  0 never executed (fallthrough)
+branch  1 never executed
+    #####:  462:            sum += obj_to_int(val);
+call    0 never executed
+    #####:  463:            dec_ref(val);
+call    0 never executed
+        -:  464:        }
+        -:  465:    }
+        -:  466:
+    #####:  467:    thread_join(thread);
+call    0 never executed
+        -:  468:
+    #####:  469:    ASSERT_EQ(sum, 45);  /* 0+1+2+...+9 = 45 */
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+        -:  470:
+    #####:  471:    dec_ref(thread);
+call    0 never executed
+    #####:  472:    dec_ref(closure);
+call    0 never executed
+    #####:  473:    dec_ref(ch);
+call    0 never executed
+    #####:  474:    PASS();
+call    0 never executed
+        -:  475:}
+        -:  476:
+        -:  477:/* ========== Concurrent Atom Tests ========== */
+        -:  478:
+function conc_atom_incrementer called 0 returned 0% blocks executed 0%
+    #####:  479:static Obj* conc_atom_incrementer(Obj** caps, Obj** args, int nargs) {
+        -:  480:    (void)args; (void)nargs;
+    #####:  481:    Obj* atom = caps[0];
+    #####:  482:    Obj* inc_closure = caps[1];  /* Pass the increment closure as capture */
+    #####:  483:    for (int i = 0; i < 100; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  484:        Obj* result = atom_swap(atom, inc_closure);
+call    0 never executed
+    #####:  485:        if (result) dec_ref(result);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+        -:  486:    }
+    #####:  487:    return NULL;
+        -:  488:}
+        -:  489:
+function test_concurrent_atom called 0 returned 0% blocks executed 0%
+    #####:  490:void test_concurrent_atom(void) {
+    #####:  491:    Obj* val = mk_int(0);
+call    0 never executed
+    #####:  492:    Obj* atom = make_atom(val);
+call    0 never executed
+    #####:  493:    Obj* inc_closure = mk_closure(conc_increment_closure_fn, NULL, NULL, 0, 1);
+call    0 never executed
+    #####:  494:    Obj* caps[] = {atom, inc_closure};
+        -:  495:
+    #####:  496:    Obj* closure1 = mk_closure(conc_atom_incrementer, caps, NULL, 2, 0);
+call    0 never executed
+    #####:  497:    Obj* closure2 = mk_closure(conc_atom_incrementer, caps, NULL, 2, 0);
+call    0 never executed
+        -:  498:
+    #####:  499:    Obj* thread1 = spawn_thread(closure1);
+call    0 never executed
+    #####:  500:    Obj* thread2 = spawn_thread(closure2);
+call    0 never executed
+        -:  501:
+    #####:  502:    thread_join(thread1);
+call    0 never executed
+    #####:  503:    thread_join(thread2);
+call    0 never executed
+        -:  504:
+    #####:  505:    Obj* final = atom_deref(atom);
+call    0 never executed
+    #####:  506:    ASSERT_EQ(obj_to_int(final), 200);  /* 100 + 100 */
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+        -:  507:
+    #####:  508:    dec_ref(final);
+call    0 never executed
+    #####:  509:    dec_ref(thread1);
+call    0 never executed
+    #####:  510:    dec_ref(thread2);
+call    0 never executed
+    #####:  511:    dec_ref(closure1);
+call    0 never executed
+    #####:  512:    dec_ref(closure2);
+call    0 never executed
+    #####:  513:    dec_ref(inc_closure);
+call    0 never executed
+    #####:  514:    dec_ref(atom);
+call    0 never executed
+    #####:  515:    dec_ref(val);
+call    0 never executed
+    #####:  516:    PASS();
+call    0 never executed
+        -:  517:}
+        -:  518:
+        -:  519:/* ========== Stress Tests ========== */
+        -:  520:
+function test_channel_stress_many_values called 0 returned 0% blocks executed 0%
+    #####:  521:void test_channel_stress_many_values(void) {
+    #####:  522:    Obj* ch = make_channel(1000);
+call    0 never executed
+    #####:  523:    for (int i = 0; i < 1000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  524:        channel_send(ch, mk_int(i));
+call    0 never executed
+call    1 never executed
+        -:  525:    }
+    #####:  526:    for (int i = 0; i < 1000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  527:        Obj* val = channel_recv(ch);
+call    0 never executed
+    #####:  528:        ASSERT_EQ(obj_to_int(val), i);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+    #####:  529:        dec_ref(val);
+call    0 never executed
+        -:  530:    }
+    #####:  531:    dec_ref(ch);
+call    0 never executed
+    #####:  532:    PASS();
+call    0 never executed
+        -:  533:}
+        -:  534:
+function test_atom_stress_many_swaps called 0 returned 0% blocks executed 0%
+    #####:  535:void test_atom_stress_many_swaps(void) {
+    #####:  536:    Obj* val = mk_int(0);
+call    0 never executed
+    #####:  537:    Obj* atom = make_atom(val);
+call    0 never executed
+    #####:  538:    Obj* inc_closure = mk_closure(conc_increment_closure_fn, NULL, NULL, 0, 1);
+call    0 never executed
+        -:  539:
+    #####:  540:    for (int i = 0; i < 1000; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  541:        Obj* result = atom_swap(atom, inc_closure);
+call    0 never executed
+    #####:  542:        if (result) dec_ref(result);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+        -:  543:    }
+        -:  544:
+    #####:  545:    Obj* final = atom_deref(atom);
+call    0 never executed
+    #####:  546:    ASSERT_EQ(obj_to_int(final), 1000);
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+call    4 never executed
+    #####:  547:    dec_ref(final);
+call    0 never executed
+    #####:  548:    dec_ref(inc_closure);
+call    0 never executed
+    #####:  549:    dec_ref(atom);
+call    0 never executed
+    #####:  550:    dec_ref(val);
+call    0 never executed
+    #####:  551:    PASS();
+call    0 never executed
+        -:  552:}
+        -:  553:
+function noop_fn called 0 returned 0% blocks executed 0%
+    #####:  554:static Obj* noop_fn(Obj** caps, Obj** args, int nargs) {
+        -:  555:    (void)caps; (void)args; (void)nargs;
+    #####:  556:    return mk_int(0);
+call    0 never executed
+        -:  557:}
+        -:  558:
+function test_thread_stress_many_threads called 0 returned 0% blocks executed 0%
+    #####:  559:void test_thread_stress_many_threads(void) {
+        -:  560:    Obj* threads[50];
+    #####:  561:    Obj* closure = mk_closure(noop_fn, NULL, NULL, 0, 0);
+call    0 never executed
+        -:  562:
+    #####:  563:    for (int i = 0; i < 50; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  564:        threads[i] = spawn_thread(closure);
+call    0 never executed
+        -:  565:    }
+        -:  566:
+    #####:  567:    for (int i = 0; i < 50; i++) {
+branch  0 never executed
+branch  1 never executed (fallthrough)
+    #####:  568:        Obj* result = thread_join(threads[i]);
+call    0 never executed
+    #####:  569:        dec_ref(result);
+call    0 never executed
+    #####:  570:        dec_ref(threads[i]);
+call    0 never executed
+        -:  571:    }
+        -:  572:
+    #####:  573:    dec_ref(closure);
+call    0 never executed
+    #####:  574:    PASS();
+call    0 never executed
+    #####:  575:}
+        -:  576:
+        -:  577:/* ========== Run All Concurrency Tests ========== */
+        -:  578:
+function run_concurrency_tests called 0 returned 0% blocks executed 0%
+    #####:  579:void run_concurrency_tests(void) {
+    #####:  580:    TEST_SUITE("Concurrency");
+call    0 never executed
+        -:  581:
+    #####:  582:    TEST_SECTION("Channel Creation");
+call    0 never executed
+    #####:  583:    RUN_TEST(test_make_channel_unbuffered);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  584:    RUN_TEST(test_make_channel_buffered);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  585:    RUN_TEST(test_make_channel_large_buffer);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  586:
+    #####:  587:    TEST_SECTION("Channel Send/Receive");
+call    0 never executed
+    #####:  588:    RUN_TEST(test_channel_send_receive_basic);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  589:    RUN_TEST(test_channel_send_multiple);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  590:    RUN_TEST(test_channel_send_immediate);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  591:
+    #####:  592:    TEST_SECTION("Channel Close");
+call    0 never executed
+    #####:  593:    RUN_TEST(test_channel_close);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  594:    RUN_TEST(test_channel_close_null);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  595:
+    #####:  596:    TEST_SECTION("Channel Edge Cases");
+call    0 never executed
+    #####:  597:    RUN_TEST(test_channel_send_null);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  598:    RUN_TEST(test_channel_recv_from_closed_empty);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  599:
+    #####:  600:    TEST_SECTION("Atom Creation");
+call    0 never executed
+    #####:  601:    RUN_TEST(test_make_atom);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  602:    RUN_TEST(test_make_atom_null);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  603:    RUN_TEST(test_make_atom_immediate);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  604:
+    #####:  605:    TEST_SECTION("Atom Deref");
+call    0 never executed
+    #####:  606:    RUN_TEST(test_atom_deref);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  607:    RUN_TEST(test_atom_deref_null_atom);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  608:    RUN_TEST(test_atom_deref_immediate);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  609:
+    #####:  610:    TEST_SECTION("Atom Reset");
+call    0 never executed
+    #####:  611:    RUN_TEST(test_atom_reset);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  612:    RUN_TEST(test_atom_reset_null_atom);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  613:    RUN_TEST(test_atom_reset_to_null);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  614:
+    #####:  615:    TEST_SECTION("Atom Swap");
+call    0 never executed
+    #####:  616:    RUN_TEST(test_atom_swap);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  617:    RUN_TEST(test_atom_swap_null_atom);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  618:    RUN_TEST(test_atom_swap_null_fn);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  619:    RUN_TEST(test_atom_swap_multiple);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  620:
+    #####:  621:    TEST_SECTION("Atom CAS");
+call    0 never executed
+    #####:  622:    RUN_TEST(test_atom_cas_success);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  623:    RUN_TEST(test_atom_cas_failure);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  624:    RUN_TEST(test_atom_cas_null_atom);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  625:
+    #####:  626:    TEST_SECTION("Thread Spawn");
+call    0 never executed
+    #####:  627:    RUN_TEST(test_spawn_thread);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  628:    RUN_TEST(test_spawn_thread_null);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  629:    RUN_TEST(test_spawn_thread_with_captures);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  630:
+    #####:  631:    TEST_SECTION("Thread Join");
+call    0 never executed
+    #####:  632:    RUN_TEST(test_thread_join_null);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  633:    RUN_TEST(test_thread_join_multiple_times);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  634:
+    #####:  635:    TEST_SECTION("Concurrent Operations");
+call    0 never executed
+    #####:  636:    RUN_TEST(test_concurrent_channel);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  637:    RUN_TEST(test_concurrent_atom);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  638:
+    #####:  639:    TEST_SECTION("Stress Tests");
+call    0 never executed
+    #####:  640:    RUN_TEST(test_channel_stress_many_values);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  641:    RUN_TEST(test_atom_stress_many_swaps);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  642:    RUN_TEST(test_thread_stress_many_threads);
+call    0 never executed
+call    1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+    #####:  643:}

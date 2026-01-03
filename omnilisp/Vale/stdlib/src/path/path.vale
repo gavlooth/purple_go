@@ -1,0 +1,320 @@
+import stdlib.collections.list.*;
+import stdlib.resultutils.*;
+
+export Array<imm, str> as StrArray;
+export Array<mut, str> as MutStrArray;
+export List<Path> as PathList;
+
+
+interface FileError { }
+struct FileNotFoundError {
+  path Path;
+}
+impl FileError for FileNotFoundError;
+
+
+exported func AddToPathChildList(parent &Path, list &List<Path>, child_name str) {
+  list.add(parent./(child_name));
+}
+
+exported struct Path {
+  segments List<str>;
+  //drive Opt<str>;
+}
+func resolve(self &Path) Path {
+  if not self.exists() {
+    panic("Error: used resolve() on a non-existent path.")
+  }
+  Path(resolve(self.str()))
+}
+
+func is_dir(path &Path) bool {
+  is_dir(path.str())
+}
+
+func is_file(path &Path) bool {
+  is_file(path.str())
+}
+
+func parent(path &Path) Path {
+  result = path.clone();
+  if (result.segments.len() == 0) {
+    panic("Can't get parent directory, is already root.");
+  }
+  result.segments.remove(result.segments.len() - 1);
+  return result;
+}
+
+func directory(path &Path) Path {
+  result = path.clone();
+  if (path.is_dir()) {
+    return result;
+  }
+  result.segments.remove(result.segments.len() - 1);
+  return result;
+}
+
+func Path(s str) Path {
+  segments = List<str>();
+  foreach a in s.split("/") {
+    foreach b in a.split("\\") {
+      segments.add(b.str());
+    }
+  }
+  // If it ends in a / there will be an empty string at the end, remove it.
+  if (segments.get(segments.len() - 1) == "") {
+    segments.remove(segments.len() - 1);
+  }
+  vassert(segments.len() > 0, "Path is empty!");
+  return Path(segments);
+}
+
+func name(path &Path) str {
+  path.segments.get(path.segments.len() - 1)
+}
+
+func str(path Path) str { path.str() }
+func str(path &Path) str {
+  sep = GetPathSeparator();
+
+  builder = StringBuilder();
+  first = true;
+  //if (not path.drive.isEmpty()) {
+  //  builder.print(path.drive.get());
+  //  set first = false;
+  //}
+  foreach segment in path.segments {
+    if (not first) {
+      builder.print(sep);
+    }
+    builder.print(segment);
+    set first = false;
+  }
+  return builder.str();
+}
+
+func exists(path &Path) bool {
+  return path.str().exists();
+}
+func exists(path Path) bool { path.exists() }
+
+func ==(a &Path, b &Path) bool {
+  if (a.segments.len() != b.segments.len()) {
+    return false;
+  }
+  i = 0;
+  while (i < a.segments.len()) {
+    if (a.segments.get(i) != b.segments.get(i)) {
+      return false;
+    }
+    set i = i + 1;
+  }
+
+  //if (a.drive.isEmpty() != b.drive.isEmpty()) {
+  //  return false;
+  //}
+  //if (not a.drive.isEmpty()) {
+  //  if (a.drive.get() != b.drive.get()) {
+  //    return false;
+  //  }
+  //}
+  return true;
+}
+func !=(a &Path, b &Path) bool { not (a == b) }
+
+func clone(self &Path) Path {
+  segments = List<str>();
+  foreach segment in self.segments {
+    segments.add(segment);
+  }
+  return Path(segments); //, self.drive);
+}
+
+func /(path Path, segment str) Path { path / segment }
+func /(path &Path, segment str) Path {
+  new_path = path.clone();
+
+  new_segments = segment.split(GetPathSeparator());
+  foreach new_segment in new_segments {
+    if (new_segment.len() > 0) {
+      new_path.segments.add(new_segment.str());
+    }
+  }
+
+  return new_path;
+}
+
+func iterdir(path &Path) List<Path> {
+  destination_list = List<Path>();
+  success = iterdir(path, path.str(), &destination_list);
+  if (not success) {
+    panic("iterdir failed!");
+  }
+  return destination_list;
+}
+
+func readAsString(path &Path) str {
+  readFileAsString(path.str())
+}
+func writeString(path &Path, contentsVStr str) {
+  writeStringToFile(path.str(), contentsVStr)
+}
+func writeToFile(contentsVStr str, path &Path) {
+  writeString(path, contentsVStr)
+}
+
+func CreateDir(path &Path, allow_already_existing bool) Result<void, FileError> {
+  if (CreateDirExtern(path.str(), allow_already_existing)) {
+    Ok<void, FileError>(void())
+  } else {
+    panic("Error in CreateDir");
+  }
+}
+
+func CreateDirAll(path &Path, allow_already_existing bool) Result<void, FileError> {
+  if (path.segments.len() == 0) {
+    return Err<void, FileError>(FileNotFoundError(path.clone()));
+  }
+  if (not path.exists()) {
+    // Recurse
+    recurse_result = CreateDirAll(&path.parent(), allow_already_existing);
+    if (recurse_result.is_err()) {
+      return recurse_result;
+    }
+    recurse_result.expect("zork h");
+
+    create_dir_result = path.CreateDir(allow_already_existing);
+    if (create_dir_result.is_err()) {
+      return create_dir_result;
+    }
+    create_dir_result.expect("zork i");
+  }
+  return Ok<void, FileError>(void());
+}
+
+func RemoveDirAll(path &Path) Result<void, FileError> {
+  is_symlink_result = path.IsSymLink();
+  if (is_symlink_result.is_err()) {
+    return Err<void, FileError>((is_symlink_result).expect_err("criminey"));
+  }
+  is_symlink = is_symlink_result.expect("jeebus");
+  if is_symlink {
+    RemoveFile(path)
+  } else {
+    RemoveDirAllRecursive(path)
+  }
+}
+
+func RemoveDirAllRecursive(path &Path) Result<void, FileError> {
+  read_dir_result = ListDir(path);
+  children =
+    if (read_dir_result.is_ok()) {
+      read_dir_result.expect("wat")
+    } else {
+      return Err<void, FileError>((read_dir_result).expect_err("wot"));
+    };
+
+  i = 0;
+  while (i < children.len()) {
+    child = children.get(i);
+    is_directory_result = IsDirectory(child);
+    if (is_directory_result.is_err()) {
+      return Err<void, FileError>((is_directory_result).expect_err("ehwot"));
+    }
+    is_dir = is_directory_result.expect("blimey");
+
+    if (is_dir) {
+      remove_dir_all_recursive_result = RemoveDirAllRecursive(child);
+      if (remove_dir_all_recursive_result.is_err()) {
+        return Err<void, FileError>((remove_dir_all_recursive_result).expect_err("bollocks"));
+      }
+      remove_dir_all_recursive_result.expect("hogwash");
+      // continue
+    } else {
+      remove_file_result = RemoveFile(child);
+      if (remove_file_result.is_err()) {
+        return Err<void, FileError>((remove_file_result).expect_err("crikey"));
+      }
+      remove_file_result.expect("bloody");
+      // continue
+    }
+    set i = i + 1;
+  }
+
+  return RemoveDir(path);
+}
+
+func ListDir(path &Path) Result<List<Path>, FileError> {
+  Ok<List<Path>, FileError>(iterdir(path))
+}
+
+func ExternErrorCodeToError(error_code int, path &Path) FileError {
+  if (error_code == 0) {
+    panic("ExternErrorCodeToError Extern error: bad argument")
+  } else if (error_code == 1) {
+    FileNotFoundError(path.clone())
+  } else {
+    panic("RemoveDir: unknown Extern error code {error_code}")
+  }
+}
+
+func RemoveDir(path &Path) Result<void, FileError> {
+  error_code = RemoveDirExtern(path.str());
+  if (error_code == 0) {
+    Ok<void, FileError>(void())
+  } else {
+    Err<void, FileError>(ExternErrorCodeToError(error_code, path))
+  }
+}
+
+
+func RemoveFile(path &Path) Result<void, FileError> {
+  error_code = RemoveFileExtern(path.str());
+  if (error_code == 0) {
+    Ok<void, FileError>(void())
+  } else {
+    Err<void, FileError>(ExternErrorCodeToError(error_code, path))
+  }
+}
+
+
+func IsSymLink(path &Path) Result<bool, FileError> {
+  Ok<bool, FileError>(IsSymLinkExtern(path.str()))
+}
+
+
+func IsDirectory(path &Path) Result<bool, FileError> {
+  Ok<bool, FileError>(is_dir(path))
+}
+
+func GetTempDir() Path {
+  Path(GetTempDirExtern())
+}
+
+func Rename(path &Path, destination &Path) Result<void, FileError> {
+  error_code = RenameExtern(path.str(), destination.str());
+  if (error_code == 0) {
+    Ok<void, FileError>(void())
+  } else {
+    Err<void, FileError>(ExternErrorCodeToError(error_code, path))
+  }
+}
+
+
+
+extern func readFileAsString(filenameVStr str) str;
+extern func writeStringToFile(filenameVStr str, contentsVStr str) void;
+extern func GetEnvPathSeparator() str;
+extern func GetPathSeparator() str;
+extern func is_dir(value str) bool;
+extern func is_file(value str) bool;
+extern func exists(path str) bool;
+extern func iterdir(path &Path, path_str str, destination_list &List<Path>) bool;
+extern func makeDirectory(path str, allow_already_existing bool) bool;
+extern func resolve(path str) str;
+extern func CreateDirExtern(path str, allow_already_existing bool) bool;
+extern func RemoveDirExtern(path str) int;
+extern func RemoveFileExtern(path str) int;
+extern func IsSymLinkExtern(path str) bool;
+extern func RenameExtern(path str, destination str) int;
+extern func GetTempDirExtern() str;

@@ -1,0 +1,2280 @@
+        -:    0:Source:test_lists.c
+        -:    0:Graph:./run_tests_cov-test_main.gcno
+        -:    0:Data:./run_tests_cov-test_main.gcda
+        -:    0:Runs:1
+        -:    1:/* test_lists.c - Comprehensive list operation tests */
+        -:    2:#include "test_framework.h"
+        -:    3:
+        -:    4:/* Helper to count list length (returns int instead of Obj*) */
+function count_list_length called 22 returned 100% blocks executed 100%
+       22:    5:static int count_list_length(Obj* xs) {
+       22:    6:    int len = 0;
+     1323:    7:    while (xs && xs->tag == TAG_PAIR) {
+branch  0 taken 1302 (fallthrough)
+branch  1 taken 21
+branch  2 taken 1301
+branch  3 taken 1 (fallthrough)
+     1301:    8:        len++;
+     1301:    9:        xs = xs->b;
+        -:   10:    }
+       22:   11:    return len;
+        -:   12:}
+        -:   13:
+function raw_car called 113 returned 100% blocks executed 80%
+      113:   14:static Obj* raw_car(Obj* p) {
+     113*:   15:    if (!p || p->tag != TAG_PAIR) return NULL;
+branch  0 taken 113 (fallthrough)
+branch  1 taken 0
+branch  2 taken 0 (fallthrough)
+branch  3 taken 113
+      113:   16:    return p->a;
+        -:   17:}
+        -:   18:
+function raw_cdr called 109 returned 100% blocks executed 80%
+      109:   19:static Obj* raw_cdr(Obj* p) {
+     109*:   20:    if (!p || p->tag != TAG_PAIR) return NULL;
+branch  0 taken 109 (fallthrough)
+branch  1 taken 0
+branch  2 taken 0 (fallthrough)
+branch  3 taken 109
+      109:   21:    return p->b;
+        -:   22:}
+        -:   23:
+        -:   24:/* ========== obj_car tests (list-specific) ========== */
+        -:   25:
+function test_list_car_basic called 1 returned 100% blocks executed 62%
+        1:   26:void test_list_car_basic(void) {
+        1:   27:    Obj* pair = mk_pair(mk_int(42), mk_int(99));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:   28:    Obj* car = obj_car(pair);
+call    0 returned 1
+       1*:   29:    ASSERT_NOT_NULL(car);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   30:    ASSERT_EQ(obj_to_int(car), 42);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:   31:    dec_ref(car);
+call    0 returned 1
+        1:   32:    dec_ref(pair);
+call    0 returned 1
+        -:   33:}
+        -:   34:
+function test_list_car_nested called 1 returned 100% blocks executed 65%
+        1:   35:void test_list_car_nested(void) {
+        1:   36:    Obj* inner = mk_pair(mk_int(1), mk_int(2));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:   37:    Obj* outer = mk_pair(inner, mk_int(3));
+call    0 returned 1
+call    1 returned 1
+        1:   38:    Obj* car = obj_car(outer);
+call    0 returned 1
+       1*:   39:    ASSERT_NOT_NULL(car);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   40:    ASSERT_TRUE(car->tag == TAG_PAIR);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   41:    Obj* inner_car = obj_car(car);
+call    0 returned 1
+       1*:   42:    ASSERT_EQ(obj_to_int(inner_car), 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:   43:    dec_ref(inner_car);
+call    0 returned 1
+        1:   44:    dec_ref(car);
+call    0 returned 1
+        1:   45:    dec_ref(outer);
+call    0 returned 1
+        -:   46:}
+        -:   47:
+function test_list_car_empty called 1 returned 100% blocks executed 60%
+        1:   48:void test_list_car_empty(void) {
+        1:   49:    Obj* car = obj_car(NULL);
+call    0 returned 1
+       1*:   50:    ASSERT_NULL(car);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        -:   51:}
+        -:   52:
+function test_list_car_non_pair called 1 returned 100% blocks executed 71%
+        1:   53:void test_list_car_non_pair(void) {
+        1:   54:    Obj* num = mk_int(42);
+call    0 returned 1
+        1:   55:    Obj* car = obj_car(num);
+call    0 returned 1
+       1*:   56:    ASSERT_NULL(car);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   57:    dec_ref(num);
+call    0 returned 1
+        -:   58:}
+        -:   59:
+function test_list_car_null_car called 1 returned 100% blocks executed 75%
+        1:   60:void test_list_car_null_car(void) {
+        1:   61:    Obj* pair = mk_pair(NULL, mk_int(1));
+call    0 returned 1
+call    1 returned 1
+        1:   62:    Obj* car = obj_car(pair);
+call    0 returned 1
+       1*:   63:    ASSERT_NULL(car);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   64:    dec_ref(pair);
+call    0 returned 1
+        -:   65:}
+        -:   66:
+        -:   67:/* ========== obj_cdr tests (list-specific) ========== */
+        -:   68:
+function test_list_cdr_basic called 1 returned 100% blocks executed 62%
+        1:   69:void test_list_cdr_basic(void) {
+        1:   70:    Obj* pair = mk_pair(mk_int(42), mk_int(99));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:   71:    Obj* cdr = obj_cdr(pair);
+call    0 returned 1
+       1*:   72:    ASSERT_NOT_NULL(cdr);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   73:    ASSERT_EQ(obj_to_int(cdr), 99);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:   74:    dec_ref(cdr);
+call    0 returned 1
+        1:   75:    dec_ref(pair);
+call    0 returned 1
+        -:   76:}
+        -:   77:
+function test_list_cdr_nested called 1 returned 100% blocks executed 65%
+        1:   78:void test_list_cdr_nested(void) {
+        1:   79:    Obj* inner = mk_pair(mk_int(1), mk_int(2));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:   80:    Obj* outer = mk_pair(mk_int(0), inner);
+call    0 returned 1
+call    1 returned 1
+        1:   81:    Obj* cdr = obj_cdr(outer);
+call    0 returned 1
+       1*:   82:    ASSERT_NOT_NULL(cdr);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   83:    ASSERT_TRUE(cdr->tag == TAG_PAIR);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   84:    Obj* inner_car = obj_car(cdr);
+call    0 returned 1
+       1*:   85:    ASSERT_EQ(obj_to_int(inner_car), 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:   86:    dec_ref(inner_car);
+call    0 returned 1
+        1:   87:    dec_ref(cdr);
+call    0 returned 1
+        1:   88:    dec_ref(outer);
+call    0 returned 1
+        -:   89:}
+        -:   90:
+function test_list_cdr_empty called 1 returned 100% blocks executed 60%
+        1:   91:void test_list_cdr_empty(void) {
+        1:   92:    Obj* cdr = obj_cdr(NULL);
+call    0 returned 1
+       1*:   93:    ASSERT_NULL(cdr);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        -:   94:}
+        -:   95:
+function test_list_cdr_non_pair called 1 returned 100% blocks executed 71%
+        1:   96:void test_list_cdr_non_pair(void) {
+        1:   97:    Obj* num = mk_int(42);
+call    0 returned 1
+        1:   98:    Obj* cdr = obj_cdr(num);
+call    0 returned 1
+       1*:   99:    ASSERT_NULL(cdr);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  100:    dec_ref(num);
+call    0 returned 1
+        -:  101:}
+        -:  102:
+function test_list_cdr_null_cdr called 1 returned 100% blocks executed 75%
+        1:  103:void test_list_cdr_null_cdr(void) {
+        1:  104:    Obj* pair = mk_pair(mk_int(1), NULL);
+call    0 returned 1
+call    1 returned 1
+        1:  105:    Obj* cdr = obj_cdr(pair);
+call    0 returned 1
+       1*:  106:    ASSERT_NULL(cdr);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  107:    dec_ref(pair);
+call    0 returned 1
+        -:  108:}
+        -:  109:
+        -:  110:/* ========== list_length tests ========== */
+        -:  111:
+function test_list_length_empty called 1 returned 100% blocks executed 43%
+        1:  112:void test_list_length_empty(void) {
+       1*:  113:    ASSERT_EQ(count_list_length(NULL), 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        -:  114:}
+        -:  115:
+function test_list_length_single called 1 returned 100% blocks executed 60%
+        1:  116:void test_list_length_single(void) {
+        1:  117:    Obj* list = mk_pair(mk_int(1), NULL);
+call    0 returned 1
+call    1 returned 1
+       1*:  118:    ASSERT_EQ(count_list_length(list), 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  119:    dec_ref(list);
+call    0 returned 1
+        -:  120:}
+        -:  121:
+function test_list_length_multiple called 1 returned 100% blocks executed 71%
+        1:  122:void test_list_length_multiple(void) {
+        1:  123:    Obj* list = mk_pair(mk_int(1), mk_pair(mk_int(2), mk_pair(mk_int(3), NULL)));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+call    4 returned 1
+call    5 returned 1
+       1*:  124:    ASSERT_EQ(count_list_length(list), 3);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  125:    dec_ref(list);
+call    0 returned 1
+        -:  126:}
+        -:  127:
+function test_list_length_ten called 1 returned 100% blocks executed 69%
+        1:  128:void test_list_length_ten(void) {
+        1:  129:    Obj* list = NULL;
+       11:  130:    for (int i = 0; i < 10; i++) {
+branch  0 taken 10
+branch  1 taken 1 (fallthrough)
+       10:  131:        list = mk_pair(mk_int(i), list);
+call    0 returned 10
+call    1 returned 10
+        -:  132:    }
+       1*:  133:    ASSERT_EQ(count_list_length(list), 10);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  134:    dec_ref(list);
+call    0 returned 1
+        -:  135:}
+        -:  136:
+function test_list_length_hundred called 1 returned 100% blocks executed 69%
+        1:  137:void test_list_length_hundred(void) {
+        1:  138:    Obj* list = NULL;
+      101:  139:    for (int i = 0; i < 100; i++) {
+branch  0 taken 100
+branch  1 taken 1 (fallthrough)
+      100:  140:        list = mk_pair(mk_int(i), list);
+call    0 returned 100
+call    1 returned 100
+        -:  141:    }
+       1*:  142:    ASSERT_EQ(count_list_length(list), 100);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  143:    dec_ref(list);
+call    0 returned 1
+        -:  144:}
+        -:  145:
+function test_list_length_improper called 1 returned 100% blocks executed 64%
+        1:  146:void test_list_length_improper(void) {
+        -:  147:    /* Improper list (cdr is not a list) */
+        1:  148:    Obj* pair = mk_pair(mk_int(1), mk_int(2));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        -:  149:    /* Should return 1 (only counts proper list elements) */
+       1*:  150:    ASSERT_EQ(count_list_length(pair), 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  151:    dec_ref(pair);
+call    0 returned 1
+        -:  152:}
+        -:  153:
+function test_list_length_runtime_empty called 1 returned 100% blocks executed 56%
+        1:  154:void test_list_length_runtime_empty(void) {
+        1:  155:    Obj* len = list_length(NULL);
+call    0 returned 1
+       1*:  156:    ASSERT_EQ(obj_to_int(len), 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  157:    dec_ref(len);
+call    0 returned 1
+        -:  158:}
+        -:  159:
+function test_list_length_runtime_single called 1 returned 100% blocks executed 67%
+        1:  160:void test_list_length_runtime_single(void) {
+        1:  161:    Obj* list = mk_pair(mk_int(1), NULL);
+call    0 returned 1
+call    1 returned 1
+        1:  162:    Obj* len = list_length(list);
+call    0 returned 1
+       1*:  163:    ASSERT_EQ(obj_to_int(len), 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  164:    dec_ref(len);
+call    0 returned 1
+        1:  165:    dec_ref(list);
+call    0 returned 1
+        -:  166:}
+        -:  167:
+function test_list_length_runtime_improper called 1 returned 100% blocks executed 69%
+        1:  168:void test_list_length_runtime_improper(void) {
+        1:  169:    Obj* list = mk_pair(mk_int(1), mk_int(2));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  170:    Obj* len = list_length(list);
+call    0 returned 1
+       1*:  171:    ASSERT_EQ(obj_to_int(len), 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  172:    dec_ref(len);
+call    0 returned 1
+        1:  173:    dec_ref(list);
+call    0 returned 1
+        -:  174:}
+        -:  175:
+function test_list_length_runtime_non_list called 1 returned 100% blocks executed 64%
+        1:  176:void test_list_length_runtime_non_list(void) {
+        1:  177:    Obj* val = mk_int(7);
+call    0 returned 1
+        1:  178:    Obj* len = list_length(val);
+call    0 returned 1
+       1*:  179:    ASSERT_EQ(obj_to_int(len), 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  180:    dec_ref(len);
+call    0 returned 1
+        1:  181:    dec_ref(val);
+call    0 returned 1
+        -:  182:}
+        -:  183:
+        -:  184:/* ========== list_append tests ========== */
+        -:  185:
+function test_list_append_both_non_empty called 1 returned 100% blocks executed 70%
+        1:  186:void test_list_append_both_non_empty(void) {
+        1:  187:    Obj* a = mk_pair(mk_int(1), mk_pair(mk_int(2), NULL));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+        1:  188:    Obj* b = mk_pair(mk_int(3), mk_pair(mk_int(4), NULL));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+        1:  189:    Obj* result = list_append(a, b);
+call    0 returned 1
+       1*:  190:    ASSERT_EQ(count_list_length(result), 4);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  191:    Obj* first = obj_car(result);
+call    0 returned 1
+       1*:  192:    ASSERT_EQ(obj_to_int(first), 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  193:    dec_ref(first);
+call    0 returned 1
+        1:  194:    dec_ref(a);
+call    0 returned 1
+        1:  195:    dec_ref(b);
+call    0 returned 1
+        1:  196:    dec_ref(result);
+call    0 returned 1
+        -:  197:}
+        -:  198:
+function test_list_append_first_empty called 1 returned 100% blocks executed 62%
+        1:  199:void test_list_append_first_empty(void) {
+        1:  200:    Obj* b = mk_pair(mk_int(1), mk_pair(mk_int(2), NULL));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+        1:  201:    Obj* result = list_append(NULL, b);
+call    0 returned 1
+       1*:  202:    ASSERT_EQ(count_list_length(result), 2);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  203:    Obj* first = obj_car(result);
+call    0 returned 1
+       1*:  204:    ASSERT_EQ(obj_to_int(first), 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  205:    dec_ref(first);
+call    0 returned 1
+        -:  206:    /* b is returned directly */
+        1:  207:    dec_ref(b);
+call    0 returned 1
+        -:  208:}
+        -:  209:
+function test_list_append_second_empty called 1 returned 100% blocks executed 71%
+        1:  210:void test_list_append_second_empty(void) {
+        1:  211:    Obj* a = mk_pair(mk_int(1), mk_pair(mk_int(2), NULL));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+        1:  212:    Obj* result = list_append(a, NULL);
+call    0 returned 1
+       1*:  213:    ASSERT_EQ(count_list_length(result), 2);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  214:    dec_ref(a);
+call    0 returned 1
+        1:  215:    dec_ref(result);
+call    0 returned 1
+        -:  216:}
+        -:  217:
+function test_list_append_both_empty called 1 returned 100% blocks executed 60%
+        1:  218:void test_list_append_both_empty(void) {
+        1:  219:    Obj* result = list_append(NULL, NULL);
+call    0 returned 1
+       1*:  220:    ASSERT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        -:  221:}
+        -:  222:
+function test_list_append_single_elements called 1 returned 100% blocks executed 64%
+        1:  223:void test_list_append_single_elements(void) {
+        1:  224:    Obj* a = mk_pair(mk_int(1), NULL);
+call    0 returned 1
+call    1 returned 1
+        1:  225:    Obj* b = mk_pair(mk_int(2), NULL);
+call    0 returned 1
+call    1 returned 1
+        1:  226:    Obj* result = list_append(a, b);
+call    0 returned 1
+       1*:  227:    ASSERT_EQ(count_list_length(result), 2);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  228:    Obj* first = obj_car(result);
+call    0 returned 1
+        1:  229:    Obj* tail = obj_cdr(result);
+call    0 returned 1
+        1:  230:    Obj* second = obj_car(tail);
+call    0 returned 1
+       1*:  231:    ASSERT_EQ(obj_to_int(first), 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+       1*:  232:    ASSERT_EQ(obj_to_int(second), 2);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  233:    dec_ref(second);
+call    0 returned 1
+        1:  234:    dec_ref(tail);
+call    0 returned 1
+        1:  235:    dec_ref(first);
+call    0 returned 1
+        1:  236:    dec_ref(a);
+call    0 returned 1
+        1:  237:    dec_ref(b);
+call    0 returned 1
+        1:  238:    dec_ref(result);
+call    0 returned 1
+        -:  239:}
+        -:  240:
+function test_list_append_long_lists called 1 returned 100% blocks executed 81%
+        1:  241:void test_list_append_long_lists(void) {
+        1:  242:    Obj* a = NULL;
+        1:  243:    Obj* b = NULL;
+       51:  244:    for (int i = 49; i >= 0; i--) a = mk_pair(mk_int(i), a);
+call    0 returned 50
+call    1 returned 50
+branch  2 taken 50
+branch  3 taken 1 (fallthrough)
+       51:  245:    for (int i = 99; i >= 50; i--) b = mk_pair(mk_int(i), b);
+call    0 returned 50
+call    1 returned 50
+branch  2 taken 50
+branch  3 taken 1 (fallthrough)
+        1:  246:    Obj* result = list_append(a, b);
+call    0 returned 1
+       1*:  247:    ASSERT_EQ(count_list_length(result), 100);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  248:    dec_ref(a);
+call    0 returned 1
+        1:  249:    dec_ref(b);
+call    0 returned 1
+        1:  250:    dec_ref(result);
+call    0 returned 1
+        -:  251:}
+        -:  252:
+        -:  253:/* ========== list_reverse tests ========== */
+        -:  254:
+function test_list_reverse_empty called 1 returned 100% blocks executed 60%
+        1:  255:void test_list_reverse_empty(void) {
+        1:  256:    Obj* result = list_reverse(NULL);
+call    0 returned 1
+       1*:  257:    ASSERT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        -:  258:}
+        -:  259:
+function test_list_reverse_single called 1 returned 100% blocks executed 60%
+        1:  260:void test_list_reverse_single(void) {
+        1:  261:    Obj* list = mk_pair(mk_int(42), NULL);
+call    0 returned 1
+call    1 returned 1
+        1:  262:    Obj* result = list_reverse(list);
+call    0 returned 1
+       1*:  263:    ASSERT_EQ(count_list_length(result), 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  264:    Obj* first = obj_car(result);
+call    0 returned 1
+       1*:  265:    ASSERT_EQ(obj_to_int(first), 42);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  266:    dec_ref(first);
+call    0 returned 1
+        1:  267:    dec_ref(list);
+call    0 returned 1
+        1:  268:    dec_ref(result);
+call    0 returned 1
+        -:  269:}
+        -:  270:
+function test_list_reverse_two called 1 returned 100% blocks executed 69%
+        1:  271:void test_list_reverse_two(void) {
+        1:  272:    Obj* list = mk_pair(mk_int(1), mk_pair(mk_int(2), NULL));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+        1:  273:    Obj* result = list_reverse(list);
+call    0 returned 1
+        1:  274:    Obj* first = obj_car(result);
+call    0 returned 1
+        1:  275:    Obj* tail = obj_cdr(result);
+call    0 returned 1
+        1:  276:    Obj* second = obj_car(tail);
+call    0 returned 1
+       1*:  277:    ASSERT_EQ(obj_to_int(first), 2);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+       1*:  278:    ASSERT_EQ(obj_to_int(second), 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  279:    dec_ref(second);
+call    0 returned 1
+        1:  280:    dec_ref(tail);
+call    0 returned 1
+        1:  281:    dec_ref(first);
+call    0 returned 1
+        1:  282:    dec_ref(list);
+call    0 returned 1
+        1:  283:    dec_ref(result);
+call    0 returned 1
+        -:  284:}
+        -:  285:
+function test_list_reverse_three called 1 returned 100% blocks executed 68%
+        1:  286:void test_list_reverse_three(void) {
+        1:  287:    Obj* list = mk_pair(mk_int(1), mk_pair(mk_int(2), mk_pair(mk_int(3), NULL)));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+call    4 returned 1
+call    5 returned 1
+        1:  288:    Obj* result = list_reverse(list);
+call    0 returned 1
+        1:  289:    Obj* first = obj_car(result);
+call    0 returned 1
+        1:  290:    Obj* tail1 = obj_cdr(result);
+call    0 returned 1
+        1:  291:    Obj* second = obj_car(tail1);
+call    0 returned 1
+        1:  292:    Obj* tail2 = obj_cdr(tail1);
+call    0 returned 1
+        1:  293:    Obj* third = obj_car(tail2);
+call    0 returned 1
+       1*:  294:    ASSERT_EQ(obj_to_int(first), 3);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+       1*:  295:    ASSERT_EQ(obj_to_int(second), 2);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+       1*:  296:    ASSERT_EQ(obj_to_int(third), 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  297:    dec_ref(third);
+call    0 returned 1
+        1:  298:    dec_ref(tail2);
+call    0 returned 1
+        1:  299:    dec_ref(second);
+call    0 returned 1
+        1:  300:    dec_ref(tail1);
+call    0 returned 1
+        1:  301:    dec_ref(first);
+call    0 returned 1
+        1:  302:    dec_ref(list);
+call    0 returned 1
+        1:  303:    dec_ref(result);
+call    0 returned 1
+        -:  304:}
+        -:  305:
+function test_list_reverse_hundred called 1 returned 100% blocks executed 71%
+        1:  306:void test_list_reverse_hundred(void) {
+        1:  307:    Obj* list = NULL;
+      101:  308:    for (int i = 0; i < 100; i++) {
+branch  0 taken 100
+branch  1 taken 1 (fallthrough)
+      100:  309:        list = mk_pair(mk_int(i), list);
+call    0 returned 100
+call    1 returned 100
+        -:  310:    }
+        -:  311:    /* list is now (99 98 ... 0) */
+        1:  312:    Obj* result = list_reverse(list);
+call    0 returned 1
+        -:  313:    /* result should be (0 1 ... 99) */
+        1:  314:    Obj* first = obj_car(result);
+call    0 returned 1
+       1*:  315:    ASSERT_EQ(obj_to_int(first), 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  316:    dec_ref(first);
+call    0 returned 1
+        1:  317:    Obj* last = result;
+      100:  318:    for (int i = 0; i < 99; i++) {
+branch  0 taken 99
+branch  1 taken 1 (fallthrough)
+       99:  319:        last = raw_cdr(last);
+call    0 returned 99
+        -:  320:    }
+        1:  321:    Obj* last_car = raw_car(last);
+call    0 returned 1
+       1*:  322:    ASSERT_EQ(obj_to_int(last_car), 99);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  323:    dec_ref(list);
+call    0 returned 1
+        1:  324:    dec_ref(result);
+call    0 returned 1
+        -:  325:}
+        -:  326:
+function test_list_reverse_preserves_elements called 1 returned 100% blocks executed 85%
+        1:  327:void test_list_reverse_preserves_elements(void) {
+        1:  328:    Obj* list = mk_pair(mk_int(10), mk_pair(mk_int(20), mk_pair(mk_int(30), NULL)));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+call    4 returned 1
+call    5 returned 1
+        1:  329:    Obj* result = list_reverse(list);
+call    0 returned 1
+        -:  330:    /* Sum should be same */
+        1:  331:    long sum = 0;
+        4:  332:    for (Obj* p = result; p && p->tag == TAG_PAIR; p = raw_cdr(p)) {
+branch  0 taken 3 (fallthrough)
+branch  1 taken 1
+branch  2 taken 3
+branch  3 taken 0 (fallthrough)
+        3:  333:        Obj* car = raw_car(p);
+call    0 returned 3
+        3:  334:        sum += obj_to_int(car);
+call    0 returned 3
+call    1 returned 3
+        -:  335:    }
+       1*:  336:    ASSERT_EQ(sum, 60);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  337:    dec_ref(list);
+call    0 returned 1
+        1:  338:    dec_ref(result);
+call    0 returned 1
+        -:  339:}
+        -:  340:
+        -:  341:/* ========== list_map tests ========== */
+        -:  342:
+        -:  343:/* Closure-form helper functions */
+function double_closure_fn called 54 returned 100% blocks executed 71%
+       54:  344:static Obj* double_closure_fn(Obj** caps, Obj** args, int nargs) {
+        -:  345:    (void)caps;
+      54*:  346:    if (nargs < 1 || !args[0]) return mk_int(0);
+branch  0 taken 54 (fallthrough)
+branch  1 taken 0
+branch  2 taken 0 (fallthrough)
+branch  3 taken 54
+call    4 never executed
+       54:  347:    return mk_int(obj_to_int(args[0]) * 2);
+call    0 returned 54
+call    1 returned 54
+        -:  348:}
+        -:  349:
+function square_closure_fn called 3 returned 100% blocks executed 71%
+        3:  350:static Obj* square_closure_fn(Obj** caps, Obj** args, int nargs) {
+        -:  351:    (void)caps;
+       3*:  352:    if (nargs < 1 || !args[0]) return mk_int(0);
+branch  0 taken 3 (fallthrough)
+branch  1 taken 0
+branch  2 taken 0 (fallthrough)
+branch  3 taken 3
+call    4 never executed
+        3:  353:    long x = obj_to_int(args[0]);
+call    0 returned 3
+        3:  354:    return mk_int(x * x);
+call    0 returned 3
+        -:  355:}
+        -:  356:
+function test_list_map_empty called 1 returned 100% blocks executed 71%
+        1:  357:void test_list_map_empty(void) {
+        1:  358:    Obj* fn = mk_closure(double_closure_fn, NULL, NULL, 0, 1);
+call    0 returned 1
+        1:  359:    Obj* result = list_map(fn, NULL);
+call    0 returned 1
+       1*:  360:    ASSERT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  361:    dec_ref(fn);
+call    0 returned 1
+        -:  362:}
+        -:  363:
+function test_list_map_single called 1 returned 100% blocks executed 59%
+        1:  364:void test_list_map_single(void) {
+        1:  365:    Obj* fn = mk_closure(double_closure_fn, NULL, NULL, 0, 1);
+call    0 returned 1
+        1:  366:    Obj* list = mk_pair(mk_int(5), NULL);
+call    0 returned 1
+call    1 returned 1
+        1:  367:    Obj* result = list_map(fn, list);
+call    0 returned 1
+       1*:  368:    ASSERT_EQ(count_list_length(result), 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+       1*:  369:    ASSERT_EQ(obj_to_int(raw_car(result)), 10);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+call    4 never executed
+call    5 never executed
+call    6 never executed
+        1:  370:    dec_ref(list);
+call    0 returned 1
+        1:  371:    dec_ref(result);
+call    0 returned 1
+        1:  372:    dec_ref(fn);
+call    0 returned 1
+        -:  373:}
+        -:  374:
+function test_list_map_multiple called 1 returned 100% blocks executed 57%
+        1:  375:void test_list_map_multiple(void) {
+        1:  376:    Obj* fn = mk_closure(double_closure_fn, NULL, NULL, 0, 1);
+call    0 returned 1
+        1:  377:    Obj* list = mk_pair(mk_int(1), mk_pair(mk_int(2), mk_pair(mk_int(3), NULL)));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+call    4 returned 1
+call    5 returned 1
+        1:  378:    Obj* result = list_map(fn, list);
+call    0 returned 1
+       1*:  379:    ASSERT_EQ(obj_to_int(raw_car(result)), 2);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+call    4 never executed
+call    5 never executed
+call    6 never executed
+       1*:  380:    ASSERT_EQ(obj_to_int(raw_car(raw_cdr(result))), 4);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+branch  3 taken 0 (fallthrough)
+branch  4 taken 1
+call    5 never executed
+call    6 never executed
+call    7 never executed
+call    8 never executed
+       1*:  381:    ASSERT_EQ(obj_to_int(raw_car(raw_cdr(raw_cdr(result)))), 6);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+branch  4 taken 0 (fallthrough)
+branch  5 taken 1
+call    6 never executed
+call    7 never executed
+call    8 never executed
+call    9 never executed
+call   10 never executed
+        1:  382:    dec_ref(list);
+call    0 returned 1
+        1:  383:    dec_ref(result);
+call    0 returned 1
+        1:  384:    dec_ref(fn);
+call    0 returned 1
+        -:  385:}
+        -:  386:
+function test_list_map_square called 1 returned 100% blocks executed 57%
+        1:  387:void test_list_map_square(void) {
+        1:  388:    Obj* fn = mk_closure(square_closure_fn, NULL, NULL, 0, 1);
+call    0 returned 1
+        1:  389:    Obj* list = mk_pair(mk_int(2), mk_pair(mk_int(3), mk_pair(mk_int(4), NULL)));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+call    4 returned 1
+call    5 returned 1
+        1:  390:    Obj* result = list_map(fn, list);
+call    0 returned 1
+       1*:  391:    ASSERT_EQ(obj_to_int(raw_car(result)), 4);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+call    4 never executed
+call    5 never executed
+call    6 never executed
+       1*:  392:    ASSERT_EQ(obj_to_int(raw_car(raw_cdr(result))), 9);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+branch  3 taken 0 (fallthrough)
+branch  4 taken 1
+call    5 never executed
+call    6 never executed
+call    7 never executed
+call    8 never executed
+       1*:  393:    ASSERT_EQ(obj_to_int(raw_car(raw_cdr(raw_cdr(result)))), 16);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+branch  4 taken 0 (fallthrough)
+branch  5 taken 1
+call    6 never executed
+call    7 never executed
+call    8 never executed
+call    9 never executed
+call   10 never executed
+        1:  394:    dec_ref(list);
+call    0 returned 1
+        1:  395:    dec_ref(result);
+call    0 returned 1
+        1:  396:    dec_ref(fn);
+call    0 returned 1
+        -:  397:}
+        -:  398:
+function test_list_map_preserves_length called 1 returned 100% blocks executed 76%
+        1:  399:void test_list_map_preserves_length(void) {
+        1:  400:    Obj* fn = mk_closure(double_closure_fn, NULL, NULL, 0, 1);
+call    0 returned 1
+        1:  401:    Obj* list = NULL;
+       51:  402:    for (int i = 0; i < 50; i++) {
+branch  0 taken 50
+branch  1 taken 1 (fallthrough)
+       50:  403:        list = mk_pair(mk_int(i), list);
+call    0 returned 50
+call    1 returned 50
+        -:  404:    }
+        1:  405:    Obj* result = list_map(fn, list);
+call    0 returned 1
+       1*:  406:    ASSERT_EQ(count_list_length(result), 50);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  407:    dec_ref(list);
+call    0 returned 1
+        1:  408:    dec_ref(result);
+call    0 returned 1
+        1:  409:    dec_ref(fn);
+call    0 returned 1
+        -:  410:}
+        -:  411:
+function test_list_map_null_fn called 1 returned 100% blocks executed 75%
+        1:  412:void test_list_map_null_fn(void) {
+        1:  413:    Obj* list = mk_pair(mk_int(1), NULL);
+call    0 returned 1
+call    1 returned 1
+        1:  414:    Obj* result = list_map(NULL, list);
+call    0 returned 1
+       1*:  415:    ASSERT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  416:    dec_ref(list);
+call    0 returned 1
+        -:  417:}
+        -:  418:
+function test_list_map_non_list called 1 returned 100% blocks executed 78%
+        1:  419:void test_list_map_non_list(void) {
+        1:  420:    Obj* fn = mk_closure(double_closure_fn, NULL, NULL, 0, 1);
+call    0 returned 1
+        1:  421:    Obj* val = mk_int(5);
+call    0 returned 1
+        1:  422:    Obj* result = list_map(fn, val);
+call    0 returned 1
+       1*:  423:    ASSERT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  424:    dec_ref(fn);
+call    0 returned 1
+        1:  425:    dec_ref(val);
+call    0 returned 1
+        -:  426:}
+        -:  427:
+        -:  428:/* ========== list_filter tests ========== */
+        -:  429:
+        -:  430:/* Filter predicate closures - return truthy Obj* for keep */
+function is_even_closure_fn called 10 returned 100% blocks executed 89%
+       10:  431:static Obj* is_even_closure_fn(Obj** caps, Obj** args, int nargs) {
+        -:  432:    (void)caps;
+      10*:  433:    if (nargs < 1 || !args[0]) return NULL;
+branch  0 taken 10 (fallthrough)
+branch  1 taken 0
+branch  2 taken 0 (fallthrough)
+branch  3 taken 10
+       10:  434:    return (obj_to_int(args[0]) % 2 == 0) ? mk_int(1) : NULL;
+call    0 returned 10
+branch  1 taken 5 (fallthrough)
+branch  2 taken 5
+call    3 returned 5
+        -:  435:}
+        -:  436:
+function is_positive_closure_fn called 5 returned 100% blocks executed 89%
+        5:  437:static Obj* is_positive_closure_fn(Obj** caps, Obj** args, int nargs) {
+        -:  438:    (void)caps;
+       5*:  439:    if (nargs < 1 || !args[0]) return NULL;
+branch  0 taken 5 (fallthrough)
+branch  1 taken 0
+branch  2 taken 0 (fallthrough)
+branch  3 taken 5
+        5:  440:    return (obj_to_int(args[0]) > 0) ? mk_int(1) : NULL;
+call    0 returned 5
+branch  1 taken 2 (fallthrough)
+branch  2 taken 3
+call    3 returned 2
+        -:  441:}
+        -:  442:
+function always_true_closure_fn called 3 returned 100% blocks executed 100%
+        3:  443:static Obj* always_true_closure_fn(Obj** caps, Obj** args, int nargs) {
+        -:  444:    (void)caps; (void)args; (void)nargs;
+        3:  445:    return mk_int(1);
+call    0 returned 3
+        -:  446:}
+        -:  447:
+function always_false_closure_fn called 3 returned 100% blocks executed 100%
+        3:  448:static Obj* always_false_closure_fn(Obj** caps, Obj** args, int nargs) {
+        -:  449:    (void)caps; (void)args; (void)nargs;
+        3:  450:    return NULL;
+        -:  451:}
+        -:  452:
+function test_list_filter_empty called 1 returned 100% blocks executed 71%
+        1:  453:void test_list_filter_empty(void) {
+        1:  454:    Obj* fn = mk_closure(is_even_closure_fn, NULL, NULL, 0, 1);
+call    0 returned 1
+        1:  455:    Obj* result = list_filter(fn, NULL);
+call    0 returned 1
+       1*:  456:    ASSERT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  457:    dec_ref(fn);
+call    0 returned 1
+        -:  458:}
+        -:  459:
+function test_list_filter_keep_all called 1 returned 100% blocks executed 79%
+        1:  460:void test_list_filter_keep_all(void) {
+        1:  461:    Obj* fn = mk_closure(is_even_closure_fn, NULL, NULL, 0, 1);
+call    0 returned 1
+        1:  462:    Obj* list = mk_pair(mk_int(2), mk_pair(mk_int(4), mk_pair(mk_int(6), NULL)));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+call    4 returned 1
+call    5 returned 1
+        1:  463:    Obj* result = list_filter(fn, list);
+call    0 returned 1
+       1*:  464:    ASSERT_EQ(count_list_length(result), 3);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        -:  465:    /* Use dec_ref for shared structure - filter shares elements with original */
+        1:  466:    dec_ref(list);
+call    0 returned 1
+        1:  467:    dec_ref(result);
+call    0 returned 1
+        1:  468:    dec_ref(fn);
+call    0 returned 1
+        1:  469:    PASS();
+call    0 returned 1
+        -:  470:}
+        -:  471:
+function test_list_filter_keep_none called 1 returned 100% blocks executed 87%
+        1:  472:void test_list_filter_keep_none(void) {
+        1:  473:    Obj* fn = mk_closure(is_even_closure_fn, NULL, NULL, 0, 1);
+call    0 returned 1
+        1:  474:    Obj* list = mk_pair(mk_int(1), mk_pair(mk_int(3), mk_pair(mk_int(5), NULL)));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+call    4 returned 1
+call    5 returned 1
+        1:  475:    Obj* result = list_filter(fn, list);
+call    0 returned 1
+       1*:  476:    ASSERT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  477:    dec_ref(list);
+call    0 returned 1
+        1:  478:    dec_ref(fn);
+call    0 returned 1
+        1:  479:    PASS();
+call    0 returned 1
+        -:  480:}
+        -:  481:
+function test_list_filter_keep_some called 1 returned 100% blocks executed 62%
+        1:  482:void test_list_filter_keep_some(void) {
+        1:  483:    Obj* fn = mk_closure(is_even_closure_fn, NULL, NULL, 0, 1);
+call    0 returned 1
+        1:  484:    Obj* list = mk_pair(mk_int(1), mk_pair(mk_int(2), mk_pair(mk_int(3), mk_pair(mk_int(4), NULL))));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+call    4 returned 1
+call    5 returned 1
+call    6 returned 1
+call    7 returned 1
+        1:  485:    Obj* result = list_filter(fn, list);
+call    0 returned 1
+       1*:  486:    ASSERT_EQ(count_list_length(result), 2);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+       1*:  487:    ASSERT_EQ(obj_to_int(raw_car(result)), 2);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+call    4 never executed
+call    5 never executed
+call    6 never executed
+       1*:  488:    ASSERT_EQ(obj_to_int(raw_car(raw_cdr(result))), 4);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+branch  3 taken 0 (fallthrough)
+branch  4 taken 1
+call    5 never executed
+call    6 never executed
+call    7 never executed
+call    8 never executed
+        1:  489:    dec_ref(list);
+call    0 returned 1
+        1:  490:    dec_ref(result);
+call    0 returned 1
+        1:  491:    dec_ref(fn);
+call    0 returned 1
+        1:  492:    PASS();
+call    0 returned 1
+        -:  493:}
+        -:  494:
+function test_list_filter_positive called 1 returned 100% blocks executed 83%
+        1:  495:void test_list_filter_positive(void) {
+        1:  496:    Obj* fn = mk_closure(is_positive_closure_fn, NULL, NULL, 0, 1);
+call    0 returned 1
+        1:  497:    Obj* list = mk_pair(mk_int(-2), mk_pair(mk_int(0), mk_pair(mk_int(3), mk_pair(mk_int(-1), mk_pair(mk_int(5), NULL)))));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+call    4 returned 1
+call    5 returned 1
+call    6 returned 1
+call    7 returned 1
+call    8 returned 1
+call    9 returned 1
+        1:  498:    Obj* result = list_filter(fn, list);
+call    0 returned 1
+       1*:  499:    ASSERT_EQ(count_list_length(result), 2);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  500:    dec_ref(list);
+call    0 returned 1
+        1:  501:    dec_ref(result);
+call    0 returned 1
+        1:  502:    dec_ref(fn);
+call    0 returned 1
+        1:  503:    PASS();
+call    0 returned 1
+        -:  504:}
+        -:  505:
+function test_list_filter_always_true called 1 returned 100% blocks executed 79%
+        1:  506:void test_list_filter_always_true(void) {
+        1:  507:    Obj* fn = mk_closure(always_true_closure_fn, NULL, NULL, 0, 1);
+call    0 returned 1
+        1:  508:    Obj* list = mk_pair(mk_int(1), mk_pair(mk_int(2), mk_pair(mk_int(3), NULL)));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+call    4 returned 1
+call    5 returned 1
+        1:  509:    Obj* result = list_filter(fn, list);
+call    0 returned 1
+       1*:  510:    ASSERT_EQ(count_list_length(result), 3);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  511:    dec_ref(list);
+call    0 returned 1
+        1:  512:    dec_ref(result);
+call    0 returned 1
+        1:  513:    dec_ref(fn);
+call    0 returned 1
+        1:  514:    PASS();
+call    0 returned 1
+        -:  515:}
+        -:  516:
+function test_list_filter_always_false called 1 returned 100% blocks executed 87%
+        1:  517:void test_list_filter_always_false(void) {
+        1:  518:    Obj* fn = mk_closure(always_false_closure_fn, NULL, NULL, 0, 1);
+call    0 returned 1
+        1:  519:    Obj* list = mk_pair(mk_int(1), mk_pair(mk_int(2), mk_pair(mk_int(3), NULL)));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+call    4 returned 1
+call    5 returned 1
+        1:  520:    Obj* result = list_filter(fn, list);
+call    0 returned 1
+       1*:  521:    ASSERT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  522:    dec_ref(list);
+call    0 returned 1
+        1:  523:    dec_ref(fn);
+call    0 returned 1
+        1:  524:    PASS();
+call    0 returned 1
+        -:  525:}
+        -:  526:
+function test_list_filter_null_fn called 1 returned 100% blocks executed 78%
+        1:  527:void test_list_filter_null_fn(void) {
+        1:  528:    Obj* list = mk_pair(mk_int(1), NULL);
+call    0 returned 1
+call    1 returned 1
+        1:  529:    Obj* result = list_filter(NULL, list);
+call    0 returned 1
+       1*:  530:    ASSERT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  531:    dec_ref(list);
+call    0 returned 1
+        1:  532:    PASS();
+call    0 returned 1
+        -:  533:}
+        -:  534:
+function test_list_filter_non_list called 1 returned 100% blocks executed 80%
+        1:  535:void test_list_filter_non_list(void) {
+        1:  536:    Obj* fn = mk_closure(is_even_closure_fn, NULL, NULL, 0, 1);
+call    0 returned 1
+        1:  537:    Obj* val = mk_int(7);
+call    0 returned 1
+        1:  538:    Obj* result = list_filter(fn, val);
+call    0 returned 1
+       1*:  539:    ASSERT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  540:    dec_ref(fn);
+call    0 returned 1
+        1:  541:    dec_ref(val);
+call    0 returned 1
+        1:  542:    PASS();
+call    0 returned 1
+        -:  543:}
+        -:  544:
+function test_list_reverse_non_list called 1 returned 100% blocks executed 71%
+        1:  545:void test_list_reverse_non_list(void) {
+        1:  546:    Obj* val = mk_int(3);
+call    0 returned 1
+        1:  547:    Obj* result = list_reverse(val);
+call    0 returned 1
+       1*:  548:    ASSERT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  549:    dec_ref(val);
+call    0 returned 1
+        -:  550:}
+        -:  551:
+        -:  552:/* ========== list_fold tests ========== */
+        -:  553:
+        -:  554:/* Fold function closures - take (acc, elem) return new acc */
+function add_fold_closure_fn called 106 returned 100% blocks executed 71%
+      106:  555:static Obj* add_fold_closure_fn(Obj** caps, Obj** args, int nargs) {
+        -:  556:    (void)caps;
+     106*:  557:    if (nargs < 2) return mk_int(0);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 106
+call    2 never executed
+      106:  558:    return mk_int(obj_to_int(args[0]) + obj_to_int(args[1]));
+call    0 returned 106
+call    1 returned 106
+call    2 returned 106
+        -:  559:}
+        -:  560:
+function mul_fold_closure_fn called 3 returned 100% blocks executed 71%
+        3:  561:static Obj* mul_fold_closure_fn(Obj** caps, Obj** args, int nargs) {
+        -:  562:    (void)caps;
+       3*:  563:    if (nargs < 2) return mk_int(1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 3
+call    2 never executed
+        3:  564:    return mk_int(obj_to_int(args[0]) * obj_to_int(args[1]));
+call    0 returned 3
+call    1 returned 3
+call    2 returned 3
+        -:  565:}
+        -:  566:
+function sub_fold_closure_fn called 6 returned 100% blocks executed 71%
+        6:  567:static Obj* sub_fold_closure_fn(Obj** caps, Obj** args, int nargs) {
+        -:  568:    (void)caps;
+       6*:  569:    if (nargs < 2) return mk_int(0);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 6
+call    2 never executed
+        6:  570:    return mk_int(obj_to_int(args[0]) - obj_to_int(args[1]));
+call    0 returned 6
+call    1 returned 6
+call    2 returned 6
+        -:  571:}
+        -:  572:
+function test_list_fold_empty called 1 returned 100% blocks executed 67%
+        1:  573:void test_list_fold_empty(void) {
+        1:  574:    Obj* fn = mk_closure(add_fold_closure_fn, NULL, NULL, 0, 2);
+call    0 returned 1
+        1:  575:    Obj* init = mk_int(0);
+call    0 returned 1
+        1:  576:    Obj* result = list_fold(fn, init, NULL);
+call    0 returned 1
+       1*:  577:    ASSERT_EQ(obj_to_int(result), 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  578:    dec_ref(result);
+call    0 returned 1
+        1:  579:    dec_ref(fn);
+call    0 returned 1
+        -:  580:}
+        -:  581:
+function test_list_fold_sum called 1 returned 100% blocks executed 79%
+        1:  582:void test_list_fold_sum(void) {
+        1:  583:    Obj* fn = mk_closure(add_fold_closure_fn, NULL, NULL, 0, 2);
+call    0 returned 1
+        1:  584:    Obj* list = mk_pair(mk_int(1), mk_pair(mk_int(2), mk_pair(mk_int(3), NULL)));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+call    4 returned 1
+call    5 returned 1
+        1:  585:    Obj* init = mk_int(0);
+call    0 returned 1
+        1:  586:    Obj* result = list_fold(fn, init, list);
+call    0 returned 1
+       1*:  587:    ASSERT_EQ(obj_to_int(result), 6);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  588:    dec_ref(list);
+call    0 returned 1
+        1:  589:    dec_ref(result);
+call    0 returned 1
+        1:  590:    dec_ref(fn);
+call    0 returned 1
+        -:  591:}
+        -:  592:
+function test_list_fold_product called 1 returned 100% blocks executed 79%
+        1:  593:void test_list_fold_product(void) {
+        1:  594:    Obj* fn = mk_closure(mul_fold_closure_fn, NULL, NULL, 0, 2);
+call    0 returned 1
+        1:  595:    Obj* list = mk_pair(mk_int(2), mk_pair(mk_int(3), mk_pair(mk_int(4), NULL)));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+call    4 returned 1
+call    5 returned 1
+        1:  596:    Obj* init = mk_int(1);
+call    0 returned 1
+        1:  597:    Obj* result = list_fold(fn, init, list);
+call    0 returned 1
+       1*:  598:    ASSERT_EQ(obj_to_int(result), 24);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  599:    dec_ref(list);
+call    0 returned 1
+        1:  600:    dec_ref(result);
+call    0 returned 1
+        1:  601:    dec_ref(fn);
+call    0 returned 1
+        -:  602:}
+        -:  603:
+function test_list_fold_subtraction called 1 returned 100% blocks executed 79%
+        1:  604:void test_list_fold_subtraction(void) {
+        1:  605:    Obj* fn = mk_closure(sub_fold_closure_fn, NULL, NULL, 0, 2);
+call    0 returned 1
+        1:  606:    Obj* list = mk_pair(mk_int(1), mk_pair(mk_int(2), mk_pair(mk_int(3), NULL)));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+call    4 returned 1
+call    5 returned 1
+        1:  607:    Obj* init = mk_int(10);
+call    0 returned 1
+        1:  608:    Obj* result = list_fold(fn, init, list);
+call    0 returned 1
+        -:  609:    /* 10 - 1 - 2 - 3 = 4 */
+       1*:  610:    ASSERT_EQ(obj_to_int(result), 4);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  611:    dec_ref(list);
+call    0 returned 1
+        1:  612:    dec_ref(result);
+call    0 returned 1
+        1:  613:    dec_ref(fn);
+call    0 returned 1
+        -:  614:}
+        -:  615:
+function test_list_fold_large_sum called 1 returned 100% blocks executed 78%
+        1:  616:void test_list_fold_large_sum(void) {
+        1:  617:    Obj* fn = mk_closure(add_fold_closure_fn, NULL, NULL, 0, 2);
+call    0 returned 1
+        1:  618:    Obj* list = NULL;
+      101:  619:    for (int i = 1; i <= 100; i++) {
+branch  0 taken 100
+branch  1 taken 1 (fallthrough)
+      100:  620:        list = mk_pair(mk_int(i), list);
+call    0 returned 100
+call    1 returned 100
+        -:  621:    }
+        1:  622:    Obj* init = mk_int(0);
+call    0 returned 1
+        1:  623:    Obj* result = list_fold(fn, init, list);
+call    0 returned 1
+        -:  624:    /* Sum 1..100 = 5050 */
+       1*:  625:    ASSERT_EQ(obj_to_int(result), 5050);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  626:    dec_ref(list);
+call    0 returned 1
+        1:  627:    dec_ref(result);
+call    0 returned 1
+        1:  628:    dec_ref(fn);
+call    0 returned 1
+        -:  629:}
+        -:  630:
+function test_list_fold_null_fn called 1 returned 100% blocks executed 69%
+        1:  631:void test_list_fold_null_fn(void) {
+        1:  632:    Obj* list = mk_pair(mk_int(1), NULL);
+call    0 returned 1
+call    1 returned 1
+        1:  633:    Obj* init = mk_int(0);
+call    0 returned 1
+        1:  634:    Obj* result = list_fold(NULL, init, list);
+call    0 returned 1
+        -:  635:    /* Should return init when fn is NULL */
+       1*:  636:    ASSERT_EQ(obj_to_int(result), 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  637:    dec_ref(list);
+call    0 returned 1
+        1:  638:    dec_ref(result);
+call    0 returned 1
+        -:  639:}
+        -:  640:
+        -:  641:/* ========== list_foldr tests ========== */
+        -:  642:
+function test_list_foldr_empty called 1 returned 100% blocks executed 67%
+        1:  643:void test_list_foldr_empty(void) {
+        1:  644:    Obj* fn = mk_closure(add_fold_closure_fn, NULL, NULL, 0, 2);
+call    0 returned 1
+        1:  645:    Obj* init = mk_int(0);
+call    0 returned 1
+        1:  646:    Obj* result = list_foldr(fn, init, NULL);
+call    0 returned 1
+       1*:  647:    ASSERT_EQ(obj_to_int(result), 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  648:    dec_ref(result);
+call    0 returned 1
+        1:  649:    dec_ref(fn);
+call    0 returned 1
+        -:  650:}
+        -:  651:
+function test_list_foldr_sum called 1 returned 100% blocks executed 79%
+        1:  652:void test_list_foldr_sum(void) {
+        1:  653:    Obj* fn = mk_closure(add_fold_closure_fn, NULL, NULL, 0, 2);
+call    0 returned 1
+        1:  654:    Obj* list = mk_pair(mk_int(1), mk_pair(mk_int(2), mk_pair(mk_int(3), NULL)));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+call    4 returned 1
+call    5 returned 1
+        1:  655:    Obj* init = mk_int(0);
+call    0 returned 1
+        1:  656:    Obj* result = list_foldr(fn, init, list);
+call    0 returned 1
+       1*:  657:    ASSERT_EQ(obj_to_int(result), 6);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  658:    dec_ref(list);
+call    0 returned 1
+        1:  659:    dec_ref(result);
+call    0 returned 1
+        1:  660:    dec_ref(fn);
+call    0 returned 1
+        -:  661:}
+        -:  662:
+function test_list_foldr_subtraction called 1 returned 100% blocks executed 79%
+        1:  663:void test_list_foldr_subtraction(void) {
+        1:  664:    Obj* fn = mk_closure(sub_fold_closure_fn, NULL, NULL, 0, 2);
+call    0 returned 1
+        1:  665:    Obj* list = mk_pair(mk_int(1), mk_pair(mk_int(2), mk_pair(mk_int(3), NULL)));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+call    4 returned 1
+call    5 returned 1
+        1:  666:    Obj* init = mk_int(0);
+call    0 returned 1
+        1:  667:    Obj* result = list_foldr(fn, init, list);
+call    0 returned 1
+        -:  668:    /* (1 - (2 - (3 - 0))) = 1 - (2 - 3) = 1 - (-1) = 2 */
+       1*:  669:    ASSERT_EQ(obj_to_int(result), 2);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  670:    dec_ref(list);
+call    0 returned 1
+        1:  671:    dec_ref(result);
+call    0 returned 1
+        1:  672:    dec_ref(fn);
+call    0 returned 1
+        -:  673:}
+        -:  674:
+        -:  675:/* ========== list construction helpers ========== */
+        -:  676:
+function test_build_list_10 called 1 returned 100% blocks executed 62%
+        1:  677:void test_build_list_10(void) {
+        1:  678:    Obj* list = NULL;
+       11:  679:    for (int i = 9; i >= 0; i--) {
+branch  0 taken 10
+branch  1 taken 1 (fallthrough)
+       10:  680:        list = mk_pair(mk_int(i), list);
+call    0 returned 10
+call    1 returned 10
+        -:  681:    }
+       1*:  682:    ASSERT_EQ(count_list_length(list), 10);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  683:    Obj* first = obj_car(list);
+call    0 returned 1
+       1*:  684:    ASSERT_EQ(obj_to_int(first), 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  685:    dec_ref(first);
+call    0 returned 1
+        1:  686:    dec_ref(list);
+call    0 returned 1
+        -:  687:}
+        -:  688:
+function test_build_list_1000 called 1 returned 100% blocks executed 69%
+        1:  689:void test_build_list_1000(void) {
+        1:  690:    Obj* list = NULL;
+     1001:  691:    for (int i = 0; i < 1000; i++) {
+branch  0 taken 1000
+branch  1 taken 1 (fallthrough)
+     1000:  692:        list = mk_pair(mk_int(i), list);
+call    0 returned 1000
+call    1 returned 1000
+        -:  693:    }
+       1*:  694:    ASSERT_EQ(count_list_length(list), 1000);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  695:    dec_ref(list);
+call    0 returned 1
+        -:  696:}
+        -:  697:
+function test_nested_list called 1 returned 100% blocks executed 69%
+        1:  698:void test_nested_list(void) {
+        1:  699:    Obj* inner1 = mk_pair(mk_int(1), mk_pair(mk_int(2), NULL));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+        1:  700:    Obj* inner2 = mk_pair(mk_int(3), mk_pair(mk_int(4), NULL));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+        1:  701:    Obj* outer = mk_pair(inner1, mk_pair(inner2, NULL));
+call    0 returned 1
+call    1 returned 1
+       1*:  702:    ASSERT_EQ(count_list_length(outer), 2);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  703:    Obj* inner = obj_car(outer);
+call    0 returned 1
+       1*:  704:    ASSERT_EQ(count_list_length(inner), 2);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  705:    dec_ref(inner);
+call    0 returned 1
+        1:  706:    dec_ref(outer);
+call    0 returned 1
+        -:  707:}
+        -:  708:
+function test_deeply_nested_list called 1 returned 100% blocks executed 80%
+        1:  709:void test_deeply_nested_list(void) {
+        1:  710:    Obj* list = mk_int(0);
+call    0 returned 1
+      101:  711:    for (int i = 0; i < 100; i++) {
+branch  0 taken 100
+branch  1 taken 1 (fallthrough)
+      100:  712:        list = mk_pair(list, NULL);
+call    0 returned 100
+        -:  713:    }
+        -:  714:    /* 100 levels of nesting */
+        1:  715:    Obj* p = list;
+        1:  716:    int depth = 0;
+      101:  717:    while (p && p->tag == TAG_PAIR) {
+branch  0 taken 101 (fallthrough)
+branch  1 taken 0
+branch  2 taken 100
+branch  3 taken 1 (fallthrough)
+      100:  718:        depth++;
+      100:  719:        p = raw_car(p);
+call    0 returned 100
+        -:  720:    }
+       1*:  721:    ASSERT_EQ(depth, 100);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  722:    dec_ref(list);
+call    0 returned 1
+        -:  723:}
+        -:  724:
+        -:  725:/* ========== Run all list tests ========== */
+        -:  726:
+function run_list_tests called 1 returned 100% blocks executed 95%
+        1:  727:void run_list_tests(void) {
+        1:  728:    TEST_SECTION("List Operations - car/cdr");
+call    0 returned 1
+        1:  729:    RUN_TEST(test_list_car_basic);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  730:    RUN_TEST(test_list_car_nested);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  731:    RUN_TEST(test_list_car_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  732:    RUN_TEST(test_list_car_non_pair);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  733:    RUN_TEST(test_list_car_null_car);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  734:    RUN_TEST(test_list_cdr_basic);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  735:    RUN_TEST(test_list_cdr_nested);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  736:    RUN_TEST(test_list_cdr_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  737:    RUN_TEST(test_list_cdr_non_pair);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  738:    RUN_TEST(test_list_cdr_null_cdr);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        -:  739:
+        1:  740:    TEST_SECTION("List Operations - length");
+call    0 returned 1
+        1:  741:    RUN_TEST(test_list_length_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  742:    RUN_TEST(test_list_length_single);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  743:    RUN_TEST(test_list_length_multiple);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  744:    RUN_TEST(test_list_length_ten);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  745:    RUN_TEST(test_list_length_hundred);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  746:    RUN_TEST(test_list_length_improper);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  747:    RUN_TEST(test_list_length_runtime_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  748:    RUN_TEST(test_list_length_runtime_single);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  749:    RUN_TEST(test_list_length_runtime_improper);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  750:    RUN_TEST(test_list_length_runtime_non_list);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        -:  751:
+        1:  752:    TEST_SECTION("List Operations - append");
+call    0 returned 1
+        1:  753:    RUN_TEST(test_list_append_both_non_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  754:    RUN_TEST(test_list_append_first_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  755:    RUN_TEST(test_list_append_second_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  756:    RUN_TEST(test_list_append_both_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  757:    RUN_TEST(test_list_append_single_elements);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  758:    RUN_TEST(test_list_append_long_lists);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        -:  759:
+        1:  760:    TEST_SECTION("List Operations - reverse");
+call    0 returned 1
+        1:  761:    RUN_TEST(test_list_reverse_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  762:    RUN_TEST(test_list_reverse_single);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  763:    RUN_TEST(test_list_reverse_two);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  764:    RUN_TEST(test_list_reverse_three);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  765:    RUN_TEST(test_list_reverse_hundred);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  766:    RUN_TEST(test_list_reverse_preserves_elements);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  767:    RUN_TEST(test_list_reverse_non_list);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        -:  768:
+        1:  769:    TEST_SECTION("List Operations - map");
+call    0 returned 1
+        1:  770:    RUN_TEST(test_list_map_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  771:    RUN_TEST(test_list_map_single);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  772:    RUN_TEST(test_list_map_multiple);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  773:    RUN_TEST(test_list_map_square);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  774:    RUN_TEST(test_list_map_preserves_length);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  775:    RUN_TEST(test_list_map_null_fn);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  776:    RUN_TEST(test_list_map_non_list);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        -:  777:
+        1:  778:    TEST_SECTION("List Operations - filter");
+call    0 returned 1
+        1:  779:    RUN_TEST(test_list_filter_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+       1*:  780:    RUN_TEST(test_list_filter_keep_all);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  781:    RUN_TEST(test_list_filter_keep_none);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  782:    RUN_TEST(test_list_filter_keep_some);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  783:    RUN_TEST(test_list_filter_positive);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  784:    RUN_TEST(test_list_filter_always_true);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  785:    RUN_TEST(test_list_filter_always_false);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  786:    RUN_TEST(test_list_filter_null_fn);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  787:    RUN_TEST(test_list_filter_non_list);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  788:
+        1:  789:    TEST_SECTION("List Operations - fold");
+call    0 returned 1
+        1:  790:    RUN_TEST(test_list_fold_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  791:    RUN_TEST(test_list_fold_sum);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  792:    RUN_TEST(test_list_fold_product);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  793:    RUN_TEST(test_list_fold_subtraction);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  794:    RUN_TEST(test_list_fold_large_sum);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  795:    RUN_TEST(test_list_fold_null_fn);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        -:  796:
+        1:  797:    TEST_SECTION("List Operations - foldr");
+call    0 returned 1
+        1:  798:    RUN_TEST(test_list_foldr_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  799:    RUN_TEST(test_list_foldr_sum);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  800:    RUN_TEST(test_list_foldr_subtraction);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        -:  801:
+        1:  802:    TEST_SECTION("List Construction");
+call    0 returned 1
+        1:  803:    RUN_TEST(test_build_list_10);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  804:    RUN_TEST(test_build_list_1000);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  805:    RUN_TEST(test_nested_list);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  806:    RUN_TEST(test_deeply_nested_list);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  807:}

@@ -4,6 +4,69 @@ This document provides a comprehensive set of examples for all Omnilisp features
 
 ---
 
+## Implemented Syntax (C Compiler)
+
+The current C compiler implements a **small core** of the language. Everything
+below this section is the full design spec and may not be wired yet.
+
+### Literals
+```lisp
+42               ; Integer
+foo              ; Symbol
+()               ; Empty list
+```
+
+### Lists, Quote, and Function Calls
+```lisp
+(+ 1 2)           ; Function application (prefix)
+(cons 1 (cons 2 ()))  ; List construction
+'x               ; Quote -> (quote x)
+```
+
+### Special Forms
+```lisp
+(define answer 42)
+(define (square x) (* x x))
+
+(lambda (x) (* x x))
+(fn (x) (* x x))        ; Alias for lambda
+
+(let ((x 1) (y 2)) (+ x y))   ; List-style bindings
+(let [x 1 y 2] (+ x y))       ; Array-style bindings
+
+(if (< 1 2) 10 20)
+
+(do
+  (print "hi")
+  42)                       ; Returns last expression
+
+(begin 1 2 3)               ; Alias for do
+```
+
+### Truthiness
+```lisp
+; empty list and numeric zero are falsey, everything else is truthy
+(if 0 1 2)   ; -> 2
+(if () 1 2)  ; -> 2
+```
+
+### Built-ins Wired Today
+```lisp
+; Arithmetic: + - * / %
+; Comparison: < > <= >= =
+; Lists: cons car cdr null?
+; I/O: display print newline
+```
+
+### Comments
+```lisp
+; This is a comment to end-of-line
+```
+
+## Planned Syntax (Design Target)
+
+All sections below describe the intended Omnilisp language design and are not yet implemented in the C compiler unless explicitly noted.
+
 ## Bracket Semantics
 
 | Bracket | Context | Meaning | Example |
@@ -166,6 +229,12 @@ Bindings are in `[]` as an even number of forms (name-value pairs):
 ;; With type annotations (types wrapped in {})
 (define (add [x {Int}] [y {Int}]) {Int}
   (+ x y))
+```
+
+### 3.1.1 Lambda Shorthand (Planned)
+```lisp
+(-> x (+ x 1))         ; Single-arg lambda
+(-> (x y) (* x y))     ; Multi-arg lambda
 ```
 
 ### 3.2 Multi-Arity (via Overloads)

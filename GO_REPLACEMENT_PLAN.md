@@ -54,7 +54,7 @@ Vendoring checklist:
 - [x] Port parser tests from Go (`pkg/parser/*_test.go`).
 - [x] Verify grammar parity against Java/Paper (existing tests + new golden tests).
 - [x] Parsing must follow the Pika algorithm **and** the Omnilisp parser module semantics (treat both as authoritative).
-- [x] Use Omnilisp design docs as the syntax guide: `omnilisp/DESIGN.md`, `omnilisp/DESIGN_DECISIONS.md`, `omnilisp/DECISIONS.md`, `omnilisp/SYNTAX.md`, `omnilisp/SUMMARY.md`.
+- [x] Use Omnilisp design docs as the syntax guide: `omnilisp/DESIGN.md`, `omnilisp/DESIGN_DECISIONS.md`, `omnilisp/SYNTAX.md`, `omnilisp/SUMMARY.md`.
 
 ## Phase 5 — Analysis Passes (C) ✅
 - [x] Port liveness analysis.

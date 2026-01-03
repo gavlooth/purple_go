@@ -1,0 +1,1014 @@
+        -:    0:Source:test_closures.c
+        -:    0:Graph:./run_tests_cov-test_main.gcno
+        -:    0:Data:./run_tests_cov-test_main.gcda
+        -:    0:Runs:1
+        -:    1:/* test_closures.c - Comprehensive closure operation tests */
+        -:    2:#include "test_framework.h"
+        -:    3:
+        -:    4:/* Test closure functions */
+function return_42 called 1001 returned 100% blocks executed 100%
+     1001:    5:static Obj* return_42(Obj** captures, Obj** args, int nargs) {
+        -:    6:    (void)captures; (void)args; (void)nargs;
+     1001:    7:    return mk_int(42);
+call    0 returned 1001
+        -:    8:}
+        -:    9:
+function return_first_arg called 1 returned 100% blocks executed 83%
+        1:   10:static Obj* return_first_arg(Obj** captures, Obj** args, int nargs) {
+        -:   11:    (void)captures;
+       1*:   12:    if (nargs < 1 || !args[0]) return NULL;
+branch  0 taken 1 (fallthrough)
+branch  1 taken 0
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+        1:   13:    inc_ref(args[0]);
+call    0 returned 1
+        1:   14:    return args[0];
+        -:   15:}
+        -:   16:
+function add_args called 1 returned 100% blocks executed 64%
+        1:   17:static Obj* add_args(Obj** captures, Obj** args, int nargs) {
+        -:   18:    (void)captures;
+       1*:   19:    if (nargs < 2) return mk_int(0);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   20:    long a = args[0] ? obj_to_int(args[0]) : 0;
+branch  0 taken 1 (fallthrough)
+branch  1 taken 0
+call    2 returned 1
+       1*:   21:    long b = args[1] ? obj_to_int(args[1]) : 0;
+branch  0 taken 1 (fallthrough)
+branch  1 taken 0
+call    2 returned 1
+        1:   22:    return mk_int(a + b);
+call    0 returned 1
+        -:   23:}
+        -:   24:
+function return_captured called 1001 returned 100% blocks executed 83%
+     1001:   25:static Obj* return_captured(Obj** captures, Obj** args, int nargs) {
+        -:   26:    (void)args; (void)nargs;
+    1001*:   27:    if (!captures || !captures[0]) return NULL;
+branch  0 taken 1001 (fallthrough)
+branch  1 taken 0
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1001
+     1001:   28:    inc_ref(captures[0]);
+call    0 returned 1001
+     1001:   29:    return captures[0];
+        -:   30:}
+        -:   31:
+function add_captured_to_arg called 1 returned 100% blocks executed 67%
+        1:   32:static Obj* add_captured_to_arg(Obj** captures, Obj** args, int nargs) {
+       1*:   33:    if (!captures || !captures[0]) return mk_int(0);
+branch  0 taken 1 (fallthrough)
+branch  1 taken 0
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+call    4 never executed
+       1*:   34:    if (nargs < 1 || !args[0]) return mk_int(0);
+branch  0 taken 1 (fallthrough)
+branch  1 taken 0
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+call    4 never executed
+        1:   35:    long cap = obj_to_int(captures[0]);
+call    0 returned 1
+        1:   36:    long arg = obj_to_int(args[0]);
+call    0 returned 1
+        1:   37:    return mk_int(cap + arg);
+call    0 returned 1
+        -:   38:}
+        -:   39:
+function sum_three_captures called 1 returned 100% blocks executed 82%
+        1:   40:static Obj* sum_three_captures(Obj** captures, Obj** args, int nargs) {
+        -:   41:    (void)args; (void)nargs;
+       1*:   42:    if (!captures) return mk_int(0);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   43:    long sum = 0;
+        4:   44:    for (int i = 0; i < 3; i++) {
+branch  0 taken 3
+branch  1 taken 1 (fallthrough)
+        3:   45:        if (captures[i]) sum += obj_to_int(captures[i]);
+branch  0 taken 3 (fallthrough)
+branch  1 taken 0
+call    2 returned 3
+        -:   46:    }
+        1:   47:    return mk_int(sum);
+call    0 returned 1
+        -:   48:}
+        -:   49:
+function multiply_all_args called 2 returned 100% blocks executed 100%
+        2:   50:static Obj* multiply_all_args(Obj** captures, Obj** args, int nargs) {
+        -:   51:    (void)captures;
+        2:   52:    long product = 1;
+        5:   53:    for (int i = 0; i < nargs; i++) {
+branch  0 taken 3
+branch  1 taken 2 (fallthrough)
+        3:   54:        if (args[i]) product *= obj_to_int(args[i]);
+branch  0 taken 3 (fallthrough)
+branch  1 taken 0
+call    2 returned 3
+        -:   55:    }
+        2:   56:    return mk_int(product);
+call    0 returned 2
+        -:   57:}
+        -:   58:
+function return_arg_count called 1 returned 100% blocks executed 100%
+        1:   59:static Obj* return_arg_count(Obj** captures, Obj** args, int nargs) {
+        -:   60:    (void)captures; (void)args;
+        1:   61:    return mk_int(nargs);
+call    0 returned 1
+        -:   62:}
+        -:   63:
+        -:   64:/* ========== mk_closure tests ========== */
+        -:   65:
+function test_mk_closure_no_captures called 1 returned 100% blocks executed 50%
+        1:   66:void test_mk_closure_no_captures(void) {
+        1:   67:    Obj* closure = mk_closure(return_42, NULL, NULL, 0, 0);
+call    0 returned 1
+       1*:   68:    ASSERT_NOT_NULL(closure);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   69:    ASSERT_EQ(closure->tag, TAG_CLOSURE);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   70:    dec_ref(closure);
+call    0 returned 1
+        -:   71:}
+        -:   72:
+function test_mk_closure_with_one_capture called 1 returned 100% blocks executed 57%
+        1:   73:void test_mk_closure_with_one_capture(void) {
+        1:   74:    Obj* cap = mk_int(100);
+call    0 returned 1
+        1:   75:    Obj* caps[1] = {cap};
+        1:   76:    Obj* closure = mk_closure(return_captured, caps, NULL, 1, 0);
+call    0 returned 1
+       1*:   77:    ASSERT_NOT_NULL(closure);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   78:    ASSERT_EQ(closure->tag, TAG_CLOSURE);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   79:    dec_ref(closure);
+call    0 returned 1
+        1:   80:    dec_ref(cap);
+call    0 returned 1
+        -:   81:}
+        -:   82:
+function test_mk_closure_with_multiple_captures called 1 returned 100% blocks executed 79%
+        1:   83:void test_mk_closure_with_multiple_captures(void) {
+        1:   84:    Obj* cap1 = mk_int(10);
+call    0 returned 1
+        1:   85:    Obj* cap2 = mk_int(20);
+call    0 returned 1
+        1:   86:    Obj* cap3 = mk_int(30);
+call    0 returned 1
+        1:   87:    Obj* caps[3] = {cap1, cap2, cap3};
+        1:   88:    Obj* closure = mk_closure(sum_three_captures, caps, NULL, 3, 0);
+call    0 returned 1
+       1*:   89:    ASSERT_NOT_NULL(closure);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   90:    dec_ref(closure);
+call    0 returned 1
+        1:   91:    dec_ref(cap1);
+call    0 returned 1
+        1:   92:    dec_ref(cap2);
+call    0 returned 1
+        1:   93:    dec_ref(cap3);
+call    0 returned 1
+        -:   94:}
+        -:   95:
+function test_mk_closure_arity_zero called 1 returned 100% blocks executed 67%
+        1:   96:void test_mk_closure_arity_zero(void) {
+        1:   97:    Obj* closure = mk_closure(return_42, NULL, NULL, 0, 0);
+call    0 returned 1
+       1*:   98:    ASSERT_NOT_NULL(closure);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   99:    dec_ref(closure);
+call    0 returned 1
+        -:  100:}
+        -:  101:
+function test_mk_closure_arity_one called 1 returned 100% blocks executed 67%
+        1:  102:void test_mk_closure_arity_one(void) {
+        1:  103:    Obj* closure = mk_closure(return_first_arg, NULL, NULL, 0, 1);
+call    0 returned 1
+       1*:  104:    ASSERT_NOT_NULL(closure);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  105:    dec_ref(closure);
+call    0 returned 1
+        -:  106:}
+        -:  107:
+function test_mk_closure_arity_two called 1 returned 100% blocks executed 67%
+        1:  108:void test_mk_closure_arity_two(void) {
+        1:  109:    Obj* closure = mk_closure(add_args, NULL, NULL, 0, 2);
+call    0 returned 1
+       1*:  110:    ASSERT_NOT_NULL(closure);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  111:    dec_ref(closure);
+call    0 returned 1
+        -:  112:}
+        -:  113:
+function test_mk_closure_variadic called 1 returned 100% blocks executed 67%
+        1:  114:void test_mk_closure_variadic(void) {
+        1:  115:    Obj* closure = mk_closure(multiply_all_args, NULL, NULL, 0, -1);
+call    0 returned 1
+       1*:  116:    ASSERT_NOT_NULL(closure);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  117:    dec_ref(closure);
+call    0 returned 1
+        -:  118:}
+        -:  119:
+        -:  120:/* ========== call_closure tests ========== */
+        -:  121:
+function test_call_closure_no_args called 1 returned 100% blocks executed 57%
+        1:  122:void test_call_closure_no_args(void) {
+        1:  123:    Obj* closure = mk_closure(return_42, NULL, NULL, 0, 0);
+call    0 returned 1
+        1:  124:    Obj* result = call_closure(closure, NULL, 0);
+call    0 returned 1
+       1*:  125:    ASSERT_NOT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  126:    ASSERT_EQ(obj_to_int(result), 42);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  127:    dec_ref(result);
+call    0 returned 1
+        1:  128:    dec_ref(closure);
+call    0 returned 1
+        -:  129:}
+        -:  130:
+function test_call_closure_one_arg called 1 returned 100% blocks executed 61%
+        1:  131:void test_call_closure_one_arg(void) {
+        1:  132:    Obj* closure = mk_closure(return_first_arg, NULL, NULL, 0, 1);
+call    0 returned 1
+        1:  133:    Obj* arg = mk_int(99);
+call    0 returned 1
+        1:  134:    Obj* args[1] = {arg};
+        1:  135:    Obj* result = call_closure(closure, args, 1);
+call    0 returned 1
+       1*:  136:    ASSERT_NOT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  137:    ASSERT_EQ(obj_to_int(result), 99);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  138:    dec_ref(result);
+call    0 returned 1
+        1:  139:    dec_ref(arg);
+call    0 returned 1
+        1:  140:    dec_ref(closure);
+call    0 returned 1
+        -:  141:}
+        -:  142:
+function test_call_closure_two_args called 1 returned 100% blocks executed 65%
+        1:  143:void test_call_closure_two_args(void) {
+        1:  144:    Obj* closure = mk_closure(add_args, NULL, NULL, 0, 2);
+call    0 returned 1
+        1:  145:    Obj* arg1 = mk_int(30);
+call    0 returned 1
+        1:  146:    Obj* arg2 = mk_int(12);
+call    0 returned 1
+        1:  147:    Obj* args[2] = {arg1, arg2};
+        1:  148:    Obj* result = call_closure(closure, args, 2);
+call    0 returned 1
+       1*:  149:    ASSERT_NOT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  150:    ASSERT_EQ(obj_to_int(result), 42);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  151:    dec_ref(result);
+call    0 returned 1
+        1:  152:    dec_ref(arg1);
+call    0 returned 1
+        1:  153:    dec_ref(arg2);
+call    0 returned 1
+        1:  154:    dec_ref(closure);
+call    0 returned 1
+        -:  155:}
+        -:  156:
+function test_call_closure_with_capture called 1 returned 100% blocks executed 61%
+        1:  157:void test_call_closure_with_capture(void) {
+        1:  158:    Obj* cap = mk_int(100);
+call    0 returned 1
+        1:  159:    Obj* caps[1] = {cap};
+        1:  160:    Obj* closure = mk_closure(return_captured, caps, NULL, 1, 0);
+call    0 returned 1
+        1:  161:    Obj* result = call_closure(closure, NULL, 0);
+call    0 returned 1
+       1*:  162:    ASSERT_NOT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  163:    ASSERT_EQ(obj_to_int(result), 100);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  164:    dec_ref(result);
+call    0 returned 1
+        1:  165:    dec_ref(closure);
+call    0 returned 1
+        1:  166:    dec_ref(cap);
+call    0 returned 1
+        -:  167:}
+        -:  168:
+function test_call_closure_capture_plus_arg called 1 returned 100% blocks executed 65%
+        1:  169:void test_call_closure_capture_plus_arg(void) {
+        1:  170:    Obj* cap = mk_int(50);
+call    0 returned 1
+        1:  171:    Obj* caps[1] = {cap};
+        1:  172:    Obj* closure = mk_closure(add_captured_to_arg, caps, NULL, 1, 1);
+call    0 returned 1
+        1:  173:    Obj* arg = mk_int(25);
+call    0 returned 1
+        1:  174:    Obj* args[1] = {arg};
+        1:  175:    Obj* result = call_closure(closure, args, 1);
+call    0 returned 1
+       1*:  176:    ASSERT_NOT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  177:    ASSERT_EQ(obj_to_int(result), 75);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  178:    dec_ref(result);
+call    0 returned 1
+        1:  179:    dec_ref(arg);
+call    0 returned 1
+        1:  180:    dec_ref(closure);
+call    0 returned 1
+        1:  181:    dec_ref(cap);
+call    0 returned 1
+        -:  182:}
+        -:  183:
+function test_call_closure_multiple_captures called 1 returned 100% blocks executed 68%
+        1:  184:void test_call_closure_multiple_captures(void) {
+        1:  185:    Obj* cap1 = mk_int(10);
+call    0 returned 1
+        1:  186:    Obj* cap2 = mk_int(20);
+call    0 returned 1
+        1:  187:    Obj* cap3 = mk_int(30);
+call    0 returned 1
+        1:  188:    Obj* caps[3] = {cap1, cap2, cap3};
+        1:  189:    Obj* closure = mk_closure(sum_three_captures, caps, NULL, 3, 0);
+call    0 returned 1
+        1:  190:    Obj* result = call_closure(closure, NULL, 0);
+call    0 returned 1
+       1*:  191:    ASSERT_NOT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  192:    ASSERT_EQ(obj_to_int(result), 60);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  193:    dec_ref(result);
+call    0 returned 1
+        1:  194:    dec_ref(closure);
+call    0 returned 1
+        1:  195:    dec_ref(cap1);
+call    0 returned 1
+        1:  196:    dec_ref(cap2);
+call    0 returned 1
+        1:  197:    dec_ref(cap3);
+call    0 returned 1
+        -:  198:}
+        -:  199:
+function test_call_closure_variadic_zero_args called 1 returned 100% blocks executed 57%
+        1:  200:void test_call_closure_variadic_zero_args(void) {
+        1:  201:    Obj* closure = mk_closure(multiply_all_args, NULL, NULL, 0, -1);
+call    0 returned 1
+        1:  202:    Obj* result = call_closure(closure, NULL, 0);
+call    0 returned 1
+       1*:  203:    ASSERT_NOT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  204:    ASSERT_EQ(obj_to_int(result), 1); /* Empty product */
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  205:    dec_ref(result);
+call    0 returned 1
+        1:  206:    dec_ref(closure);
+call    0 returned 1
+        -:  207:}
+        -:  208:
+function test_call_closure_variadic_many_args called 1 returned 100% blocks executed 68%
+        1:  209:void test_call_closure_variadic_many_args(void) {
+        1:  210:    Obj* closure = mk_closure(multiply_all_args, NULL, NULL, 0, -1);
+call    0 returned 1
+        1:  211:    Obj* arg1 = mk_int(2);
+call    0 returned 1
+        1:  212:    Obj* arg2 = mk_int(3);
+call    0 returned 1
+        1:  213:    Obj* arg3 = mk_int(4);
+call    0 returned 1
+        1:  214:    Obj* args[3] = {arg1, arg2, arg3};
+        1:  215:    Obj* result = call_closure(closure, args, 3);
+call    0 returned 1
+       1*:  216:    ASSERT_NOT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  217:    ASSERT_EQ(obj_to_int(result), 24);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  218:    dec_ref(result);
+call    0 returned 1
+        1:  219:    dec_ref(arg1);
+call    0 returned 1
+        1:  220:    dec_ref(arg2);
+call    0 returned 1
+        1:  221:    dec_ref(arg3);
+call    0 returned 1
+        1:  222:    dec_ref(closure);
+call    0 returned 1
+        -:  223:}
+        -:  224:
+function test_call_closure_null_closure called 1 returned 100% blocks executed 60%
+        1:  225:void test_call_closure_null_closure(void) {
+        1:  226:    Obj* result = call_closure(NULL, NULL, 0);
+call    0 returned 1
+       1*:  227:    ASSERT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        -:  228:}
+        -:  229:
+function test_call_closure_wrong_tag called 1 returned 100% blocks executed 71%
+        1:  230:void test_call_closure_wrong_tag(void) {
+        1:  231:    Obj* not_closure = mk_int(1);
+call    0 returned 1
+        1:  232:    Obj* result = call_closure(not_closure, NULL, 0);
+call    0 returned 1
+       1*:  233:    ASSERT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  234:    dec_ref(not_closure);
+call    0 returned 1
+        -:  235:}
+        -:  236:
+function test_call_closure_wrong_arity called 1 returned 100% blocks executed 71%
+        1:  237:void test_call_closure_wrong_arity(void) {
+        1:  238:    Obj* closure = mk_closure(return_first_arg, NULL, NULL, 0, 1);
+call    0 returned 1
+        1:  239:    Obj* result = call_closure(closure, NULL, 0);
+call    0 returned 1
+       1*:  240:    ASSERT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  241:    dec_ref(closure);
+call    0 returned 1
+        -:  242:}
+        -:  243:
+function test_call_closure_arg_count called 1 returned 100% blocks executed 81%
+        1:  244:void test_call_closure_arg_count(void) {
+        1:  245:    Obj* closure = mk_closure(return_arg_count, NULL, NULL, 0, -1);
+call    0 returned 1
+        1:  246:    Obj* arg1 = mk_int(1);
+call    0 returned 1
+        1:  247:    Obj* arg2 = mk_int(2);
+call    0 returned 1
+        1:  248:    Obj* arg3 = mk_int(3);
+call    0 returned 1
+        1:  249:    Obj* arg4 = mk_int(4);
+call    0 returned 1
+        1:  250:    Obj* arg5 = mk_int(5);
+call    0 returned 1
+        1:  251:    Obj* args[5] = {arg1, arg2, arg3, arg4, arg5};
+        1:  252:    Obj* result = call_closure(closure, args, 5);
+call    0 returned 1
+       1*:  253:    ASSERT_EQ(obj_to_int(result), 5);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  254:    dec_ref(result);
+call    0 returned 1
+        6:  255:    for (int i = 0; i < 5; i++) dec_ref(args[i]);
+call    0 returned 5
+branch  1 taken 5
+branch  2 taken 1 (fallthrough)
+        1:  256:    dec_ref(closure);
+call    0 returned 1
+        -:  257:}
+        -:  258:
+        -:  259:/* ========== Closure with different captured types ========== */
+        -:  260:
+function return_captured_pair_car called 1 returned 100% blocks executed 80%
+        1:  261:static Obj* return_captured_pair_car(Obj** captures, Obj** args, int nargs) {
+        -:  262:    (void)args; (void)nargs;
+       1*:  263:    if (!captures || !captures[0]) return NULL;
+branch  0 taken 1 (fallthrough)
+branch  1 taken 0
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+        1:  264:    return obj_car(captures[0]);
+call    0 returned 1
+        -:  265:}
+        -:  266:
+function test_closure_capture_pair called 1 returned 100% blocks executed 65%
+        1:  267:void test_closure_capture_pair(void) {
+        1:  268:    Obj* pair = mk_pair(mk_int(42), mk_int(99));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  269:    Obj* caps[1] = {pair};
+        1:  270:    Obj* closure = mk_closure(return_captured_pair_car, caps, NULL, 1, 0);
+call    0 returned 1
+        1:  271:    Obj* result = call_closure(closure, NULL, 0);
+call    0 returned 1
+       1*:  272:    ASSERT_NOT_NULL(result);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  273:    ASSERT_EQ(obj_to_int(result), 42);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  274:    dec_ref(result);
+call    0 returned 1
+        1:  275:    dec_ref(closure);
+call    0 returned 1
+        1:  276:    dec_ref(pair);
+call    0 returned 1
+        -:  277:}
+        -:  278:
+        -:  279:/* Helper to count list length as int */
+function closure_count_list_length called 1 returned 100% blocks executed 100%
+        1:  280:static int closure_count_list_length(Obj* xs) {
+        1:  281:    int len = 0;
+        4:  282:    while (xs && xs->tag == TAG_PAIR) {
+branch  0 taken 3 (fallthrough)
+branch  1 taken 1
+branch  2 taken 3
+branch  3 taken 0 (fallthrough)
+        3:  283:        len++;
+        3:  284:        xs = xs->b;
+        -:  285:    }
+        1:  286:    return len;
+        -:  287:}
+        -:  288:
+function return_captured_list_length called 1 returned 100% blocks executed 71%
+        1:  289:static Obj* return_captured_list_length(Obj** captures, Obj** args, int nargs) {
+        -:  290:    (void)args; (void)nargs;
+       1*:  291:    if (!captures || !captures[0]) return mk_int(0);
+branch  0 taken 1 (fallthrough)
+branch  1 taken 0
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+call    4 never executed
+        1:  292:    return mk_int(closure_count_list_length(captures[0]));
+call    0 returned 1
+call    1 returned 1
+        -:  293:}
+        -:  294:
+function test_closure_capture_list called 1 returned 100% blocks executed 79%
+        1:  295:void test_closure_capture_list(void) {
+        1:  296:    Obj* list = mk_pair(mk_int(1), mk_pair(mk_int(2), mk_pair(mk_int(3), NULL)));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+call    4 returned 1
+call    5 returned 1
+        1:  297:    Obj* caps[1] = {list};
+        1:  298:    Obj* closure = mk_closure(return_captured_list_length, caps, NULL, 1, 0);
+call    0 returned 1
+        1:  299:    Obj* result = call_closure(closure, NULL, 0);
+call    0 returned 1
+       1*:  300:    ASSERT_EQ(obj_to_int(result), 3);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  301:    dec_ref(result);
+call    0 returned 1
+        1:  302:    dec_ref(closure);
+call    0 returned 1
+        1:  303:    dec_ref(list);
+call    0 returned 1
+        -:  304:}
+        -:  305:
+        -:  306:/* ========== Closure chaining ========== */
+        -:  307:
+function make_adder_inner called 1 returned 100% blocks executed 67%
+        1:  308:static Obj* make_adder_inner(Obj** captures, Obj** args, int nargs) {
+       1*:  309:    if (!captures || !captures[0]) return mk_int(0);
+branch  0 taken 1 (fallthrough)
+branch  1 taken 0
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+call    4 never executed
+       1*:  310:    if (nargs < 1 || !args[0]) return mk_int(0);
+branch  0 taken 1 (fallthrough)
+branch  1 taken 0
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+call    4 never executed
+        1:  311:    return mk_int(obj_to_int(captures[0]) + obj_to_int(args[0]));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        -:  312:}
+        -:  313:
+function test_closure_returned_from_closure called 1 returned 100% blocks executed 75%
+        1:  314:void test_closure_returned_from_closure(void) {
+        -:  315:    /* Simulate (make-adder 10) returning a closure that adds 10 */
+        1:  316:    Obj* ten = mk_int(10);
+call    0 returned 1
+        1:  317:    Obj* caps[1] = {ten};
+        1:  318:    Obj* adder = mk_closure(make_adder_inner, caps, NULL, 1, 1);
+call    0 returned 1
+        -:  319:
+        -:  320:    /* Call (adder 5) => 15 */
+        1:  321:    Obj* five = mk_int(5);
+call    0 returned 1
+        1:  322:    Obj* args[1] = {five};
+        1:  323:    Obj* result = call_closure(adder, args, 1);
+call    0 returned 1
+       1*:  324:    ASSERT_EQ(obj_to_int(result), 15);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        -:  325:
+        1:  326:    dec_ref(result);
+call    0 returned 1
+        1:  327:    dec_ref(five);
+call    0 returned 1
+        1:  328:    dec_ref(adder);
+call    0 returned 1
+        1:  329:    dec_ref(ten);
+call    0 returned 1
+        -:  330:}
+        -:  331:
+        -:  332:/* ========== Stress tests ========== */
+        -:  333:
+function test_closure_many_calls called 1 returned 100% blocks executed 71%
+        1:  334:void test_closure_many_calls(void) {
+        1:  335:    Obj* closure = mk_closure(return_42, NULL, NULL, 0, 0);
+call    0 returned 1
+     1001:  336:    for (int i = 0; i < 1000; i++) {
+branch  0 taken 1000
+branch  1 taken 1 (fallthrough)
+     1000:  337:        Obj* result = call_closure(closure, NULL, 0);
+call    0 returned 1000
+    1000*:  338:        ASSERT_EQ(obj_to_int(result), 42);
+call    0 returned 1000
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1000
+call    3 never executed
+call    4 never executed
+     1000:  339:        dec_ref(result);
+call    0 returned 1000
+        -:  340:    }
+        1:  341:    dec_ref(closure);
+call    0 returned 1
+        -:  342:}
+        -:  343:
+        -:  344:#define TEST_MANY_CAPS 50
+function sum_all_caps_fn called 1 returned 100% blocks executed 100%
+        1:  345:static Obj* sum_all_caps_fn(Obj** captures, Obj** args, int nargs) {
+        -:  346:    (void)args; (void)nargs;
+        1:  347:    long sum = 0;
+       51:  348:    for (int i = 0; i < TEST_MANY_CAPS; i++) {
+branch  0 taken 50
+branch  1 taken 1 (fallthrough)
+       50:  349:        if (captures && captures[i]) sum += obj_to_int(captures[i]);
+branch  0 taken 50 (fallthrough)
+branch  1 taken 0
+branch  2 taken 50 (fallthrough)
+branch  3 taken 0
+call    4 returned 50
+        -:  350:    }
+        1:  351:    return mk_int(sum);
+call    0 returned 1
+        -:  352:}
+        -:  353:
+function test_closure_many_captures called 1 returned 100% blocks executed 80%
+        1:  354:void test_closure_many_captures(void) {
+        -:  355:    Obj* caps[TEST_MANY_CAPS];
+        1:  356:    long expected_sum = 0;
+       51:  357:    for (int i = 0; i < TEST_MANY_CAPS; i++) {
+branch  0 taken 50
+branch  1 taken 1 (fallthrough)
+       50:  358:        caps[i] = mk_int(i);
+call    0 returned 50
+       50:  359:        expected_sum += i;
+        -:  360:    }
+        -:  361:
+        1:  362:    Obj* closure = mk_closure(sum_all_caps_fn, caps, NULL, TEST_MANY_CAPS, 0);
+call    0 returned 1
+        1:  363:    Obj* result = call_closure(closure, NULL, 0);
+call    0 returned 1
+       1*:  364:    ASSERT_EQ(obj_to_int(result), expected_sum);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        -:  365:
+        1:  366:    dec_ref(result);
+call    0 returned 1
+        1:  367:    dec_ref(closure);
+call    0 returned 1
+       51:  368:    for (int i = 0; i < TEST_MANY_CAPS; i++) dec_ref(caps[i]);
+call    0 returned 50
+branch  1 taken 50
+branch  2 taken 1 (fallthrough)
+        -:  369:}
+        -:  370:
+function test_closure_create_destroy_cycle called 1 returned 100% blocks executed 75%
+        1:  371:void test_closure_create_destroy_cycle(void) {
+     1001:  372:    for (int i = 0; i < 1000; i++) {
+branch  0 taken 1000
+branch  1 taken 1 (fallthrough)
+     1000:  373:        Obj* cap = mk_int(i);
+call    0 returned 1000
+     1000:  374:        Obj* caps[1] = {cap};
+     1000:  375:        Obj* closure = mk_closure(return_captured, caps, NULL, 1, 0);
+call    0 returned 1000
+     1000:  376:        Obj* result = call_closure(closure, NULL, 0);
+call    0 returned 1000
+    1000*:  377:        ASSERT_EQ(obj_to_int(result), i);
+call    0 returned 1000
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1000
+call    3 never executed
+call    4 never executed
+     1000:  378:        dec_ref(result);
+call    0 returned 1000
+     1000:  379:        dec_ref(closure);
+call    0 returned 1000
+     1000:  380:        dec_ref(cap);
+call    0 returned 1000
+        -:  381:    }
+        -:  382:}
+        -:  383:
+        -:  384:/* ========== Run all closure tests ========== */
+        -:  385:
+function run_closure_tests called 1 returned 100% blocks executed 100%
+        1:  386:void run_closure_tests(void) {
+        1:  387:    TEST_SECTION("Closure Creation");
+call    0 returned 1
+        1:  388:    RUN_TEST(test_mk_closure_no_captures);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  389:    RUN_TEST(test_mk_closure_with_one_capture);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  390:    RUN_TEST(test_mk_closure_with_multiple_captures);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  391:    RUN_TEST(test_mk_closure_arity_zero);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  392:    RUN_TEST(test_mk_closure_arity_one);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  393:    RUN_TEST(test_mk_closure_arity_two);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  394:    RUN_TEST(test_mk_closure_variadic);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        -:  395:
+        1:  396:    TEST_SECTION("Closure Calls");
+call    0 returned 1
+        1:  397:    RUN_TEST(test_call_closure_no_args);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  398:    RUN_TEST(test_call_closure_one_arg);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  399:    RUN_TEST(test_call_closure_two_args);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  400:    RUN_TEST(test_call_closure_with_capture);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  401:    RUN_TEST(test_call_closure_capture_plus_arg);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  402:    RUN_TEST(test_call_closure_multiple_captures);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  403:    RUN_TEST(test_call_closure_variadic_zero_args);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  404:    RUN_TEST(test_call_closure_variadic_many_args);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  405:    RUN_TEST(test_call_closure_null_closure);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  406:    RUN_TEST(test_call_closure_wrong_tag);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  407:    RUN_TEST(test_call_closure_wrong_arity);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  408:    RUN_TEST(test_call_closure_arg_count);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        -:  409:
+        1:  410:    TEST_SECTION("Closure with Complex Captures");
+call    0 returned 1
+        1:  411:    RUN_TEST(test_closure_capture_pair);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  412:    RUN_TEST(test_closure_capture_list);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  413:    RUN_TEST(test_closure_returned_from_closure);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        -:  414:
+        1:  415:    TEST_SECTION("Closure Stress Tests");
+call    0 returned 1
+        1:  416:    RUN_TEST(test_closure_many_calls);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  417:    RUN_TEST(test_closure_many_captures);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  418:    RUN_TEST(test_closure_create_destroy_cycle);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+branch  4 taken 1 (fallthrough)
+branch  5 taken 0
+call    6 returned 1
+        1:  419:}

@@ -90,20 +90,25 @@ The `FREE_LIST` is an optimization for **batching frees**, not a GC mechanism:
 - Allows flushing at safe points
 - NOT for mark-sweep collection
 
-## Implementation Status
+## Implementation Status (2026-01-03)
 
-### Completed Optimizations
+**All 11 planned memory optimizations are COMPLETE** with full test coverage.
 
-| Phase | Feature | Description |
-|-------|---------|-------------|
-| 1 | VarUsage Infrastructure | Track variable usage, escape, capture status |
-| 2 | Liveness Analysis | Free at last-use, not just scope-end |
-| 3 | Escape Analysis | Stack-allocate non-escaping values |
-| 4 | Capture Tracking | Don't free lambda-captured variables |
-| 5 | Dynamic Free List | Linked list instead of fixed array |
-| 6 | Type-Aware Scanners | Traversal utilities (NOT GC) |
-| 7 | Multi-Binding Let | Support `(let ((x 1) (y 2)) body)` |
-| 8 | Field-Aware Scanners | Skip non-pointer fields in traversal |
+| # | Optimization | Tests | Key Features |
+|---|--------------|-------|--------------|
+| 1 | GenRef/IPGE Soundness Fix | - | Stable slot pool |
+| 2 | Full Liveness-Driven Free Insertion | - | CFG-based analysis |
+| 3 | Ownership-Driven Codegen | - | `free_unique`/`free_tree`/`dec_ref` |
+| 4 | Escape-Aware Stack Allocation | - | `STACK_INT`/`STACK_CELL` |
+| 5 | Shape Analysis + Weak Back-Edge | 7 | Auto cycle/weak detection |
+| 6 | Perceus Reuse Analysis | 7 | `reuse_as_*`/`REUSE_OR_NEW_*` |
+| 7 | Region-Aware RC Elision | 11 | `INC_REF_IF_NEEDED`/`REGION_LOCAL_REF` |
+| 8 | Per-Region External Refcount | 7 | `REGION_CAN_BULK_FREE` |
+| 9 | Borrow/Tether Loop Insertion | 8 | `TETHER`/`BORROW_FOR_LOOP` |
+| 10 | Interprocedural Summaries | 11 | `PARAM_BORROWED`/`RETURN_FRESH` |
+| 11 | Concurrency Ownership Inference | 14 | `ATOMIC_INC_REF`/`Channel`/`SPAWN_THREAD` |
+
+**Total: 65+ tests in `csrc/tests/`**
 
 ## Key Files
 

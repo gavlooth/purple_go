@@ -1,0 +1,1190 @@
+        -:    0:Source:test_borrowref.c
+        -:    0:Graph:./run_tests_cov-test_main.gcno
+        -:    0:Data:./run_tests_cov-test_main.gcda
+        -:    0:Runs:1
+        -:    1:/* test_borrowref.c - BorrowRef and IPGE tests */
+        -:    2:#include "test_framework.h"
+        -:    3:
+        -:    4:/* ========== IPGE Evolution Tests ========== */
+        -:    5:/*
+        -:    6: * Note: Generation type is uint16_t in compact mode, uint64_t in robust mode.
+        -:    7: * These tests work for both modes.
+        -:    8: */
+        -:    9:
+function test_ipge_evolve_changes called 1 returned 100% blocks executed 67%
+        1:   10:void test_ipge_evolve_changes(void) {
+        1:   11:    Generation gen1 = 12345;
+        1:   12:    Generation gen2 = ipge_evolve(gen1);
+call    0 returned 1
+       1*:   13:    ASSERT(gen1 != gen2);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   14:    PASS();
+call    0 returned 1
+        -:   15:}
+        -:   16:
+function test_ipge_evolve_deterministic called 1 returned 100% blocks executed 62%
+        1:   17:void test_ipge_evolve_deterministic(void) {
+        1:   18:    Generation gen = 12345;
+        1:   19:    Generation evolved1 = ipge_evolve(gen);
+call    0 returned 1
+        1:   20:    Generation evolved2 = ipge_evolve(gen);
+call    0 returned 1
+       1*:   21:    ASSERT_EQ(evolved1, evolved2);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   22:    PASS();
+call    0 returned 1
+        -:   23:}
+        -:   24:
+function test_ipge_evolve_chain called 1 returned 100% blocks executed 78%
+        1:   25:void test_ipge_evolve_chain(void) {
+        1:   26:    Generation gen = 1;
+        1:   27:    Generation prev = gen;
+      101:   28:    for (int i = 0; i < 100; i++) {
+branch  0 taken 100
+branch  1 taken 1 (fallthrough)
+      100:   29:        gen = ipge_evolve(gen);
+call    0 returned 100
+     100*:   30:        ASSERT(gen != prev);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 100
+call    2 never executed
+      100:   31:        prev = gen;
+        -:   32:    }
+        1:   33:    PASS();
+call    0 returned 1
+        -:   34:}
+        -:   35:
+        -:   36:/* Test 64-bit evolution (for seed generation) */
+function test_ipge_evolve64_chain called 1 returned 100% blocks executed 78%
+        1:   37:void test_ipge_evolve64_chain(void) {
+        1:   38:    uint64_t gen = 1;
+        1:   39:    uint64_t prev = gen;
+      101:   40:    for (int i = 0; i < 100; i++) {
+branch  0 taken 100
+branch  1 taken 1 (fallthrough)
+      100:   41:        gen = ipge_evolve64(gen);
+call    0 returned 100
+     100*:   42:        ASSERT(gen != prev);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 100
+call    2 never executed
+      100:   43:        prev = gen;
+        -:   44:    }
+        1:   45:    PASS();
+call    0 returned 1
+        -:   46:}
+        -:   47:
+        -:   48:/* ========== BorrowRef Creation Tests ========== */
+        -:   49:
+function test_borrow_create called 1 returned 100% blocks executed 48%
+        1:   50:void test_borrow_create(void) {
+        1:   51:    Obj* obj = mk_int(42);
+call    0 returned 1
+        1:   52:    BorrowRef* ref = borrow_create(obj, "test");
+call    0 returned 1
+       1*:   53:    ASSERT_NOT_NULL(ref);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   54:    ASSERT_EQ(ref->ipge_target, obj);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   55:    ASSERT_EQ(ref->remembered_gen, obj->generation);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   56:    ASSERT_STR_EQ(ref->source_desc, "test");
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   57:    borrow_release(ref);
+call    0 returned 1
+        1:   58:    dec_ref(obj);
+call    0 returned 1
+        1:   59:    PASS();
+call    0 returned 1
+        -:   60:}
+        -:   61:
+function test_borrow_create_null_obj called 1 returned 100% blocks executed 67%
+        1:   62:void test_borrow_create_null_obj(void) {
+        1:   63:    BorrowRef* ref = borrow_create(NULL, "test");
+call    0 returned 1
+       1*:   64:    ASSERT_NULL(ref);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   65:    PASS();
+call    0 returned 1
+        -:   66:}
+        -:   67:
+function test_borrow_create_immediate called 1 returned 100% blocks executed 71%
+        1:   68:void test_borrow_create_immediate(void) {
+        1:   69:    Obj* imm = mk_int_unboxed(42);
+call    0 returned 1
+        1:   70:    BorrowRef* ref = borrow_create(imm, "test");
+call    0 returned 1
+       1*:   71:    ASSERT_NULL(ref);  /* Immediates cannot have borrowed refs */
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   72:    PASS();
+call    0 returned 1
+        -:   73:}
+        -:   74:
+function test_borrow_create_null_desc called 1 returned 100% blocks executed 67%
+        1:   75:void test_borrow_create_null_desc(void) {
+        1:   76:    Obj* obj = mk_int(42);
+call    0 returned 1
+        1:   77:    BorrowRef* ref = borrow_create(obj, NULL);
+call    0 returned 1
+       1*:   78:    ASSERT_NOT_NULL(ref);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   79:    ASSERT_NULL(ref->source_desc);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   80:    borrow_release(ref);
+call    0 returned 1
+        1:   81:    dec_ref(obj);
+call    0 returned 1
+        1:   82:    PASS();
+call    0 returned 1
+        -:   83:}
+        -:   84:
+        -:   85:/* ========== BorrowRef Validity Tests ========== */
+        -:   86:
+function test_borrow_is_valid_fresh called 1 returned 100% blocks executed 80%
+        1:   87:void test_borrow_is_valid_fresh(void) {
+        1:   88:    Obj* obj = mk_int(42);
+call    0 returned 1
+        1:   89:    BorrowRef* ref = borrow_create(obj, "test");
+call    0 returned 1
+       1*:   90:    ASSERT(borrow_is_valid(ref));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:   91:    borrow_release(ref);
+call    0 returned 1
+        1:   92:    dec_ref(obj);
+call    0 returned 1
+        1:   93:    PASS();
+call    0 returned 1
+        -:   94:}
+        -:   95:
+function test_borrow_is_valid_null called 1 returned 100% blocks executed 67%
+        1:   96:void test_borrow_is_valid_null(void) {
+       1*:   97:    ASSERT(!borrow_is_valid(NULL));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:   98:    PASS();
+call    0 returned 1
+        -:   99:}
+        -:  100:
+function test_borrow_is_valid_after_evolve called 1 returned 100% blocks executed 80%
+        1:  101:void test_borrow_is_valid_after_evolve(void) {
+        1:  102:    Obj* obj = mk_int(42);
+call    0 returned 1
+        1:  103:    BorrowRef* ref = borrow_create(obj, "test");
+call    0 returned 1
+        -:  104:
+        -:  105:    /* Manually evolve generation (simulating free) */
+        1:  106:    obj->generation = ipge_evolve(obj->generation);
+call    0 returned 1
+        -:  107:
+       1*:  108:    ASSERT(!borrow_is_valid(ref));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  109:    borrow_release(ref);
+call    0 returned 1
+        1:  110:    PASS();
+call    0 returned 1
+        -:  111:}
+        -:  112:
+function test_borrow_is_valid_after_invalidate called 1 returned 100% blocks executed 80%
+        1:  113:void test_borrow_is_valid_after_invalidate(void) {
+        1:  114:    Obj* obj = mk_int(42);
+call    0 returned 1
+        1:  115:    BorrowRef* ref = borrow_create(obj, "test");
+call    0 returned 1
+        -:  116:
+        1:  117:    borrow_invalidate_obj(obj);
+call    0 returned 1
+        -:  118:
+       1*:  119:    ASSERT(!borrow_is_valid(ref));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  120:    borrow_release(ref);
+call    0 returned 1
+        1:  121:    PASS();
+call    0 returned 1
+        -:  122:}
+        -:  123:
+function test_borrow_is_valid_zero_gen called 1 returned 100% blocks executed 78%
+        1:  124:void test_borrow_is_valid_zero_gen(void) {
+        1:  125:    Obj* obj = mk_int(42);
+call    0 returned 1
+        1:  126:    BorrowRef* ref = borrow_create(obj, "test");
+call    0 returned 1
+        -:  127:
+        1:  128:    obj->generation = 0;  /* Mark as freed */
+        -:  129:
+       1*:  130:    ASSERT(!borrow_is_valid(ref));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  131:    borrow_release(ref);
+call    0 returned 1
+        1:  132:    PASS();
+call    0 returned 1
+        -:  133:}
+        -:  134:
+        -:  135:/* ========== borrow_invalidate_obj Tests ========== */
+        -:  136:
+function test_borrow_invalidate_obj called 1 returned 100% blocks executed 75%
+        1:  137:void test_borrow_invalidate_obj(void) {
+        1:  138:    Obj* obj = mk_int(42);
+call    0 returned 1
+        1:  139:    Generation old_gen = obj->generation;
+        1:  140:    borrow_invalidate_obj(obj);
+call    0 returned 1
+       1*:  141:    ASSERT(obj->generation != old_gen);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  142:    dec_ref(obj);
+call    0 returned 1
+        1:  143:    PASS();
+call    0 returned 1
+        -:  144:}
+        -:  145:
+        -:  146:/* ========== Generation Type Tests ========== */
+        -:  147:
+function test_generation_size called 1 returned 100% blocks executed 100%
+        1:  148:void test_generation_size(void) {
+        -:  149:    /* Generation type is uint16_t in compact mode, uint64_t in robust mode */
+        -:  150:#if IPGE_ROBUST_MODE
+        -:  151:    ASSERT_EQ(sizeof(Generation), 8);
+        -:  152:#else
+        -:  153:    ASSERT_EQ(sizeof(Generation), 2);
+        -:  154:#endif
+        1:  155:    PASS();
+call    0 returned 1
+        -:  156:}
+        -:  157:
+function test_borrowref_size called 1 returned 100% blocks executed 100%
+        1:  158:void test_borrowref_size(void) {
+        -:  159:    /* BorrowRef is heap-allocated struct */
+        -:  160:    ASSERT(sizeof(BorrowRef) >= sizeof(void*) + sizeof(Generation));
+        1:  161:    PASS();
+call    0 returned 1
+        -:  162:}
+        -:  163:
+function test_borrow_invalidate_obj_null called 1 returned 100% blocks executed 100%
+        1:  164:void test_borrow_invalidate_obj_null(void) {
+        1:  165:    borrow_invalidate_obj(NULL);  /* Should not crash */
+call    0 returned 1
+        1:  166:    PASS();
+call    0 returned 1
+        1:  167:}
+        -:  168:
+function test_borrow_invalidate_obj_immediate called 1 returned 100% blocks executed 100%
+        1:  169:void test_borrow_invalidate_obj_immediate(void) {
+        1:  170:    Obj* imm = mk_int_unboxed(42);
+call    0 returned 1
+        1:  171:    borrow_invalidate_obj(imm);  /* Should be no-op */
+call    0 returned 1
+        1:  172:    PASS();
+call    0 returned 1
+        1:  173:}
+        -:  174:
+        -:  175:/* ========== BorrowRef Release Tests ========== */
+        -:  176:
+function test_borrow_release called 1 returned 100% blocks executed 100%
+        1:  177:void test_borrow_release(void) {
+        1:  178:    Obj* obj = mk_int(42);
+call    0 returned 1
+        1:  179:    BorrowRef* ref = borrow_create(obj, "test");
+call    0 returned 1
+        1:  180:    borrow_release(ref);  /* Should free the ref */
+call    0 returned 1
+        1:  181:    dec_ref(obj);
+call    0 returned 1
+        1:  182:    PASS();
+call    0 returned 1
+        1:  183:}
+        -:  184:
+function test_borrow_release_null called 1 returned 100% blocks executed 100%
+        1:  185:void test_borrow_release_null(void) {
+        1:  186:    borrow_release(NULL);  /* Should not crash */
+call    0 returned 1
+        1:  187:    PASS();
+call    0 returned 1
+        1:  188:}
+        -:  189:
+        -:  190:/* ========== Multiple BorrowRefs Tests ========== */
+        -:  191:
+function test_multiple_borrow_refs_same_obj called 1 returned 100% blocks executed 65%
+        1:  192:void test_multiple_borrow_refs_same_obj(void) {
+        1:  193:    Obj* obj = mk_int(42);
+call    0 returned 1
+        1:  194:    BorrowRef* ref1 = borrow_create(obj, "ref1");
+call    0 returned 1
+        1:  195:    BorrowRef* ref2 = borrow_create(obj, "ref2");
+call    0 returned 1
+        1:  196:    BorrowRef* ref3 = borrow_create(obj, "ref3");
+call    0 returned 1
+        -:  197:
+       1*:  198:    ASSERT(borrow_is_valid(ref1));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+       1*:  199:    ASSERT(borrow_is_valid(ref2));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+       1*:  200:    ASSERT(borrow_is_valid(ref3));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        -:  201:
+        1:  202:    borrow_invalidate_obj(obj);
+call    0 returned 1
+        -:  203:
+       1*:  204:    ASSERT(!borrow_is_valid(ref1));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+       1*:  205:    ASSERT(!borrow_is_valid(ref2));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+       1*:  206:    ASSERT(!borrow_is_valid(ref3));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        -:  207:
+        1:  208:    borrow_release(ref1);
+call    0 returned 1
+        1:  209:    borrow_release(ref2);
+call    0 returned 1
+        1:  210:    borrow_release(ref3);
+call    0 returned 1
+        1:  211:    PASS();
+call    0 returned 1
+        -:  212:}
+        -:  213:
+function test_borrow_refs_different_objs called 1 returned 100% blocks executed 69%
+        1:  214:void test_borrow_refs_different_objs(void) {
+        1:  215:    Obj* obj1 = mk_int(1);
+call    0 returned 1
+        1:  216:    Obj* obj2 = mk_int(2);
+call    0 returned 1
+        1:  217:    BorrowRef* ref1 = borrow_create(obj1, "ref1");
+call    0 returned 1
+        1:  218:    BorrowRef* ref2 = borrow_create(obj2, "ref2");
+call    0 returned 1
+        -:  219:
+       1*:  220:    ASSERT(borrow_is_valid(ref1));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+       1*:  221:    ASSERT(borrow_is_valid(ref2));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        -:  222:
+        1:  223:    borrow_invalidate_obj(obj1);
+call    0 returned 1
+        -:  224:
+       1*:  225:    ASSERT(!borrow_is_valid(ref1));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+       1*:  226:    ASSERT(borrow_is_valid(ref2));  /* Still valid */
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        -:  227:
+        1:  228:    borrow_release(ref1);
+call    0 returned 1
+        1:  229:    borrow_release(ref2);
+call    0 returned 1
+        1:  230:    dec_ref(obj2);
+call    0 returned 1
+        1:  231:    PASS();
+call    0 returned 1
+        -:  232:}
+        -:  233:
+        -:  234:/* ========== BorrowRef with Closures Tests ========== */
+        -:  235:
+function return_captured_borrow called 1 returned 100% blocks executed 83%
+        1:  236:static Obj* return_captured_borrow(Obj** captures, Obj** args, int nargs) {
+        -:  237:    (void)args; (void)nargs;
+       1*:  238:    if (!captures || !captures[0]) return NULL;
+branch  0 taken 1 (fallthrough)
+branch  1 taken 0
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+        1:  239:    inc_ref(captures[0]);
+call    0 returned 1
+        1:  240:    return captures[0];
+        -:  241:}
+        -:  242:
+function test_borrow_in_closure called 1 returned 100% blocks executed 62%
+        1:  243:void test_borrow_in_closure(void) {
+        1:  244:    Obj* cap = mk_int(42);
+call    0 returned 1
+        1:  245:    BorrowRef* ref = borrow_create(cap, "closure_capture");
+call    0 returned 1
+        1:  246:    Obj* caps[1] = {cap};
+        1:  247:    BorrowRef* refs[1] = {ref};
+        -:  248:
+        1:  249:    Obj* closure = mk_closure(return_captured_borrow, caps, refs, 1, 0);
+call    0 returned 1
+       1*:  250:    ASSERT_NOT_NULL(closure);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        -:  251:
+        -:  252:    /* Closure should validate captures before calling */
+       1*:  253:    ASSERT(closure_validate((Closure*)closure->ptr));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        -:  254:
+        1:  255:    Obj* result = call_closure(closure, NULL, 0);
+call    0 returned 1
+       1*:  256:    ASSERT_EQ(obj_to_int(result), 42);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        -:  257:
+        1:  258:    dec_ref(result);
+call    0 returned 1
+        1:  259:    dec_ref(closure);
+call    0 returned 1
+        1:  260:    dec_ref(cap);
+call    0 returned 1
+        1:  261:    PASS();
+call    0 returned 1
+        -:  262:}
+        -:  263:
+function test_borrow_invalid_in_closure called 1 returned 100% blocks executed 79%
+        1:  264:void test_borrow_invalid_in_closure(void) {
+        1:  265:    Obj* cap = mk_int(42);
+call    0 returned 1
+        1:  266:    BorrowRef* ref = borrow_create(cap, "closure_capture");
+call    0 returned 1
+        1:  267:    Obj* caps[1] = {cap};
+        1:  268:    BorrowRef* refs[1] = {ref};
+        -:  269:
+        1:  270:    Obj* closure = mk_closure(return_captured_borrow, caps, refs, 1, 0);
+call    0 returned 1
+        -:  271:
+        -:  272:    /* Invalidate the capture */
+        1:  273:    borrow_invalidate_obj(cap);
+call    0 returned 1
+        -:  274:
+        -:  275:    /* Closure validation should fail */
+       1*:  276:    ASSERT(!closure_validate((Closure*)closure->ptr));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        -:  277:
+        1:  278:    dec_ref(closure);
+call    0 returned 1
+        1:  279:    dec_ref(cap);
+call    0 returned 1
+        1:  280:    PASS();
+call    0 returned 1
+        -:  281:}
+        -:  282:
+        -:  283:/* ========== IPGE Integration Tests ========== */
+        -:  284:
+function test_ipge_on_free_obj called 1 returned 100% blocks executed 71%
+        1:  285:void test_ipge_on_free_obj(void) {
+        1:  286:    Obj* obj = mk_int(42);
+call    0 returned 1
+        1:  287:    BorrowRef* ref = borrow_create(obj, "test");
+call    0 returned 1
+        -:  288:
+       1*:  289:    ASSERT(borrow_is_valid(ref));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        -:  290:
+        1:  291:    free_obj(obj);
+call    0 returned 1
+        -:  292:
+        -:  293:    /* After free_obj, generation should have evolved */
+       1*:  294:    ASSERT(!borrow_is_valid(ref));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  295:    borrow_release(ref);
+call    0 returned 1
+        1:  296:    PASS();
+call    0 returned 1
+        -:  297:}
+        -:  298:
+function test_ipge_on_dec_ref_to_zero called 1 returned 100% blocks executed 71%
+        1:  299:void test_ipge_on_dec_ref_to_zero(void) {
+        1:  300:    Obj* obj = mk_int(42);
+call    0 returned 1
+        1:  301:    BorrowRef* ref = borrow_create(obj, "test");
+call    0 returned 1
+        -:  302:
+       1*:  303:    ASSERT(borrow_is_valid(ref));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        -:  304:
+        1:  305:    dec_ref(obj);
+call    0 returned 1
+        -:  306:
+        -:  307:    /* After dec_ref to zero, generation should have evolved */
+       1*:  308:    ASSERT(!borrow_is_valid(ref));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  309:    borrow_release(ref);
+call    0 returned 1
+        1:  310:    PASS();
+call    0 returned 1
+        -:  311:}
+        -:  312:
+function test_ipge_on_free_tree called 1 returned 100% blocks executed 78%
+        1:  313:void test_ipge_on_free_tree(void) {
+        1:  314:    Obj* tree = mk_pair(mk_int(1), mk_pair(mk_int(2), mk_int(3)));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+call    3 returned 1
+call    4 returned 1
+        1:  315:    BorrowRef* ref = borrow_create(tree, "tree");
+call    0 returned 1
+        -:  316:
+       1*:  317:    ASSERT(borrow_is_valid(ref));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        -:  318:
+        1:  319:    free_tree(tree);
+call    0 returned 1
+        -:  320:
+       1*:  321:    ASSERT(!borrow_is_valid(ref));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  322:    borrow_release(ref);
+call    0 returned 1
+        1:  323:    PASS();
+call    0 returned 1
+        -:  324:}
+        -:  325:
+function test_ipge_on_free_unique called 1 returned 100% blocks executed 71%
+        1:  326:void test_ipge_on_free_unique(void) {
+        1:  327:    Obj* obj = mk_int(42);
+call    0 returned 1
+        1:  328:    BorrowRef* ref = borrow_create(obj, "test");
+call    0 returned 1
+        -:  329:
+       1*:  330:    ASSERT(borrow_is_valid(ref));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        -:  331:
+        1:  332:    free_unique(obj);
+call    0 returned 1
+        -:  333:
+       1*:  334:    ASSERT(!borrow_is_valid(ref));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  335:    borrow_release(ref);
+call    0 returned 1
+        1:  336:    PASS();
+call    0 returned 1
+        -:  337:}
+        -:  338:
+        -:  339:/* ========== Generation Uniqueness Tests ========== */
+        -:  340:
+function test_generations_unique called 1 returned 100% blocks executed 86%
+        1:  341:void test_generations_unique(void) {
+        -:  342:    Obj* objs[100];
+      101:  343:    for (int i = 0; i < 100; i++) {
+branch  0 taken 100
+branch  1 taken 1 (fallthrough)
+      100:  344:        objs[i] = mk_int(i);
+call    0 returned 100
+        -:  345:    }
+        -:  346:
+        -:  347:    /* Check all generations are unique */
+      101:  348:    for (int i = 0; i < 100; i++) {
+branch  0 taken 100
+branch  1 taken 1 (fallthrough)
+     5050:  349:        for (int j = i + 1; j < 100; j++) {
+branch  0 taken 4950
+branch  1 taken 100 (fallthrough)
+    4950*:  350:            ASSERT(objs[i]->generation != objs[j]->generation);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 4950
+call    2 never executed
+        -:  351:        }
+        -:  352:    }
+        -:  353:
+      101:  354:    for (int i = 0; i < 100; i++) {
+branch  0 taken 100
+branch  1 taken 1 (fallthrough)
+      100:  355:        dec_ref(objs[i]);
+call    0 returned 100
+        -:  356:    }
+        1:  357:    PASS();
+call    0 returned 1
+        -:  358:}
+        -:  359:
+function test_generation_never_zero called 1 returned 100% blocks executed 80%
+        1:  360:void test_generation_never_zero(void) {
+      101:  361:    for (int i = 0; i < 100; i++) {
+branch  0 taken 100
+branch  1 taken 1 (fallthrough)
+      100:  362:        Obj* obj = mk_int(i);
+call    0 returned 100
+     100*:  363:        ASSERT(obj->generation != 0);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 100
+call    2 never executed
+      100:  364:        dec_ref(obj);
+call    0 returned 100
+        -:  365:    }
+        1:  366:    PASS();
+call    0 returned 1
+        -:  367:}
+        -:  368:
+        -:  369:/* ========== Stress Tests ========== */
+        -:  370:
+function test_borrow_stress_many_refs called 1 returned 100% blocks executed 72%
+        1:  371:void test_borrow_stress_many_refs(void) {
+        1:  372:    Obj* obj = mk_int(42);
+call    0 returned 1
+        -:  373:    BorrowRef* refs[100];
+        -:  374:
+      101:  375:    for (int i = 0; i < 100; i++) {
+branch  0 taken 100
+branch  1 taken 1 (fallthrough)
+      100:  376:        refs[i] = borrow_create(obj, "stress");
+call    0 returned 100
+     100*:  377:        ASSERT_NOT_NULL(refs[i]);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 100
+call    2 never executed
+     100*:  378:        ASSERT(borrow_is_valid(refs[i]));
+call    0 returned 100
+branch  1 taken 0 (fallthrough)
+branch  2 taken 100
+call    3 never executed
+        -:  379:    }
+        -:  380:
+        1:  381:    borrow_invalidate_obj(obj);
+call    0 returned 1
+        -:  382:
+      101:  383:    for (int i = 0; i < 100; i++) {
+branch  0 taken 100
+branch  1 taken 1 (fallthrough)
+     100*:  384:        ASSERT(!borrow_is_valid(refs[i]));
+call    0 returned 100
+branch  1 taken 0 (fallthrough)
+branch  2 taken 100
+call    3 never executed
+      100:  385:        borrow_release(refs[i]);
+call    0 returned 100
+        -:  386:    }
+        1:  387:    PASS();
+call    0 returned 1
+        -:  388:}
+        -:  389:
+function test_borrow_stress_create_release_cycle called 1 returned 100% blocks executed 85%
+        1:  390:void test_borrow_stress_create_release_cycle(void) {
+     1001:  391:    for (int i = 0; i < 1000; i++) {
+branch  0 taken 1000
+branch  1 taken 1 (fallthrough)
+     1000:  392:        Obj* obj = mk_int(i);
+call    0 returned 1000
+     1000:  393:        BorrowRef* ref = borrow_create(obj, "cycle");
+call    0 returned 1000
+    1000*:  394:        ASSERT(borrow_is_valid(ref));
+call    0 returned 1000
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1000
+call    3 never executed
+     1000:  395:        borrow_release(ref);
+call    0 returned 1000
+     1000:  396:        dec_ref(obj);
+call    0 returned 1000
+        -:  397:    }
+        1:  398:    PASS();
+call    0 returned 1
+        -:  399:}
+        -:  400:
+function test_ipge_stress_many_evolutions called 1 returned 100% blocks executed 78%
+        1:  401:void test_ipge_stress_many_evolutions(void) {
+        1:  402:    uint64_t gen = 1;
+    10001:  403:    for (int i = 0; i < 10000; i++) {
+branch  0 taken 10000
+branch  1 taken 1 (fallthrough)
+    10000:  404:        uint64_t next = ipge_evolve(gen);
+call    0 returned 10000
+   10000*:  405:        ASSERT(gen != next);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 10000
+call    2 never executed
+    10000:  406:        gen = next;
+        -:  407:    }
+        1:  408:    PASS();
+call    0 returned 1
+        -:  409:}
+        -:  410:
+        -:  411:/* ========== Edge Cases ========== */
+        -:  412:
+function test_borrow_ref_after_realloc called 1 returned 100% blocks executed 55%
+        1:  413:void test_borrow_ref_after_realloc(void) {
+        -:  414:    /* Test that borrow ref correctly detects reused memory */
+        1:  415:    Obj* obj1 = mk_int(42);
+call    0 returned 1
+        1:  416:    BorrowRef* ref = borrow_create(obj1, "test");
+call    0 returned 1
+        1:  417:    uint64_t old_gen = ref->remembered_gen;
+        -:  418:
+        1:  419:    free_obj(obj1);
+call    0 returned 1
+        -:  420:
+        -:  421:    /* ref is now invalid */
+       1*:  422:    ASSERT(!borrow_is_valid(ref));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        -:  423:
+        -:  424:    /* Allocate new object - might get same memory */
+        1:  425:    Obj* obj2 = mk_int(99);
+call    0 returned 1
+        -:  426:
+        -:  427:    /* Even if same memory, generation is different */
+        1:  428:    if (ref->ipge_target == obj2) {
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+        -:  429:        /* Same memory reused, but generation evolved */
+    #####:  430:        ASSERT(obj2->generation != old_gen);
+branch  0 never executed (fallthrough)
+branch  1 never executed
+call    2 never executed
+    #####:  431:        ASSERT(!borrow_is_valid(ref));  /* Still invalid */
+call    0 never executed
+branch  1 never executed (fallthrough)
+branch  2 never executed
+call    3 never executed
+        -:  432:    }
+        -:  433:
+        1:  434:    borrow_release(ref);
+call    0 returned 1
+        1:  435:    dec_ref(obj2);
+call    0 returned 1
+        1:  436:    PASS();
+call    0 returned 1
+        -:  437:}
+        -:  438:
+function test_borrow_pair_components called 1 returned 100% blocks executed 76%
+        1:  439:void test_borrow_pair_components(void) {
+        1:  440:    Obj* car = mk_int(1);
+call    0 returned 1
+        1:  441:    Obj* cdr = mk_int(2);
+call    0 returned 1
+        1:  442:    Obj* pair = mk_pair(car, cdr);
+call    0 returned 1
+        -:  443:
+        1:  444:    BorrowRef* ref_pair = borrow_create(pair, "pair");
+call    0 returned 1
+        -:  445:
+       1*:  446:    ASSERT(borrow_is_valid(ref_pair));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        -:  447:
+        -:  448:    /* Free just the pair (car/cdr refs transferred) */
+        1:  449:    borrow_invalidate_obj(pair);
+call    0 returned 1
+       1*:  450:    ASSERT(!borrow_is_valid(ref_pair));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        -:  451:
+        1:  452:    borrow_release(ref_pair);
+call    0 returned 1
+        1:  453:    dec_ref(pair);
+call    0 returned 1
+        1:  454:    PASS();
+call    0 returned 1
+        -:  455:}
+        -:  456:
+        -:  457:/* ========== Run All BorrowRef Tests ========== */
+        -:  458:
+function run_borrowref_tests called 1 returned 100% blocks executed 63%
+        1:  459:void run_borrowref_tests(void) {
+        1:  460:    TEST_SUITE("BorrowRef and IPGE");
+call    0 returned 1
+        -:  461:
+        1:  462:    TEST_SECTION("IPGE Evolution");
+call    0 returned 1
+       1*:  463:    RUN_TEST(test_ipge_evolve_changes);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  464:    RUN_TEST(test_ipge_evolve_deterministic);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  465:    RUN_TEST(test_ipge_evolve_chain);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  466:    RUN_TEST(test_ipge_evolve64_chain);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  467:
+        1:  468:    TEST_SECTION("BorrowRef Creation");
+call    0 returned 1
+       1*:  469:    RUN_TEST(test_borrow_create);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  470:    RUN_TEST(test_borrow_create_null_obj);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  471:    RUN_TEST(test_borrow_create_immediate);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  472:    RUN_TEST(test_borrow_create_null_desc);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  473:
+        1:  474:    TEST_SECTION("BorrowRef Validity");
+call    0 returned 1
+       1*:  475:    RUN_TEST(test_borrow_is_valid_fresh);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  476:    RUN_TEST(test_borrow_is_valid_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  477:    RUN_TEST(test_borrow_is_valid_after_evolve);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  478:    RUN_TEST(test_borrow_is_valid_after_invalidate);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  479:    RUN_TEST(test_borrow_is_valid_zero_gen);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  480:
+        1:  481:    TEST_SECTION("borrow_invalidate_obj");
+call    0 returned 1
+       1*:  482:    RUN_TEST(test_borrow_invalidate_obj);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  483:    RUN_TEST(test_borrow_invalidate_obj_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  484:    RUN_TEST(test_borrow_invalidate_obj_immediate);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  485:
+        1:  486:    TEST_SECTION("Generation and BorrowRef Types");
+call    0 returned 1
+       1*:  487:    RUN_TEST(test_generation_size);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  488:    RUN_TEST(test_borrowref_size);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  489:
+        1:  490:    TEST_SECTION("BorrowRef Release");
+call    0 returned 1
+       1*:  491:    RUN_TEST(test_borrow_release);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  492:    RUN_TEST(test_borrow_release_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  493:
+        1:  494:    TEST_SECTION("Multiple BorrowRefs");
+call    0 returned 1
+       1*:  495:    RUN_TEST(test_multiple_borrow_refs_same_obj);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  496:    RUN_TEST(test_borrow_refs_different_objs);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  497:
+        1:  498:    TEST_SECTION("BorrowRef with Closures");
+call    0 returned 1
+       1*:  499:    RUN_TEST(test_borrow_in_closure);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  500:    RUN_TEST(test_borrow_invalid_in_closure);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  501:
+        1:  502:    TEST_SECTION("IPGE Integration");
+call    0 returned 1
+       1*:  503:    RUN_TEST(test_ipge_on_free_obj);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  504:    RUN_TEST(test_ipge_on_dec_ref_to_zero);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  505:    RUN_TEST(test_ipge_on_free_tree);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  506:    RUN_TEST(test_ipge_on_free_unique);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  507:
+        1:  508:    TEST_SECTION("Generation Uniqueness");
+call    0 returned 1
+       1*:  509:    RUN_TEST(test_generations_unique);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  510:    RUN_TEST(test_generation_never_zero);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  511:
+        1:  512:    TEST_SECTION("Stress Tests");
+call    0 returned 1
+       1*:  513:    RUN_TEST(test_borrow_stress_many_refs);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  514:    RUN_TEST(test_borrow_stress_create_release_cycle);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  515:    RUN_TEST(test_ipge_stress_many_evolutions);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  516:
+        1:  517:    TEST_SECTION("Edge Cases");
+call    0 returned 1
+       1*:  518:    RUN_TEST(test_borrow_ref_after_realloc);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  519:    RUN_TEST(test_borrow_pair_components);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        1:  520:}

@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(make clean:*)",
+      "Bash(make:*)",
+      "Bash(cat:*)",
+      "Bash(find:*)"
     ]
   }
 }

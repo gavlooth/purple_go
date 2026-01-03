@@ -258,28 +258,6 @@ Pipeline already uses `|>`, so `->` is reserved for lambdas.
 
 ---
 
-### 9. Begin Semantics
-
-**Context:** What does `(begin)` do?
-
-| Option | Empty `(begin)` | Return | Creates Scope? |
-|--------|-----------------|--------|----------------|
-| A | `nothing` | Last expr | No |
-| B | `nothing` | Last expr | Yes |
-| C | ERROR | Last expr | No |
-
-```
-[x] Option A - Empty returns nothing, no scope
-[ ] Option B - Empty returns nothing, creates scope
-[ ] Option C - Empty is error
-
-Notes:
-Decision: `(begin)` returns `nothing`; returns last expr; no new scope.
-
-```
-
----
-
 ### 10. For/Foreach Multiple Bindings
 
 **Context:** What does `(for [x xs y ys] ...)` mean?
@@ -466,6 +444,5 @@ Decision: `&` separates positional from named args in definitions and calls.
 **Can Defer:**
 - [x] 7. Channel Closed Semantics
 - [x] 8. Lambda Shorthand
-- [x] 9. Begin Semantics
 - [x] 10. For/Foreach Bindings
 - [x] 14. Named Arguments

@@ -1,0 +1,919 @@
+        -:    0:Source:test_constructors.c
+        -:    0:Graph:./run_tests_cov-test_main.gcno
+        -:    0:Data:./run_tests_cov-test_main.gcda
+        -:    0:Runs:1
+        -:    1:/* Test Object Constructors */
+        -:    2:#include "test_framework.h"
+        -:    3:#include <limits.h>
+        -:    4:#include <float.h>
+        -:    5:
+        -:    6:/* === mk_int tests === */
+        -:    7:
+function test_mk_int_positive called 1 returned 100% blocks executed 39%
+        1:    8:void test_mk_int_positive(void) {
+        1:    9:    Obj* x = mk_int(42);
+call    0 returned 1
+       1*:   10:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   11:    ASSERT_EQ(x->tag, TAG_INT);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   12:    ASSERT_EQ(x->i, 42);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   13:    ASSERT_EQ(x->mark, 1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   14:    ASSERT_EQ(x->is_pair, 0);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   15:    dec_ref(x);
+call    0 returned 1
+        1:   16:    PASS();
+call    0 returned 1
+        -:   17:}
+        -:   18:
+function test_mk_int_negative called 1 returned 100% blocks executed 47%
+        1:   19:void test_mk_int_negative(void) {
+        1:   20:    Obj* x = mk_int(-100);
+call    0 returned 1
+       1*:   21:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   22:    ASSERT_EQ(x->tag, TAG_INT);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   23:    ASSERT_EQ(x->i, -100);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   24:    dec_ref(x);
+call    0 returned 1
+        1:   25:    PASS();
+call    0 returned 1
+        -:   26:}
+        -:   27:
+function test_mk_int_zero called 1 returned 100% blocks executed 55%
+        1:   28:void test_mk_int_zero(void) {
+        1:   29:    Obj* x = mk_int(0);
+call    0 returned 1
+       1*:   30:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   31:    ASSERT_EQ(x->i, 0);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   32:    dec_ref(x);
+call    0 returned 1
+        1:   33:    PASS();
+call    0 returned 1
+        -:   34:}
+        -:   35:
+function test_mk_int_max called 1 returned 100% blocks executed 55%
+        1:   36:void test_mk_int_max(void) {
+        1:   37:    Obj* x = mk_int(LONG_MAX);
+call    0 returned 1
+       1*:   38:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   39:    ASSERT_EQ(x->i, LONG_MAX);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   40:    dec_ref(x);
+call    0 returned 1
+        1:   41:    PASS();
+call    0 returned 1
+        -:   42:}
+        -:   43:
+function test_mk_int_min called 1 returned 100% blocks executed 55%
+        1:   44:void test_mk_int_min(void) {
+        1:   45:    Obj* x = mk_int(LONG_MIN);
+call    0 returned 1
+       1*:   46:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   47:    ASSERT_EQ(x->i, LONG_MIN);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   48:    dec_ref(x);
+call    0 returned 1
+        1:   49:    PASS();
+call    0 returned 1
+        -:   50:}
+        -:   51:
+        -:   52:/* === mk_float tests === */
+        -:   53:
+function test_mk_float_positive called 1 returned 100% blocks executed 47%
+        1:   54:void test_mk_float_positive(void) {
+        1:   55:    Obj* x = mk_float(3.14);
+call    0 returned 1
+       1*:   56:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   57:    ASSERT_EQ(x->tag, TAG_FLOAT);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   58:    ASSERT_EQ_FLOAT(x->f, 3.14, 0.0001);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   59:    dec_ref(x);
+call    0 returned 1
+        1:   60:    PASS();
+call    0 returned 1
+        -:   61:}
+        -:   62:
+function test_mk_float_negative called 1 returned 100% blocks executed 55%
+        1:   63:void test_mk_float_negative(void) {
+        1:   64:    Obj* x = mk_float(-2.718);
+call    0 returned 1
+       1*:   65:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   66:    ASSERT_EQ_FLOAT(x->f, -2.718, 0.0001);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   67:    dec_ref(x);
+call    0 returned 1
+        1:   68:    PASS();
+call    0 returned 1
+        -:   69:}
+        -:   70:
+function test_mk_float_zero called 1 returned 100% blocks executed 55%
+        1:   71:void test_mk_float_zero(void) {
+        1:   72:    Obj* x = mk_float(0.0);
+call    0 returned 1
+       1*:   73:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   74:    ASSERT_EQ_FLOAT(x->f, 0.0, 0.0001);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   75:    dec_ref(x);
+call    0 returned 1
+        1:   76:    PASS();
+call    0 returned 1
+        -:   77:}
+        -:   78:
+function test_mk_float_large called 1 returned 100% blocks executed 55%
+        1:   79:void test_mk_float_large(void) {
+        1:   80:    Obj* x = mk_float(DBL_MAX);
+call    0 returned 1
+       1*:   81:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   82:    ASSERT_EQ_FLOAT(x->f, DBL_MAX, DBL_MAX * 0.0001);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   83:    dec_ref(x);
+call    0 returned 1
+        1:   84:    PASS();
+call    0 returned 1
+        -:   85:}
+        -:   86:
+function test_mk_float_small called 1 returned 100% blocks executed 60%
+        1:   87:void test_mk_float_small(void) {
+        1:   88:    Obj* x = mk_float(DBL_MIN);
+call    0 returned 1
+       1*:   89:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   90:    ASSERT(x->f > 0);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   91:    dec_ref(x);
+call    0 returned 1
+        1:   92:    PASS();
+call    0 returned 1
+        -:   93:}
+        -:   94:
+        -:   95:/* === mk_char tests === */
+        -:   96:
+function test_mk_char_ascii called 1 returned 100% blocks executed 47%
+        1:   97:void test_mk_char_ascii(void) {
+        1:   98:    Obj* x = mk_char('A');
+call    0 returned 1
+       1*:   99:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        -:  100:    /* Characters may be immediate values - use obj_tag and obj_to_char_val */
+       1*:  101:    ASSERT_EQ(obj_tag(x), TAG_CHAR);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+       1*:  102:    ASSERT_EQ(obj_to_char_val(x), 'A');
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  103:    dec_ref(x);
+call    0 returned 1
+        1:  104:    PASS();
+call    0 returned 1
+        -:  105:}
+        -:  106:
+function test_mk_char_zero called 1 returned 100% blocks executed 54%
+        1:  107:void test_mk_char_zero(void) {
+        1:  108:    Obj* x = mk_char(0);
+call    0 returned 1
+       1*:  109:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  110:    ASSERT_EQ(obj_to_char_val(x), 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  111:    dec_ref(x);
+call    0 returned 1
+        1:  112:    PASS();
+call    0 returned 1
+        -:  113:}
+        -:  114:
+function test_mk_char_extended called 1 returned 100% blocks executed 54%
+        1:  115:void test_mk_char_extended(void) {
+        1:  116:    Obj* x = mk_char(255);
+call    0 returned 1
+       1*:  117:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  118:    ASSERT_EQ(obj_to_char_val(x), 255);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  119:    dec_ref(x);
+call    0 returned 1
+        1:  120:    PASS();
+call    0 returned 1
+        -:  121:}
+        -:  122:
+        -:  123:/* === mk_pair tests === */
+        -:  124:
+function test_mk_pair_normal called 1 returned 100% blocks executed 44%
+        1:  125:void test_mk_pair_normal(void) {
+        1:  126:    Obj* a = mk_int(1);
+call    0 returned 1
+        1:  127:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  128:    Obj* p = mk_pair(a, b);
+call    0 returned 1
+       1*:  129:    ASSERT_NOT_NULL(p);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  130:    ASSERT_EQ(p->tag, TAG_PAIR);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  131:    ASSERT_EQ(p->is_pair, 1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  132:    ASSERT_EQ(p->a, a);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  133:    ASSERT_EQ(p->b, b);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  134:    dec_ref(p);
+call    0 returned 1
+        1:  135:    PASS();
+call    0 returned 1
+        -:  136:}
+        -:  137:
+function test_mk_pair_null_car called 1 returned 100% blocks executed 53%
+        1:  138:void test_mk_pair_null_car(void) {
+        1:  139:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  140:    Obj* p = mk_pair(NULL, b);
+call    0 returned 1
+       1*:  141:    ASSERT_NOT_NULL(p);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  142:    ASSERT_NULL(p->a);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  143:    ASSERT_EQ(p->b, b);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  144:    dec_ref(p);
+call    0 returned 1
+        1:  145:    PASS();
+call    0 returned 1
+        -:  146:}
+        -:  147:
+function test_mk_pair_null_cdr called 1 returned 100% blocks executed 53%
+        1:  148:void test_mk_pair_null_cdr(void) {
+        1:  149:    Obj* a = mk_int(1);
+call    0 returned 1
+        1:  150:    Obj* p = mk_pair(a, NULL);
+call    0 returned 1
+       1*:  151:    ASSERT_NOT_NULL(p);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  152:    ASSERT_EQ(p->a, a);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  153:    ASSERT_NULL(p->b);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  154:    dec_ref(p);
+call    0 returned 1
+        1:  155:    PASS();
+call    0 returned 1
+        -:  156:}
+        -:  157:
+function test_mk_pair_both_null called 1 returned 100% blocks executed 54%
+        1:  158:void test_mk_pair_both_null(void) {
+        1:  159:    Obj* p = mk_pair(NULL, NULL);
+call    0 returned 1
+       1*:  160:    ASSERT_NOT_NULL(p);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  161:    ASSERT_NULL(p->a);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  162:    ASSERT_NULL(p->b);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  163:    dec_ref(p);
+call    0 returned 1
+        1:  164:    PASS();
+call    0 returned 1
+        -:  165:}
+        -:  166:
+function test_mk_pair_nested called 1 returned 100% blocks executed 58%
+        1:  167:void test_mk_pair_nested(void) {
+        1:  168:    Obj* a = mk_int(1);
+call    0 returned 1
+        1:  169:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  170:    Obj* c = mk_int(3);
+call    0 returned 1
+        1:  171:    Obj* inner = mk_pair(b, c);
+call    0 returned 1
+        1:  172:    Obj* outer = mk_pair(a, inner);
+call    0 returned 1
+       1*:  173:    ASSERT_NOT_NULL(outer);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  174:    ASSERT_EQ(outer->a, a);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  175:    ASSERT_EQ(outer->b, inner);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  176:    dec_ref(outer);
+call    0 returned 1
+        1:  177:    PASS();
+call    0 returned 1
+        -:  178:}
+        -:  179:
+        -:  180:/* === mk_sym tests === */
+        -:  181:
+function test_mk_sym_normal called 1 returned 100% blocks executed 47%
+        1:  182:void test_mk_sym_normal(void) {
+        1:  183:    Obj* x = mk_sym("hello");
+call    0 returned 1
+       1*:  184:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  185:    ASSERT_EQ(x->tag, TAG_SYM);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  186:    ASSERT_STR_EQ((char*)x->ptr, "hello");
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  187:    dec_ref(x);
+call    0 returned 1
+        1:  188:    PASS();
+call    0 returned 1
+        -:  189:}
+        -:  190:
+function test_mk_sym_empty called 1 returned 100% blocks executed 55%
+        1:  191:void test_mk_sym_empty(void) {
+        1:  192:    Obj* x = mk_sym("");
+call    0 returned 1
+       1*:  193:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  194:    ASSERT_STR_EQ((char*)x->ptr, "");
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  195:    dec_ref(x);
+call    0 returned 1
+        1:  196:    PASS();
+call    0 returned 1
+        -:  197:}
+        -:  198:
+function test_mk_sym_null called 1 returned 100% blocks executed 60%
+        1:  199:void test_mk_sym_null(void) {
+        1:  200:    Obj* x = mk_sym(NULL);
+call    0 returned 1
+       1*:  201:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  202:    ASSERT_NULL(x->ptr);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  203:    dec_ref(x);
+call    0 returned 1
+        1:  204:    PASS();
+call    0 returned 1
+        -:  205:}
+        -:  206:
+function test_mk_sym_long called 1 returned 100% blocks executed 54%
+        1:  207:void test_mk_sym_long(void) {
+        -:  208:    char buf[1024];
+        1:  209:    memset(buf, 'x', 1023);
+        1:  210:    buf[1023] = '\0';
+        1:  211:    Obj* x = mk_sym(buf);
+call    0 returned 1
+       1*:  212:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  213:    ASSERT_STR_EQ((char*)x->ptr, buf);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  214:    dec_ref(x);
+call    0 returned 1
+        1:  215:    PASS();
+call    0 returned 1
+        -:  216:}
+        -:  217:
+        -:  218:/* === mk_box tests === */
+        -:  219:
+function test_mk_box_normal called 1 returned 100% blocks executed 53%
+        1:  220:void test_mk_box_normal(void) {
+        1:  221:    Obj* v = mk_int(42);
+call    0 returned 1
+        1:  222:    Obj* b = mk_box(v);
+call    0 returned 1
+       1*:  223:    ASSERT_NOT_NULL(b);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  224:    ASSERT_EQ(b->tag, TAG_BOX);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  225:    ASSERT_EQ(box_get(b), v);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  226:    dec_ref(b);
+call    0 returned 1
+        1:  227:    dec_ref(v);  /* box incremented ref */
+call    0 returned 1
+        1:  228:    PASS();
+call    0 returned 1
+        -:  229:}
+        -:  230:
+function test_mk_box_null called 1 returned 100% blocks executed 64%
+        1:  231:void test_mk_box_null(void) {
+        1:  232:    Obj* b = mk_box(NULL);
+call    0 returned 1
+       1*:  233:    ASSERT_NOT_NULL(b);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  234:    ASSERT_NULL(box_get(b));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  235:    dec_ref(b);
+call    0 returned 1
+        1:  236:    PASS();
+call    0 returned 1
+        -:  237:}
+        -:  238:
+        -:  239:/* === mk_error tests === */
+        -:  240:
+function test_mk_error_normal called 1 returned 100% blocks executed 47%
+        1:  241:void test_mk_error_normal(void) {
+        1:  242:    Obj* x = mk_error("something failed");
+call    0 returned 1
+       1*:  243:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  244:    ASSERT_EQ(x->tag, TAG_ERROR);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  245:    ASSERT_STR_EQ((char*)x->ptr, "something failed");
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  246:    dec_ref(x);
+call    0 returned 1
+        1:  247:    PASS();
+call    0 returned 1
+        -:  248:}
+        -:  249:
+function test_mk_error_empty called 1 returned 100% blocks executed 55%
+        1:  250:void test_mk_error_empty(void) {
+        1:  251:    Obj* x = mk_error("");
+call    0 returned 1
+       1*:  252:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  253:    ASSERT_STR_EQ((char*)x->ptr, "");
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  254:    dec_ref(x);
+call    0 returned 1
+        1:  255:    PASS();
+call    0 returned 1
+        -:  256:}
+        -:  257:
+function test_mk_error_null called 1 returned 100% blocks executed 60%
+        1:  258:void test_mk_error_null(void) {
+        1:  259:    Obj* x = mk_error(NULL);
+call    0 returned 1
+       1*:  260:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  261:    ASSERT_NULL(x->ptr);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  262:    dec_ref(x);
+call    0 returned 1
+        1:  263:    PASS();
+call    0 returned 1
+        -:  264:}
+        -:  265:
+        -:  266:/* === mk_int_stack tests === */
+        -:  267:
+function test_mk_int_stack_normal called 1 returned 100% blocks executed 39%
+        1:  268:void test_mk_int_stack_normal(void) {
+        1:  269:    int old_ptr = STACK_PTR;
+        1:  270:    Obj* x = mk_int_stack(99);
+call    0 returned 1
+       1*:  271:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  272:    ASSERT_EQ(x->tag, TAG_INT);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  273:    ASSERT_EQ(x->i, 99);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  274:    ASSERT_EQ(x->mark, 0);  /* Stack objects have mark=0 */
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  275:    STACK_PTR = old_ptr;  /* Reset for other tests */
+        1:  276:    PASS();
+call    0 returned 1
+        -:  277:}
+        -:  278:
+function test_mk_int_stack_fallback called 1 returned 100% blocks executed 47%
+        1:  279:void test_mk_int_stack_fallback(void) {
+        -:  280:    /* Fill up the stack pool */
+        1:  281:    int old_ptr = STACK_PTR;
+        1:  282:    STACK_PTR = STACK_POOL_SIZE;
+        -:  283:
+        1:  284:    Obj* x = mk_int_stack(123);
+call    0 returned 1
+       1*:  285:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  286:    ASSERT_EQ(x->i, 123);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  287:    ASSERT_EQ(x->mark, 1);  /* Heap allocated */
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        -:  288:
+        1:  289:    dec_ref(x);
+call    0 returned 1
+        1:  290:    STACK_PTR = old_ptr;
+        1:  291:    PASS();
+call    0 returned 1
+        -:  292:}
+        -:  293:
+        -:  294:/* === Run all constructor tests === */
+        -:  295:
+function run_constructor_tests called 1 returned 100% blocks executed 61%
+        1:  296:void run_constructor_tests(void) {
+        1:  297:    TEST_SUITE("Object Constructors");
+call    0 returned 1
+        -:  298:
+        -:  299:    /* mk_int */
+       1*:  300:    RUN_TEST(test_mk_int_positive);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  301:    RUN_TEST(test_mk_int_negative);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  302:    RUN_TEST(test_mk_int_zero);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  303:    RUN_TEST(test_mk_int_max);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  304:    RUN_TEST(test_mk_int_min);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  305:
+        -:  306:    /* mk_float */
+       1*:  307:    RUN_TEST(test_mk_float_positive);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  308:    RUN_TEST(test_mk_float_negative);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  309:    RUN_TEST(test_mk_float_zero);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  310:    RUN_TEST(test_mk_float_large);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  311:    RUN_TEST(test_mk_float_small);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  312:
+        -:  313:    /* mk_char */
+       1*:  314:    RUN_TEST(test_mk_char_ascii);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  315:    RUN_TEST(test_mk_char_zero);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  316:    RUN_TEST(test_mk_char_extended);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  317:
+        -:  318:    /* mk_pair */
+       1*:  319:    RUN_TEST(test_mk_pair_normal);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  320:    RUN_TEST(test_mk_pair_null_car);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  321:    RUN_TEST(test_mk_pair_null_cdr);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  322:    RUN_TEST(test_mk_pair_both_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  323:    RUN_TEST(test_mk_pair_nested);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  324:
+        -:  325:    /* mk_sym */
+       1*:  326:    RUN_TEST(test_mk_sym_normal);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  327:    RUN_TEST(test_mk_sym_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  328:    RUN_TEST(test_mk_sym_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  329:    RUN_TEST(test_mk_sym_long);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  330:
+        -:  331:    /* mk_box */
+       1*:  332:    RUN_TEST(test_mk_box_normal);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  333:    RUN_TEST(test_mk_box_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  334:
+        -:  335:    /* mk_error */
+       1*:  336:    RUN_TEST(test_mk_error_normal);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  337:    RUN_TEST(test_mk_error_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  338:    RUN_TEST(test_mk_error_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  339:
+        -:  340:    /* mk_int_stack */
+       1*:  341:    RUN_TEST(test_mk_int_stack_normal);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  342:    RUN_TEST(test_mk_int_stack_fallback);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        1:  343:}

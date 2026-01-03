@@ -92,7 +92,40 @@ Multiple Dispatch (Julia-style). No class-based OOP.
 ### 1.6 Control Flow
 Delimited Continuations (`prompt`/`control`), Trampolined Tail Calls.
 
+### 1.7 Current Implemented Subset (C Compiler)
+The current C compiler/runtime implements a **small core** of the language. The rest
+of this document describes the intended language design.
+
+**Implemented syntax & forms**
+- Lists `(...)`
+- Quote `'x` -> `(quote x)`
+- Special forms: `define`, `lambda` / `fn`, `let`, `let*`, `if`, `do` / `begin`
+- Function application in prefix form
+- Comments start with `;` and run to end-of-line
+
+**Binding forms**
+- List-style: `(let ((x 1) (y 2)) ...)`
+- Array-style: `(let [x 1 y 2] ...)` (used as a binding container)
+
+**Literals**
+- Integers (decimal)
+- Symbols
+- Empty list `()`
+
+**Primitives currently wired**
+- Arithmetic: `+`, `-`, `*`, `/`, `%`
+- Comparison: `<`, `>`, `<=`, `>=`, `=`
+- Lists: `cons`, `car`, `cdr`, `null?`
+- I/O: `display`, `print`, `newline`
+
+**Truthiness**
+- Empty list and numeric zero are false; everything else is truthy.
+
 ---
+
+## Planned Design (Not Yet Implemented in C Compiler)
+
+The sections below describe the intended Omnilisp language design and are not yet implemented in the C compiler unless explicitly noted.
 
 ## 2. Values & Nothing
 
@@ -1109,82 +1142,16 @@ Tower semantics work with hygienic macros:
 
 ---
 
-## 20. Implementation Status
+## 20. Implementation Status (C Compiler)
 
-### Phase 1: Core Parser ✅
-- [x] Bracket tokenization (`[]`, `{}`, `#{}`)
-- [x] Array literal parsing `[1 2 3]`
-- [x] Type literal parsing `{Int}`, `{Array Int}`
-- [x] Dict literal parsing `#{:a 1}`
-- [x] `:keyword` shorthand
-- [x] Dot notation `obj.field`, `obj.(expr)`, `.field`
-- [x] String interpolation `$var`, `$(expr)`
+### Implemented
+- Parser: integers, symbols, lists `(...)`, arrays `[...]` (used for `let` bindings), quote `'`
+- Special forms: `define`, `lambda` / `fn`, `let`, `let*`, `if`, `do` / `begin`
+- Primitives: `+`, `-`, `*`, `/`, `%`, `<`, `>`, `<=`, `>=`, `=`, `cons`, `car`, `cdr`, `null?`
+- I/O: `display`, `print`, `newline`
+- ASAP analysis pass integrated into codegen for compile-time `free_obj` insertion
 
-### Phase 2: AST Extensions ✅
-- [x] New Value tags (TArray, TDict, TTuple, TKeyword, TNothing, TTypeLit)
-- [x] Constructors and predicates for new types
-- [x] Array, Dict, Tuple operations
-
-### Phase 3: Evaluator Primitives ✅
-- [x] Array ops (make-array, array-ref, array-set!, etc.)
-- [x] Dict ops (make-dict, dict-ref, dict-set!, etc.)
-- [x] Tuple ops (tuple, tuple-ref, tuple-length)
-- [x] Keyword ops (keyword?, keyword-name, etc.)
-- [x] Nothing ops (nothing?, nothing)
-- [x] Generic get (for dot notation)
-
-### Phase 4: Pattern Matching ✅
-- [x] Array patterns `[a b .. rest]`
-- [x] Dict patterns `#{:key pat}`
-- [x] Tuple patterns
-- [x] Predicate patterns `(? pred)`
-- [x] Guards `:when`
-- [x] OmniLisp branch syntax `[pattern result]`
-
-### Phase 5: Multiple Dispatch ✅
-- [x] Type hierarchy (Julia-style)
-- [x] Generic function registry
-- [x] Method tables for dispatch
-- [x] Specificity-based method selection
-- [x] `(define (f [x {Type}]) ...)` syntax
-
-### Phase 6: Module System ✅
-- [x] `(module Name (export ...) body)`
-- [x] `(import Module)`
-- [x] `:as`, `:only`, `:except`, `:refer` modifiers
-- [x] Qualified name lookup `Module/name`
-
-### Phase 7: Hygienic Macros ✅
-- [x] `(define [macro name] (params) body)`
-- [x] Syntax objects with lexical context
-- [x] `#'` / `syntax-quote`
-- [x] `~` / `unquote`
-- [x] `~@` / `unquote-splicing`
-
-### Phase 8: Let Modifiers ✅
-- [x] Array-style bindings `[x 1 y 2]`
-- [x] `:seq` modifier (sequential binding)
-- [x] `:rec` modifier (recursive binding)
-- [x] Named let `(let loop [i 0] ...)`
-
-### Phase 9: Code Generation ✅
-- [x] Array code generation
-- [x] Dict code generation
-- [x] Tuple code generation
-- [x] Keyword/Nothing code generation
-- [x] Type literal code generation
-
-### Phase 10: Tower Semantics ✅
-- [x] `lift` - value to code
-- [x] `run` - execute code at base
-- [x] `EM` - escape to meta
-- [x] `shift` - go up n levels
-- [x] `meta-level` - get current level
-- [x] Handler system (get-meta, set-meta!, with-handlers)
-- [x] `clambda` - compile lambda
-
-### Pending
-- [ ] Extensible patterns
-- [ ] Full condition system
-- [ ] Advanced FFI
-- [ ] Performance optimizations
+### Not Yet Wired in the C Compiler
+- Strings, floats, chars, dicts, tuples, type literals
+- Pattern matching, macros, modules, multiple dispatch
+- Concurrency/FFI surface syntax and tower semantics

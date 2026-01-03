@@ -13,6 +13,9 @@
 #include <pthread.h>
 #include <stdbool.h>
 
+/* Sound generational references - slot pool never frees to system allocator */
+#include "memory/slot_pool.h"
+
 /* ========== Tagged Pointers (Multi-Type Immediates) ========== */
 /*
  * 3-bit tag scheme for immediate values (no heap allocation):
@@ -105,6 +108,7 @@ typedef struct BorrowRef {
     Generation remembered_gen;   /* Snapshot of generation at borrow time */
     const char* source_desc;     /* Debug description */
     struct Obj* ipge_target;     /* IPGE: Direct Obj* for generation check */
+    Handle handle;               /* Sound handle for slot-pool objects */
 } BorrowRef;
 
 void invalidate_weak_refs_for(void* target);
@@ -207,6 +211,11 @@ typedef struct Obj {
     };
 } Obj;
 /* Size: 32 bytes (compact) or 40 bytes (robust) */
+#define PURPLE_OBJ_DEFINED 1
+#define PURPLE_OBJ_SIZE sizeof(Obj)
+
+/* Now that Obj is defined, include handle system for sound borrowed refs */
+#include "memory/handle.h"
 
 /* ========== Tagged Pointer Helper Functions ========== */
 
@@ -355,6 +364,28 @@ static inline Generation _next_generation(void) {
     return (Generation)_ipge_seed;  /* Truncate to 16-bit (compact) or keep 64-bit (robust) */
 }
 
+/* ========== Sound Slot Pool Allocation ========== */
+/*
+ * alloc_obj() allocates from the stable slot pool for SOUND borrowed references.
+ * The slot is never freed to the system allocator, so generation validation
+ * is always safe (no UB from reading freed memory).
+ *
+ * Use alloc_obj() for objects that may be borrowed.
+ * Use malloc() for objects that are never borrowed (for performance).
+ */
+Obj* alloc_obj(void) {
+    return handle_alloc_obj();
+}
+
+void free_obj_pool(Obj* obj) {
+    handle_free_obj(obj);
+}
+
+/* Check if an Obj is from the slot pool (supports sound validation) */
+int is_pool_obj(Obj* obj) {
+    return handle_is_pool_obj(obj) ? 1 : 0;
+}
+
 /* Object Constructors */
 Obj* mk_int(long i) {
     Obj* x = malloc(sizeof(Obj));
@@ -377,6 +408,7 @@ Obj* mk_float(double f) {
     x->tag = TAG_FLOAT;
     x->is_pair = 0;
     x->scc_id = -1;  /* Initialize to not in SCC */
+    x->scan_tag = 0;  /* Initialize to not visited by Tarjan */
     x->f = f;
     return x;
 }
@@ -398,6 +430,8 @@ Obj* mk_char(long c) {
     x->mark = 1;
     x->tag = TAG_CHAR;
     x->is_pair = 0;
+    x->scc_id = -1;  /* Initialize to not in SCC */
+    x->scan_tag = 0;  /* Initialize to not visited by Tarjan */
     x->i = c;
     return x;
 }
@@ -424,6 +458,8 @@ Obj* mk_sym(const char* s) {
     x->mark = 1;
     x->tag = TAG_SYM;
     x->is_pair = 0;
+    x->scc_id = -1;  /* Initialize to not in SCC */
+    x->scan_tag = 0;  /* Initialize to not visited by Tarjan */
     if (s) {
         size_t len = strlen(s);
         char* copy = malloc(len + 1);
@@ -446,6 +482,8 @@ Obj* mk_box(Obj* v) {
     x->mark = 1;
     x->tag = TAG_BOX;
     x->is_pair = 0;
+    x->scc_id = -1;  /* Initialize to not in SCC */
+    x->scan_tag = 0;  /* Initialize to not visited by Tarjan */
     if (v) inc_ref(v);
     x->ptr = v;
     return x;
@@ -1724,12 +1762,22 @@ BorrowRef* legacy_create(GenObj* obj, const char* source_desc) {
 /* O(1) validity check - IPGE generation comparison */
 int borrow_is_valid(BorrowRef* ref) {
     if (!ref) return 0;
-    /* IPGE mode: use ipge_target */
+
+    /* SOUND PATH: If we have a handle (object from slot pool), use handle validation.
+     * This is always safe because slot memory is never freed to the system. */
+    if (ref->handle != HANDLE_INVALID) {
+        return handle_is_valid(ref->handle) ? 1 : 0;
+    }
+
+    /* LEGACY UNSOUND PATH: Direct IPGE for malloc'd objects.
+     * WARNING: Reading ref->ipge_target->generation is UB if object was freed!
+     * This path exists for backward compatibility - new code should use pool allocation. */
     if (ref->ipge_target) {
         /* Compare remembered generation with current generation */
         return ref->remembered_gen == ref->ipge_target->generation &&
                ref->ipge_target->generation != 0;
     }
+
     /* Legacy GenObj mode */
     if (!ref->target) return 0;
     pthread_rwlock_rdlock(&ref->target->rwlock);
@@ -1769,6 +1817,9 @@ BorrowRef* borrow_create(Obj* obj, const char* source_desc) {
     ref->remembered_gen = obj->generation;
     ref->source_desc = source_desc;
     ref->target = NULL;  /* Not using legacy GenObj mode */
+
+    /* Sound handle: if object is from slot pool, create handle for safe validation */
+    ref->handle = handle_from_obj(obj);
     return ref;
 }
 

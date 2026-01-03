@@ -16,6 +16,59 @@ Purple Go is a **stage-polymorphic evaluator**: the same evaluator interprets co
 - Variables captured by closures are NOT freed in parent scope.
 
 ### 3) Optimizations on Top of ASAP
+
+All 11 planned memory optimizations are **COMPLETE** (as of 2026-01-03):
+
+| # | Optimization | Tests | Status |
+|---|--------------|-------|--------|
+| 1 | GenRef/IPGE Soundness Fix | - | ✅ |
+| 2 | Full Liveness-Driven Free Insertion | - | ✅ |
+| 3 | Ownership-Driven Codegen | - | ✅ |
+| 4 | Escape-Aware Stack Allocation | - | ✅ |
+| 5 | Shape Analysis + Weak Back-Edge | 7 | ✅ |
+| 6 | Perceus Reuse Analysis | 7 | ✅ |
+| 7 | Region-Aware RC Elision | 11 | ✅ |
+| 8 | Per-Region External Refcount | 7 | ✅ |
+| 9 | Borrow/Tether Loop Insertion | 8 | ✅ |
+| 10 | Interprocedural Summaries | 11 | ✅ |
+| 11 | Concurrency Ownership Inference | 14 | ✅ |
+
+**Total: 65+ tests in `csrc/tests/`**
+
+## Roadmap: Post‑11 Enhancements (ASAP‑Compatible)
+
+These are **optional** future enhancements that do **not** impose language restrictions
+and do **not** introduce stop‑the‑world GC. They build on the existing ASAP‑first base.
+Detailed sketches live in `docs/UNIFIED_OPTIMIZATION_PLAN.md`.
+
+12) **Linear/Offset Regions for Serialization & FFI**
+   - Add a region mode where pointers are stored as offsets; deref applies an adjuster.
+   - Useful for zero‑copy serialization buffers and FFI blobs.
+
+13) **Pluggable Region Backends (IRegion‑style)**
+   - Runtime exposes a small region vtable (`alloc`, `free`, `deref`, `scan`).
+   - Compiler selects backend per allocation site (arena / pool / rc / unsafe) without user annotations.
+
+14) **Weak Ref Control Blocks (Merge‑friendly)**
+   - Weak refs point to a stable control block; free sets `cb->ptr = NULL`.
+   - Region merges become no‑ops; arenas can bulk‑invalidate.
+
+15) **Transmigration / Isolation on Region Escape**
+   - When values escape a temporary region, isolate by generation‑offset or copy‑out.
+   - Prevents stale cross‑region borrows without global scans.
+
+16) **External Handle Indexing (FFI + Determinism)**
+   - Stable handle table (index+generation) for FFI or record/replay.
+   - Avoids exposing raw addresses and supports deterministic mapping.
+
+**References (inspiration):**
+- Vale `LinearRegion` (offset pointers): `Vale/docs/LinearRegion.md`
+- Vale region interface: `Vale/docs/IRegion.md`
+- Vale weak ref control blocks: `Vale/docs/WeakRef.md`
+- Vale transmigration: `Vale/docs/regions/Transmigration.md`
+- Vale external handle mapping: `Vale/docs/PerfectReplayability.md`
+
+Key runtime strategies:
 - **Shape Analysis**: TREE/DAG/CYCLIC strategies (Ghiya-Hendren).
 - **DAG RC**: `inc_ref`/`dec_ref` for shared acyclic graphs.
 - **SCC RC** (frozen cycles): Tarjan on a *local* subgraph; no global pause.

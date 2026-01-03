@@ -1,0 +1,984 @@
+        -:    0:Source:test_arena.c
+        -:    0:Graph:./run_tests_cov-test_main.gcno
+        -:    0:Data:./run_tests_cov-test_main.gcda
+        -:    0:Runs:1
+        -:    1:/* test_arena.c - Comprehensive arena allocator tests */
+        -:    2:#include "test_framework.h"
+        -:    3:
+        -:    4:/* ========== Arena Creation Tests ========== */
+        -:    5:
+function test_arena_create called 1 returned 100% blocks executed 47%
+        1:    6:void test_arena_create(void) {
+        1:    7:    Arena* a = arena_create();
+call    0 returned 1
+       1*:    8:    ASSERT_NOT_NULL(a);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:    9:    ASSERT_NULL(a->current);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   10:    ASSERT_NULL(a->blocks);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   11:    ASSERT_EQ(a->block_size, ARENA_BLOCK_SIZE);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   12:    arena_destroy(a);
+call    0 returned 1
+        1:   13:    PASS();
+call    0 returned 1
+        -:   14:}
+        -:   15:
+function test_arena_destroy_null called 1 returned 100% blocks executed 100%
+        1:   16:void test_arena_destroy_null(void) {
+        1:   17:    arena_destroy(NULL);  /* Should not crash */
+call    0 returned 1
+        1:   18:    PASS();
+call    0 returned 1
+        1:   19:}
+        -:   20:
+function test_arena_destroy_empty called 1 returned 100% blocks executed 100%
+        1:   21:void test_arena_destroy_empty(void) {
+        1:   22:    Arena* a = arena_create();
+call    0 returned 1
+        1:   23:    arena_destroy(a);  /* Destroy empty arena */
+call    0 returned 1
+        1:   24:    PASS();
+call    0 returned 1
+        1:   25:}
+        -:   26:
+        -:   27:/* ========== Arena Allocation Tests ========== */
+        -:   28:
+function test_arena_mk_int called 1 returned 100% blocks executed 45%
+        1:   29:void test_arena_mk_int(void) {
+        1:   30:    Arena* a = arena_create();
+call    0 returned 1
+        1:   31:    Obj* x = arena_mk_int(a, 42);
+call    0 returned 1
+       1*:   32:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   33:    ASSERT_EQ(x->tag, TAG_INT);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   34:    ASSERT_EQ(x->i, 42);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   35:    ASSERT_EQ(x->mark, -2);  /* Arena-allocated mark */
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   36:    arena_destroy(a);
+call    0 returned 1
+        1:   37:    PASS();
+call    0 returned 1
+        -:   38:}
+        -:   39:
+function test_arena_mk_int_negative called 1 returned 100% blocks executed 58%
+        1:   40:void test_arena_mk_int_negative(void) {
+        1:   41:    Arena* a = arena_create();
+call    0 returned 1
+        1:   42:    Obj* x = arena_mk_int(a, -100);
+call    0 returned 1
+       1*:   43:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   44:    ASSERT_EQ(x->i, -100);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   45:    arena_destroy(a);
+call    0 returned 1
+        1:   46:    PASS();
+call    0 returned 1
+        -:   47:}
+        -:   48:
+function test_arena_mk_int_zero called 1 returned 100% blocks executed 58%
+        1:   49:void test_arena_mk_int_zero(void) {
+        1:   50:    Arena* a = arena_create();
+call    0 returned 1
+        1:   51:    Obj* x = arena_mk_int(a, 0);
+call    0 returned 1
+       1*:   52:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   53:    ASSERT_EQ(x->i, 0);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   54:    arena_destroy(a);
+call    0 returned 1
+        1:   55:    PASS();
+call    0 returned 1
+        -:   56:}
+        -:   57:
+function test_arena_mk_pair called 1 returned 100% blocks executed 43%
+        1:   58:void test_arena_mk_pair(void) {
+        1:   59:    Arena* a = arena_create();
+call    0 returned 1
+        1:   60:    Obj* car = arena_mk_int(a, 1);
+call    0 returned 1
+        1:   61:    Obj* cdr = arena_mk_int(a, 2);
+call    0 returned 1
+        1:   62:    Obj* p = arena_mk_pair(a, car, cdr);
+call    0 returned 1
+       1*:   63:    ASSERT_NOT_NULL(p);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   64:    ASSERT_EQ(p->tag, TAG_PAIR);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   65:    ASSERT_EQ(p->is_pair, 1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   66:    ASSERT_EQ(p->a, car);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   67:    ASSERT_EQ(p->b, cdr);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   68:    ASSERT_EQ(p->mark, -2);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   69:    arena_destroy(a);
+call    0 returned 1
+        1:   70:    PASS();
+call    0 returned 1
+        -:   71:}
+        -:   72:
+function test_arena_mk_pair_null_car called 1 returned 100% blocks executed 56%
+        1:   73:void test_arena_mk_pair_null_car(void) {
+        1:   74:    Arena* a = arena_create();
+call    0 returned 1
+        1:   75:    Obj* cdr = arena_mk_int(a, 1);
+call    0 returned 1
+        1:   76:    Obj* p = arena_mk_pair(a, NULL, cdr);
+call    0 returned 1
+       1*:   77:    ASSERT_NOT_NULL(p);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   78:    ASSERT_NULL(p->a);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   79:    ASSERT_EQ(p->b, cdr);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   80:    arena_destroy(a);
+call    0 returned 1
+        1:   81:    PASS();
+call    0 returned 1
+        -:   82:}
+        -:   83:
+function test_arena_mk_pair_null_cdr called 1 returned 100% blocks executed 56%
+        1:   84:void test_arena_mk_pair_null_cdr(void) {
+        1:   85:    Arena* a = arena_create();
+call    0 returned 1
+        1:   86:    Obj* car = arena_mk_int(a, 1);
+call    0 returned 1
+        1:   87:    Obj* p = arena_mk_pair(a, car, NULL);
+call    0 returned 1
+       1*:   88:    ASSERT_NOT_NULL(p);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   89:    ASSERT_EQ(p->a, car);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   90:    ASSERT_NULL(p->b);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   91:    arena_destroy(a);
+call    0 returned 1
+        1:   92:    PASS();
+call    0 returned 1
+        -:   93:}
+        -:   94:
+function test_arena_mk_pair_both_null called 1 returned 100% blocks executed 57%
+        1:   95:void test_arena_mk_pair_both_null(void) {
+        1:   96:    Arena* a = arena_create();
+call    0 returned 1
+        1:   97:    Obj* p = arena_mk_pair(a, NULL, NULL);
+call    0 returned 1
+       1*:   98:    ASSERT_NOT_NULL(p);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   99:    ASSERT_NULL(p->a);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  100:    ASSERT_NULL(p->b);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  101:    arena_destroy(a);
+call    0 returned 1
+        1:  102:    PASS();
+call    0 returned 1
+        -:  103:}
+        -:  104:
+        -:  105:/* ========== Arena Block Management Tests ========== */
+        -:  106:
+function test_arena_multiple_allocations called 1 returned 100% blocks executed 65%
+        1:  107:void test_arena_multiple_allocations(void) {
+        1:  108:    Arena* a = arena_create();
+call    0 returned 1
+        -:  109:    Obj* objs[100];
+      101:  110:    for (int i = 0; i < 100; i++) {
+branch  0 taken 100
+branch  1 taken 1 (fallthrough)
+      100:  111:        objs[i] = arena_mk_int(a, i);
+call    0 returned 100
+     100*:  112:        ASSERT_NOT_NULL(objs[i]);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 100
+call    2 never executed
+     100*:  113:        ASSERT_EQ(objs[i]->i, i);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 100
+call    2 never executed
+        -:  114:    }
+        1:  115:    arena_destroy(a);
+call    0 returned 1
+        1:  116:    PASS();
+call    0 returned 1
+        -:  117:}
+        -:  118:
+function test_arena_block_creation called 1 returned 100% blocks executed 71%
+        1:  119:void test_arena_block_creation(void) {
+        1:  120:    Arena* a = arena_create();
+call    0 returned 1
+        -:  121:    /* Allocate enough to force multiple blocks */
+        1:  122:    int count = (ARENA_BLOCK_SIZE / sizeof(Obj)) + 10;
+      113:  123:    for (int i = 0; i < count; i++) {
+branch  0 taken 112
+branch  1 taken 1 (fallthrough)
+      112:  124:        Obj* x = arena_mk_int(a, i);
+call    0 returned 112
+     112*:  125:        ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 112
+call    2 never executed
+        -:  126:    }
+        -:  127:    /* Verify blocks were created */
+       1*:  128:    ASSERT_NOT_NULL(a->blocks);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  129:    arena_destroy(a);
+call    0 returned 1
+        1:  130:    PASS();
+call    0 returned 1
+        -:  131:}
+        -:  132:
+        -:  133:/* ========== Arena Reset Tests ========== */
+        -:  134:
+function test_arena_reset_empty called 1 returned 100% blocks executed 100%
+        1:  135:void test_arena_reset_empty(void) {
+        1:  136:    Arena* a = arena_create();
+call    0 returned 1
+        1:  137:    arena_reset(a);  /* Should not crash */
+call    0 returned 1
+        1:  138:    arena_destroy(a);
+call    0 returned 1
+        1:  139:    PASS();
+call    0 returned 1
+        1:  140:}
+        -:  141:
+function test_arena_reset_with_data called 1 returned 100% blocks executed 71%
+        1:  142:void test_arena_reset_with_data(void) {
+        1:  143:    Arena* a = arena_create();
+call    0 returned 1
+       51:  144:    for (int i = 0; i < 50; i++) {
+branch  0 taken 50
+branch  1 taken 1 (fallthrough)
+       50:  145:        arena_mk_int(a, i);
+call    0 returned 50
+        -:  146:    }
+        1:  147:    arena_reset(a);
+call    0 returned 1
+        -:  148:    /* After reset, should be able to allocate again */
+        1:  149:    Obj* x = arena_mk_int(a, 999);
+call    0 returned 1
+       1*:  150:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  151:    ASSERT_EQ(x->i, 999);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  152:    arena_destroy(a);
+call    0 returned 1
+        1:  153:    PASS();
+call    0 returned 1
+        -:  154:}
+        -:  155:
+function test_arena_reset_null called 1 returned 100% blocks executed 100%
+        1:  156:void test_arena_reset_null(void) {
+        1:  157:    arena_reset(NULL);  /* Should not crash */
+call    0 returned 1
+        1:  158:    PASS();
+call    0 returned 1
+        1:  159:}
+        -:  160:
+function test_arena_reset_multiple_times called 1 returned 100% blocks executed 100%
+        1:  161:void test_arena_reset_multiple_times(void) {
+        1:  162:    Arena* a = arena_create();
+call    0 returned 1
+       11:  163:    for (int round = 0; round < 10; round++) {
+branch  0 taken 10
+branch  1 taken 1 (fallthrough)
+      210:  164:        for (int i = 0; i < 20; i++) {
+branch  0 taken 200
+branch  1 taken 10 (fallthrough)
+      200:  165:            arena_mk_int(a, i + round * 100);
+call    0 returned 200
+        -:  166:        }
+       10:  167:        arena_reset(a);
+call    0 returned 10
+        -:  168:    }
+        1:  169:    arena_destroy(a);
+call    0 returned 1
+        1:  170:    PASS();
+call    0 returned 1
+        1:  171:}
+        -:  172:
+        -:  173:/* ========== Arena External Pointer Tests ========== */
+        -:  174:
+        -:  175:static int cleanup_called = 0;
+function test_cleanup called 5 returned 100% blocks executed 100%
+        5:  176:static void test_cleanup(void* ptr) {
+        -:  177:    (void)ptr;
+        5:  178:    cleanup_called++;
+        5:  179:}
+        -:  180:
+function test_arena_register_external called 1 returned 100% blocks executed 70%
+        1:  181:void test_arena_register_external(void) {
+        1:  182:    cleanup_called = 0;
+        1:  183:    Arena* a = arena_create();
+call    0 returned 1
+        1:  184:    int dummy = 42;
+        1:  185:    arena_register_external(a, &dummy, test_cleanup);
+call    0 returned 1
+        1:  186:    arena_destroy(a);
+call    0 returned 1
+       1*:  187:    ASSERT_EQ(cleanup_called, 1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  188:    PASS();
+call    0 returned 1
+        -:  189:}
+        -:  190:
+function test_arena_register_external_null_arena called 1 returned 100% blocks executed 62%
+        1:  191:void test_arena_register_external_null_arena(void) {
+        1:  192:    cleanup_called = 0;
+        1:  193:    int dummy = 42;
+        1:  194:    arena_register_external(NULL, &dummy, test_cleanup);
+call    0 returned 1
+       1*:  195:    ASSERT_EQ(cleanup_called, 0);  /* Should not call cleanup */
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  196:    PASS();
+call    0 returned 1
+        -:  197:}
+        -:  198:
+function test_arena_register_external_null_ptr called 1 returned 100% blocks executed 100%
+        1:  199:void test_arena_register_external_null_ptr(void) {
+        1:  200:    Arena* a = arena_create();
+call    0 returned 1
+        1:  201:    arena_register_external(a, NULL, test_cleanup);  /* Should be ignored */
+call    0 returned 1
+        1:  202:    arena_destroy(a);
+call    0 returned 1
+        1:  203:    PASS();
+call    0 returned 1
+        1:  204:}
+        -:  205:
+function test_arena_multiple_externals called 1 returned 100% blocks executed 75%
+        1:  206:void test_arena_multiple_externals(void) {
+        1:  207:    cleanup_called = 0;
+        1:  208:    Arena* a = arena_create();
+call    0 returned 1
+        1:  209:    int d1 = 1, d2 = 2, d3 = 3;
+        1:  210:    arena_register_external(a, &d1, test_cleanup);
+call    0 returned 1
+        1:  211:    arena_register_external(a, &d2, test_cleanup);
+call    0 returned 1
+        1:  212:    arena_register_external(a, &d3, test_cleanup);
+call    0 returned 1
+        1:  213:    arena_destroy(a);
+call    0 returned 1
+       1*:  214:    ASSERT_EQ(cleanup_called, 3);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  215:    PASS();
+call    0 returned 1
+        -:  216:}
+        -:  217:
+function test_arena_external_cleanup_on_reset called 1 returned 100% blocks executed 73%
+        1:  218:void test_arena_external_cleanup_on_reset(void) {
+        1:  219:    cleanup_called = 0;
+        1:  220:    Arena* a = arena_create();
+call    0 returned 1
+        1:  221:    int dummy = 42;
+        1:  222:    arena_register_external(a, &dummy, test_cleanup);
+call    0 returned 1
+        1:  223:    arena_reset(a);
+call    0 returned 1
+       1*:  224:    ASSERT_EQ(cleanup_called, 1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  225:    arena_destroy(a);
+call    0 returned 1
+        1:  226:    PASS();
+call    0 returned 1
+        -:  227:}
+        -:  228:
+        -:  229:/* ========== Arena List Building Tests ========== */
+        -:  230:
+function test_arena_build_list called 1 returned 100% blocks executed 54%
+        1:  231:void test_arena_build_list(void) {
+        1:  232:    Arena* a = arena_create();
+call    0 returned 1
+        -:  233:    /* Build list: (1 2 3) */
+        1:  234:    Obj* list = NULL;
+        4:  235:    for (int i = 3; i >= 1; i--) {
+branch  0 taken 3
+branch  1 taken 1 (fallthrough)
+        3:  236:        list = arena_mk_pair(a, arena_mk_int(a, i), list);
+call    0 returned 3
+call    1 returned 3
+        -:  237:    }
+       1*:  238:    ASSERT_NOT_NULL(list);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  239:    ASSERT_EQ(list->a->i, 1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  240:    ASSERT_EQ(list->b->a->i, 2);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  241:    ASSERT_EQ(list->b->b->a->i, 3);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  242:    arena_destroy(a);
+call    0 returned 1
+        1:  243:    PASS();
+call    0 returned 1
+        -:  244:}
+        -:  245:
+function test_arena_nested_pairs called 1 returned 100% blocks executed 56%
+        1:  246:void test_arena_nested_pairs(void) {
+        1:  247:    Arena* a = arena_create();
+call    0 returned 1
+        -:  248:    /* Build ((1 . 2) . (3 . 4)) */
+        1:  249:    Obj* p1 = arena_mk_pair(a, arena_mk_int(a, 1), arena_mk_int(a, 2));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  250:    Obj* p2 = arena_mk_pair(a, arena_mk_int(a, 3), arena_mk_int(a, 4));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  251:    Obj* outer = arena_mk_pair(a, p1, p2);
+call    0 returned 1
+       1*:  252:    ASSERT_EQ(outer->a->a->i, 1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  253:    ASSERT_EQ(outer->a->b->i, 2);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  254:    ASSERT_EQ(outer->b->a->i, 3);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  255:    ASSERT_EQ(outer->b->b->i, 4);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  256:    arena_destroy(a);
+call    0 returned 1
+        1:  257:    PASS();
+call    0 returned 1
+        -:  258:}
+        -:  259:
+        -:  260:/* ========== Arena Stress Tests ========== */
+        -:  261:
+function test_arena_stress_many_ints called 1 returned 100% blocks executed 67%
+        1:  262:void test_arena_stress_many_ints(void) {
+        1:  263:    Arena* a = arena_create();
+call    0 returned 1
+    10001:  264:    for (int i = 0; i < 10000; i++) {
+branch  0 taken 10000
+branch  1 taken 1 (fallthrough)
+    10000:  265:        Obj* x = arena_mk_int(a, i);
+call    0 returned 10000
+   10000*:  266:        ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 10000
+call    2 never executed
+   10000*:  267:        ASSERT_EQ(x->i, i);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 10000
+call    2 never executed
+        -:  268:    }
+        1:  269:    arena_destroy(a);
+call    0 returned 1
+        1:  270:    PASS();
+call    0 returned 1
+        -:  271:}
+        -:  272:
+function test_arena_stress_many_pairs called 1 returned 100% blocks executed 85%
+        1:  273:void test_arena_stress_many_pairs(void) {
+        1:  274:    Arena* a = arena_create();
+call    0 returned 1
+     5001:  275:    for (int i = 0; i < 5000; i++) {
+branch  0 taken 5000
+branch  1 taken 1 (fallthrough)
+     5000:  276:        Obj* p = arena_mk_pair(a, arena_mk_int(a, i), arena_mk_int(a, i+1));
+call    0 returned 5000
+call    1 returned 5000
+call    2 returned 5000
+    5000*:  277:        ASSERT_NOT_NULL(p);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 5000
+call    2 never executed
+        -:  278:    }
+        1:  279:    arena_destroy(a);
+call    0 returned 1
+        1:  280:    PASS();
+call    0 returned 1
+        -:  281:}
+        -:  282:
+function test_arena_stress_long_list called 1 returned 100% blocks executed 81%
+        1:  283:void test_arena_stress_long_list(void) {
+        1:  284:    Arena* a = arena_create();
+call    0 returned 1
+        1:  285:    Obj* list = NULL;
+    10001:  286:    for (int i = 0; i < 10000; i++) {
+branch  0 taken 10000
+branch  1 taken 1 (fallthrough)
+    10000:  287:        list = arena_mk_pair(a, arena_mk_int(a, i), list);
+call    0 returned 10000
+call    1 returned 10000
+        -:  288:    }
+        -:  289:    /* Walk the list to verify */
+        1:  290:    Obj* curr = list;
+        1:  291:    int count = 0;
+    10001:  292:    while (curr) {
+branch  0 taken 10000
+branch  1 taken 1 (fallthrough)
+    10000:  293:        count++;
+    10000:  294:        curr = curr->b;
+        -:  295:    }
+       1*:  296:    ASSERT_EQ(count, 10000);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  297:    arena_destroy(a);
+call    0 returned 1
+        1:  298:    PASS();
+call    0 returned 1
+        -:  299:}
+        -:  300:
+function test_arena_stress_deep_nesting called 1 returned 100% blocks executed 85%
+        1:  301:void test_arena_stress_deep_nesting(void) {
+        1:  302:    Arena* a = arena_create();
+call    0 returned 1
+        1:  303:    Obj* deep = arena_mk_int(a, 0);
+call    0 returned 1
+     1001:  304:    for (int i = 1; i <= 1000; i++) {
+branch  0 taken 1000
+branch  1 taken 1 (fallthrough)
+     1000:  305:        deep = arena_mk_pair(a, arena_mk_int(a, i), deep);
+call    0 returned 1000
+call    1 returned 1000
+        -:  306:    }
+       1*:  307:    ASSERT_NOT_NULL(deep);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  308:    arena_destroy(a);
+call    0 returned 1
+        1:  309:    PASS();
+call    0 returned 1
+        -:  310:}
+        -:  311:
+function test_arena_stress_reset_cycle called 1 returned 100% blocks executed 100%
+        1:  312:void test_arena_stress_reset_cycle(void) {
+        1:  313:    Arena* a = arena_create();
+call    0 returned 1
+      101:  314:    for (int round = 0; round < 100; round++) {
+branch  0 taken 100
+branch  1 taken 1 (fallthrough)
+    10100:  315:        for (int i = 0; i < 100; i++) {
+branch  0 taken 10000
+branch  1 taken 100 (fallthrough)
+    10000:  316:            arena_mk_int(a, i + round);
+call    0 returned 10000
+        -:  317:        }
+      100:  318:        arena_reset(a);
+call    0 returned 100
+        -:  319:    }
+        1:  320:    arena_destroy(a);
+call    0 returned 1
+        1:  321:    PASS();
+call    0 returned 1
+        1:  322:}
+        -:  323:
+        -:  324:/* ========== Arena Edge Cases ========== */
+        -:  325:
+function test_arena_allocate_after_destroy_blocks called 1 returned 100% blocks executed 71%
+        1:  326:void test_arena_allocate_after_destroy_blocks(void) {
+        1:  327:    Arena* a = arena_create();
+call    0 returned 1
+        -:  328:    /* Force block creation */
+        1:  329:    int count = (ARENA_BLOCK_SIZE / sizeof(Obj)) + 10;
+      113:  330:    for (int i = 0; i < count; i++) {
+branch  0 taken 112
+branch  1 taken 1 (fallthrough)
+      112:  331:        arena_mk_int(a, i);
+call    0 returned 112
+        -:  332:    }
+        -:  333:    /* Reset and allocate again */
+        1:  334:    arena_reset(a);
+call    0 returned 1
+        1:  335:    Obj* x = arena_mk_int(a, 42);
+call    0 returned 1
+       1*:  336:    ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  337:    ASSERT_EQ(x->i, 42);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  338:    arena_destroy(a);
+call    0 returned 1
+        1:  339:    PASS();
+call    0 returned 1
+        -:  340:}
+        -:  341:
+function test_arena_large_allocation called 1 returned 100% blocks executed 82%
+        1:  342:void test_arena_large_allocation(void) {
+        1:  343:    Arena* a = arena_create();
+call    0 returned 1
+        -:  344:    /* Allocate many objects to trigger multiple block allocations */
+    50001:  345:    for (int i = 0; i < 50000; i++) {
+branch  0 taken 50000
+branch  1 taken 1 (fallthrough)
+    50000:  346:        Obj* x = arena_mk_int(a, i);
+call    0 returned 50000
+   50000*:  347:        ASSERT_NOT_NULL(x);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 50000
+call    2 never executed
+        -:  348:    }
+        1:  349:    arena_destroy(a);
+call    0 returned 1
+        1:  350:    PASS();
+call    0 returned 1
+        -:  351:}
+        -:  352:
+        -:  353:/* ========== Run All Arena Tests ========== */
+        -:  354:
+function run_arena_tests called 1 returned 100% blocks executed 62%
+        1:  355:void run_arena_tests(void) {
+        1:  356:    TEST_SUITE("Arena Allocator");
+call    0 returned 1
+        -:  357:
+        1:  358:    TEST_SECTION("Arena Creation");
+call    0 returned 1
+       1*:  359:    RUN_TEST(test_arena_create);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  360:    RUN_TEST(test_arena_destroy_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  361:    RUN_TEST(test_arena_destroy_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  362:
+        1:  363:    TEST_SECTION("Arena Allocation");
+call    0 returned 1
+       1*:  364:    RUN_TEST(test_arena_mk_int);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  365:    RUN_TEST(test_arena_mk_int_negative);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  366:    RUN_TEST(test_arena_mk_int_zero);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  367:    RUN_TEST(test_arena_mk_pair);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  368:    RUN_TEST(test_arena_mk_pair_null_car);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  369:    RUN_TEST(test_arena_mk_pair_null_cdr);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  370:    RUN_TEST(test_arena_mk_pair_both_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  371:
+        1:  372:    TEST_SECTION("Block Management");
+call    0 returned 1
+       1*:  373:    RUN_TEST(test_arena_multiple_allocations);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  374:    RUN_TEST(test_arena_block_creation);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  375:
+        1:  376:    TEST_SECTION("Arena Reset");
+call    0 returned 1
+       1*:  377:    RUN_TEST(test_arena_reset_empty);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  378:    RUN_TEST(test_arena_reset_with_data);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  379:    RUN_TEST(test_arena_reset_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  380:    RUN_TEST(test_arena_reset_multiple_times);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  381:
+        1:  382:    TEST_SECTION("External Pointers");
+call    0 returned 1
+       1*:  383:    RUN_TEST(test_arena_register_external);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  384:    RUN_TEST(test_arena_register_external_null_arena);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  385:    RUN_TEST(test_arena_register_external_null_ptr);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  386:    RUN_TEST(test_arena_multiple_externals);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  387:    RUN_TEST(test_arena_external_cleanup_on_reset);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  388:
+        1:  389:    TEST_SECTION("List Building");
+call    0 returned 1
+       1*:  390:    RUN_TEST(test_arena_build_list);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  391:    RUN_TEST(test_arena_nested_pairs);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  392:
+        1:  393:    TEST_SECTION("Stress Tests");
+call    0 returned 1
+       1*:  394:    RUN_TEST(test_arena_stress_many_ints);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  395:    RUN_TEST(test_arena_stress_many_pairs);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  396:    RUN_TEST(test_arena_stress_long_list);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  397:    RUN_TEST(test_arena_stress_deep_nesting);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  398:    RUN_TEST(test_arena_stress_reset_cycle);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  399:
+        1:  400:    TEST_SECTION("Edge Cases");
+call    0 returned 1
+       1*:  401:    RUN_TEST(test_arena_allocate_after_destroy_blocks);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  402:    RUN_TEST(test_arena_large_allocation);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        1:  403:}

@@ -1,0 +1,1670 @@
+        -:    0:Source:test_tagged_pointers.c
+        -:    0:Graph:./run_tests_cov-test_main.gcno
+        -:    0:Data:./run_tests_cov-test_main.gcda
+        -:    0:Runs:1
+        -:    1:/* test_tagged_pointers.c - Comprehensive tagged pointer tests */
+        -:    2:#include "test_framework.h"
+        -:    3:
+        -:    4:/* ========== Immediate Integer Tests ========== */
+        -:    5:
+function test_imm_int_positive called 1 returned 100% blocks executed 50%
+        1:    6:void test_imm_int_positive(void) {
+        1:    7:    Obj* x = mk_int_unboxed(42);
+call    0 returned 1
+       1*:    8:    ASSERT(IS_IMMEDIATE_INT(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:    9:    ASSERT_EQ(INT_IMM_VALUE(x), 42);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   10:    PASS();
+call    0 returned 1
+        -:   11:}
+        -:   12:
+function test_imm_int_negative called 1 returned 100% blocks executed 50%
+        1:   13:void test_imm_int_negative(void) {
+        1:   14:    Obj* x = mk_int_unboxed(-100);
+call    0 returned 1
+       1*:   15:    ASSERT(IS_IMMEDIATE_INT(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   16:    ASSERT_EQ(INT_IMM_VALUE(x), -100);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   17:    PASS();
+call    0 returned 1
+        -:   18:}
+        -:   19:
+function test_imm_int_zero called 1 returned 100% blocks executed 50%
+        1:   20:void test_imm_int_zero(void) {
+        1:   21:    Obj* x = mk_int_unboxed(0);
+call    0 returned 1
+       1*:   22:    ASSERT(IS_IMMEDIATE_INT(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   23:    ASSERT_EQ(INT_IMM_VALUE(x), 0);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   24:    PASS();
+call    0 returned 1
+        -:   25:}
+        -:   26:
+function test_imm_int_large_positive called 1 returned 100% blocks executed 50%
+        1:   27:void test_imm_int_large_positive(void) {
+        1:   28:    long large = (1L << 60) - 1;  /* Large but fits in 61 bits */
+        1:   29:    Obj* x = mk_int_unboxed(large);
+call    0 returned 1
+       1*:   30:    ASSERT(IS_IMMEDIATE_INT(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   31:    ASSERT_EQ(INT_IMM_VALUE(x), large);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   32:    PASS();
+call    0 returned 1
+        -:   33:}
+        -:   34:
+function test_imm_int_large_negative called 1 returned 100% blocks executed 50%
+        1:   35:void test_imm_int_large_negative(void) {
+        1:   36:    long large_neg = -(1L << 60) + 1;
+        1:   37:    Obj* x = mk_int_unboxed(large_neg);
+call    0 returned 1
+       1*:   38:    ASSERT(IS_IMMEDIATE_INT(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   39:    ASSERT_EQ(INT_IMM_VALUE(x), large_neg);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   40:    PASS();
+call    0 returned 1
+        -:   41:}
+        -:   42:
+function test_imm_int_range_stress called 1 returned 100% blocks executed 60%
+        1:   43:void test_imm_int_range_stress(void) {
+        -:   44:    /* Test various values across the range */
+        1:   45:    long values[] = {-1000000, -1, 0, 1, 1000000, 12345678};
+        7:   46:    for (int i = 0; i < 6; i++) {
+branch  0 taken 6
+branch  1 taken 1 (fallthrough)
+        6:   47:        Obj* x = mk_int_unboxed(values[i]);
+call    0 returned 6
+       6*:   48:        ASSERT(IS_IMMEDIATE_INT(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 6
+call    2 never executed
+       6*:   49:        ASSERT_EQ(INT_IMM_VALUE(x), values[i]);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 6
+call    2 never executed
+        -:   50:    }
+        1:   51:    PASS();
+call    0 returned 1
+        -:   52:}
+        -:   53:
+        -:   54:/* ========== Immediate Boolean Tests ========== */
+        -:   55:
+function test_imm_bool_true called 1 returned 100% blocks executed 71%
+        1:   56:void test_imm_bool_true(void) {
+        -:   57:    ASSERT(IS_IMMEDIATE_BOOL(PURPLE_TRUE));
+       1*:   58:    ASSERT(obj_to_bool(PURPLE_TRUE) == 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:   59:    PASS();
+call    0 returned 1
+        -:   60:}
+        -:   61:
+function test_imm_bool_false called 1 returned 100% blocks executed 71%
+        1:   62:void test_imm_bool_false(void) {
+        -:   63:    ASSERT(IS_IMMEDIATE_BOOL(PURPLE_FALSE));
+       1*:   64:    ASSERT(obj_to_bool(PURPLE_FALSE) == 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:   65:    PASS();
+call    0 returned 1
+        -:   66:}
+        -:   67:
+function test_imm_bool_distinct called 1 returned 100% blocks executed 100%
+        1:   68:void test_imm_bool_distinct(void) {
+        -:   69:    ASSERT(PURPLE_TRUE != PURPLE_FALSE);
+        1:   70:    PASS();
+call    0 returned 1
+        -:   71:}
+        -:   72:
+function test_mk_bool called 1 returned 100% blocks executed 56%
+        1:   73:void test_mk_bool(void) {
+       1*:   74:    ASSERT(mk_bool(1) == PURPLE_TRUE);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+       1*:   75:    ASSERT(mk_bool(0) == PURPLE_FALSE);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+       1*:   76:    ASSERT(mk_bool(100) == PURPLE_TRUE);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+       1*:   77:    ASSERT(mk_bool(-1) == PURPLE_TRUE);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:   78:    PASS();
+call    0 returned 1
+        -:   79:}
+        -:   80:
+        -:   81:/* ========== Immediate Character Tests ========== */
+        -:   82:
+function test_imm_char_ascii called 1 returned 100% blocks executed 50%
+        1:   83:void test_imm_char_ascii(void) {
+        1:   84:    Obj* c = mk_char_unboxed('A');
+call    0 returned 1
+       1*:   85:    ASSERT(IS_IMMEDIATE_CHAR(c));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   86:    ASSERT_EQ(CHAR_IMM_VALUE(c), 'A');
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   87:    PASS();
+call    0 returned 1
+        -:   88:}
+        -:   89:
+function test_imm_char_zero called 1 returned 100% blocks executed 50%
+        1:   90:void test_imm_char_zero(void) {
+        1:   91:    Obj* c = mk_char_unboxed(0);
+call    0 returned 1
+       1*:   92:    ASSERT(IS_IMMEDIATE_CHAR(c));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   93:    ASSERT_EQ(CHAR_IMM_VALUE(c), 0);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   94:    PASS();
+call    0 returned 1
+        -:   95:}
+        -:   96:
+function test_imm_char_unicode_basic called 1 returned 100% blocks executed 50%
+        1:   97:void test_imm_char_unicode_basic(void) {
+        1:   98:    Obj* c = mk_char_unboxed(0x03B1);  /* Greek alpha */
+call    0 returned 1
+       1*:   99:    ASSERT(IS_IMMEDIATE_CHAR(c));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  100:    ASSERT_EQ(CHAR_IMM_VALUE(c), 0x03B1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  101:    PASS();
+call    0 returned 1
+        -:  102:}
+        -:  103:
+function test_imm_char_unicode_emoji called 1 returned 100% blocks executed 50%
+        1:  104:void test_imm_char_unicode_emoji(void) {
+        1:  105:    Obj* c = mk_char_unboxed(0x1F600);  /* Emoji */
+call    0 returned 1
+       1*:  106:    ASSERT(IS_IMMEDIATE_CHAR(c));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  107:    ASSERT_EQ(CHAR_IMM_VALUE(c), 0x1F600);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  108:    PASS();
+call    0 returned 1
+        -:  109:}
+        -:  110:
+function test_imm_char_max_unicode called 1 returned 100% blocks executed 50%
+        1:  111:void test_imm_char_max_unicode(void) {
+        1:  112:    Obj* c = mk_char_unboxed(0x10FFFF);  /* Max unicode */
+call    0 returned 1
+       1*:  113:    ASSERT(IS_IMMEDIATE_CHAR(c));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  114:    ASSERT_EQ(CHAR_IMM_VALUE(c), 0x10FFFF);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  115:    PASS();
+call    0 returned 1
+        -:  116:}
+        -:  117:
+        -:  118:/* ========== Tag Detection Tests ========== */
+        -:  119:
+function test_tag_detection_int called 1 returned 100% blocks executed 42%
+        1:  120:void test_tag_detection_int(void) {
+        1:  121:    Obj* x = mk_int_unboxed(42);
+call    0 returned 1
+       1*:  122:    ASSERT(IS_IMMEDIATE(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  123:    ASSERT(IS_IMMEDIATE_INT(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  124:    ASSERT(!IS_IMMEDIATE_CHAR(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  125:    ASSERT(!IS_IMMEDIATE_BOOL(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  126:    ASSERT(!IS_BOXED(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+branch  2 never executed (fallthrough)
+branch  3 never executed
+call    4 never executed
+        1:  127:    PASS();
+call    0 returned 1
+        -:  128:}
+        -:  129:
+function test_tag_detection_char called 1 returned 100% blocks executed 42%
+        1:  130:void test_tag_detection_char(void) {
+        1:  131:    Obj* x = mk_char_unboxed('Z');
+call    0 returned 1
+       1*:  132:    ASSERT(IS_IMMEDIATE(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  133:    ASSERT(IS_IMMEDIATE_CHAR(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  134:    ASSERT(!IS_IMMEDIATE_INT(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  135:    ASSERT(!IS_IMMEDIATE_BOOL(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  136:    ASSERT(!IS_BOXED(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+branch  2 never executed (fallthrough)
+branch  3 never executed
+call    4 never executed
+        1:  137:    PASS();
+call    0 returned 1
+        -:  138:}
+        -:  139:
+function test_tag_detection_bool called 1 returned 100% blocks executed 100%
+        1:  140:void test_tag_detection_bool(void) {
+        -:  141:    ASSERT(IS_IMMEDIATE(PURPLE_TRUE));
+        -:  142:    ASSERT(IS_IMMEDIATE_BOOL(PURPLE_TRUE));
+        -:  143:    ASSERT(!IS_IMMEDIATE_INT(PURPLE_TRUE));
+        -:  144:    ASSERT(!IS_IMMEDIATE_CHAR(PURPLE_TRUE));
+        -:  145:    ASSERT(!IS_BOXED(PURPLE_TRUE));
+        1:  146:    PASS();
+call    0 returned 1
+        -:  147:}
+        -:  148:
+function test_tag_detection_boxed called 1 returned 100% blocks executed 57%
+        1:  149:void test_tag_detection_boxed(void) {
+        1:  150:    Obj* x = mk_int(42);
+call    0 returned 1
+       1*:  151:    ASSERT(!IS_IMMEDIATE(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  152:    ASSERT(IS_BOXED(x));
+branch  0 taken 1 (fallthrough)
+branch  1 taken 0
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+call    4 never executed
+       1*:  153:    ASSERT(!IS_IMMEDIATE_INT(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  154:    dec_ref(x);
+call    0 returned 1
+        1:  155:    PASS();
+call    0 returned 1
+        -:  156:}
+        -:  157:
+function test_tag_detection_null called 1 returned 100% blocks executed 100%
+        1:  158:void test_tag_detection_null(void) {
+        -:  159:    ASSERT(!IS_IMMEDIATE(NULL));
+        -:  160:    ASSERT(!IS_BOXED(NULL));
+        1:  161:    PASS();
+call    0 returned 1
+        -:  162:}
+        -:  163:
+        -:  164:/* ========== obj_to_int Tests ========== */
+        -:  165:
+function test_obj_to_int_immediate called 1 returned 100% blocks executed 56%
+        1:  166:void test_obj_to_int_immediate(void) {
+        1:  167:    Obj* x = mk_int_unboxed(999);
+call    0 returned 1
+       1*:  168:    ASSERT_EQ(obj_to_int(x), 999);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  169:    PASS();
+call    0 returned 1
+        -:  170:}
+        -:  171:
+function test_obj_to_int_boxed called 1 returned 100% blocks executed 60%
+        1:  172:void test_obj_to_int_boxed(void) {
+        1:  173:    Obj* x = mk_int(888);
+call    0 returned 1
+       1*:  174:    ASSERT_EQ(obj_to_int(x), 888);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  175:    dec_ref(x);
+call    0 returned 1
+        1:  176:    PASS();
+call    0 returned 1
+        -:  177:}
+        -:  178:
+function test_obj_to_int_bool_true called 1 returned 100% blocks executed 50%
+        1:  179:void test_obj_to_int_bool_true(void) {
+       1*:  180:    ASSERT_EQ(obj_to_int(PURPLE_TRUE), 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  181:    PASS();
+call    0 returned 1
+        -:  182:}
+        -:  183:
+function test_obj_to_int_bool_false called 1 returned 100% blocks executed 50%
+        1:  184:void test_obj_to_int_bool_false(void) {
+       1*:  185:    ASSERT_EQ(obj_to_int(PURPLE_FALSE), 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  186:    PASS();
+call    0 returned 1
+        -:  187:}
+        -:  188:
+function test_obj_to_int_char called 1 returned 100% blocks executed 56%
+        1:  189:void test_obj_to_int_char(void) {
+        1:  190:    Obj* c = mk_char_unboxed('X');
+call    0 returned 1
+       1*:  191:    ASSERT_EQ(obj_to_int(c), 'X');
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  192:    PASS();
+call    0 returned 1
+        -:  193:}
+        -:  194:
+function test_obj_to_int_null called 1 returned 100% blocks executed 50%
+        1:  195:void test_obj_to_int_null(void) {
+       1*:  196:    ASSERT_EQ(obj_to_int(NULL), 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  197:    PASS();
+call    0 returned 1
+        -:  198:}
+        -:  199:
+        -:  200:/* ========== obj_to_bool Tests ========== */
+        -:  201:
+function test_obj_to_bool_true called 1 returned 100% blocks executed 50%
+        1:  202:void test_obj_to_bool_true(void) {
+       1*:  203:    ASSERT_EQ(obj_to_bool(PURPLE_TRUE), 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  204:    PASS();
+call    0 returned 1
+        -:  205:}
+        -:  206:
+function test_obj_to_bool_false called 1 returned 100% blocks executed 50%
+        1:  207:void test_obj_to_bool_false(void) {
+       1*:  208:    ASSERT_EQ(obj_to_bool(PURPLE_FALSE), 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  209:    PASS();
+call    0 returned 1
+        -:  210:}
+        -:  211:
+function test_obj_to_bool_int_nonzero called 1 returned 100% blocks executed 56%
+        1:  212:void test_obj_to_bool_int_nonzero(void) {
+        1:  213:    Obj* x = mk_int_unboxed(42);
+call    0 returned 1
+       1*:  214:    ASSERT_EQ(obj_to_bool(x), 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  215:    PASS();
+call    0 returned 1
+        -:  216:}
+        -:  217:
+function test_obj_to_bool_int_zero called 1 returned 100% blocks executed 56%
+        1:  218:void test_obj_to_bool_int_zero(void) {
+        1:  219:    Obj* x = mk_int_unboxed(0);
+call    0 returned 1
+       1*:  220:    ASSERT_EQ(obj_to_bool(x), 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  221:    PASS();
+call    0 returned 1
+        -:  222:}
+        -:  223:
+function test_obj_to_bool_null called 1 returned 100% blocks executed 50%
+        1:  224:void test_obj_to_bool_null(void) {
+       1*:  225:    ASSERT_EQ(obj_to_bool(NULL), 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  226:    PASS();
+call    0 returned 1
+        -:  227:}
+        -:  228:
+function test_obj_to_bool_boxed called 1 returned 100% blocks executed 60%
+        1:  229:void test_obj_to_bool_boxed(void) {
+        1:  230:    Obj* x = mk_int(1);
+call    0 returned 1
+       1*:  231:    ASSERT_EQ(obj_to_bool(x), 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  232:    dec_ref(x);
+call    0 returned 1
+        1:  233:    PASS();
+call    0 returned 1
+        -:  234:}
+        -:  235:
+        -:  236:/* ========== obj_tag Tests ========== */
+        -:  237:
+function test_obj_tag_null called 1 returned 100% blocks executed 50%
+        1:  238:void test_obj_tag_null(void) {
+       1*:  239:    ASSERT_EQ(obj_tag(NULL), 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  240:    PASS();
+call    0 returned 1
+        -:  241:}
+        -:  242:
+function test_obj_tag_imm_int called 1 returned 100% blocks executed 56%
+        1:  243:void test_obj_tag_imm_int(void) {
+        1:  244:    Obj* x = mk_int_unboxed(5);
+call    0 returned 1
+       1*:  245:    ASSERT_EQ(obj_tag(x), TAG_INT);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  246:    PASS();
+call    0 returned 1
+        -:  247:}
+        -:  248:
+function test_obj_tag_imm_char called 1 returned 100% blocks executed 56%
+        1:  249:void test_obj_tag_imm_char(void) {
+        1:  250:    Obj* x = mk_char_unboxed('Q');
+call    0 returned 1
+       1*:  251:    ASSERT_EQ(obj_tag(x), TAG_CHAR);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  252:    PASS();
+call    0 returned 1
+        -:  253:}
+        -:  254:
+function test_obj_tag_imm_bool called 1 returned 100% blocks executed 50%
+        1:  255:void test_obj_tag_imm_bool(void) {
+       1*:  256:    ASSERT_EQ(obj_tag(PURPLE_TRUE), TAG_INT);  /* Bools treated as int-like */
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  257:    PASS();
+call    0 returned 1
+        -:  258:}
+        -:  259:
+function test_obj_tag_boxed_int called 1 returned 100% blocks executed 60%
+        1:  260:void test_obj_tag_boxed_int(void) {
+        1:  261:    Obj* x = mk_int(7);
+call    0 returned 1
+       1*:  262:    ASSERT_EQ(obj_tag(x), TAG_INT);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  263:    dec_ref(x);
+call    0 returned 1
+        1:  264:    PASS();
+call    0 returned 1
+        -:  265:}
+        -:  266:
+function test_obj_tag_boxed_float called 1 returned 100% blocks executed 60%
+        1:  267:void test_obj_tag_boxed_float(void) {
+        1:  268:    Obj* x = mk_float(3.14);
+call    0 returned 1
+       1*:  269:    ASSERT_EQ(obj_tag(x), TAG_FLOAT);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  270:    dec_ref(x);
+call    0 returned 1
+        1:  271:    PASS();
+call    0 returned 1
+        -:  272:}
+        -:  273:
+function test_obj_tag_pair called 1 returned 100% blocks executed 67%
+        1:  274:void test_obj_tag_pair(void) {
+        1:  275:    Obj* p = mk_pair(mk_int_unboxed(1), mk_int_unboxed(2));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+       1*:  276:    ASSERT_EQ(obj_tag(p), TAG_PAIR);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  277:    dec_ref(p);
+call    0 returned 1
+        1:  278:    PASS();
+call    0 returned 1
+        -:  279:}
+        -:  280:
+        -:  281:/* ========== is_int Tests ========== */
+        -:  282:
+function test_is_int_immediate called 1 returned 100% blocks executed 71%
+        1:  283:void test_is_int_immediate(void) {
+        1:  284:    Obj* x = mk_int_unboxed(42);
+call    0 returned 1
+       1*:  285:    ASSERT(is_int(x));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  286:    PASS();
+call    0 returned 1
+        -:  287:}
+        -:  288:
+function test_is_int_boxed called 1 returned 100% blocks executed 75%
+        1:  289:void test_is_int_boxed(void) {
+        1:  290:    Obj* x = mk_int(42);
+call    0 returned 1
+       1*:  291:    ASSERT(is_int(x));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  292:    dec_ref(x);
+call    0 returned 1
+        1:  293:    PASS();
+call    0 returned 1
+        -:  294:}
+        -:  295:
+function test_is_int_bool called 1 returned 100% blocks executed 60%
+        1:  296:void test_is_int_bool(void) {
+       1*:  297:    ASSERT(is_int(PURPLE_TRUE));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+       1*:  298:    ASSERT(is_int(PURPLE_FALSE));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  299:    PASS();
+call    0 returned 1
+        -:  300:}
+        -:  301:
+function test_is_int_char called 1 returned 100% blocks executed 71%
+        1:  302:void test_is_int_char(void) {
+        1:  303:    Obj* c = mk_char_unboxed('A');
+call    0 returned 1
+       1*:  304:    ASSERT(!is_int(c));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  305:    PASS();
+call    0 returned 1
+        -:  306:}
+        -:  307:
+function test_is_int_float called 1 returned 100% blocks executed 75%
+        1:  308:void test_is_int_float(void) {
+        1:  309:    Obj* f = mk_float(3.14);
+call    0 returned 1
+       1*:  310:    ASSERT(!is_int(f));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  311:    dec_ref(f);
+call    0 returned 1
+        1:  312:    PASS();
+call    0 returned 1
+        -:  313:}
+        -:  314:
+function test_is_int_null called 1 returned 100% blocks executed 67%
+        1:  315:void test_is_int_null(void) {
+       1*:  316:    ASSERT(!is_int(NULL));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  317:    PASS();
+call    0 returned 1
+        -:  318:}
+        -:  319:
+        -:  320:/* ========== is_char Tests ========== */
+        -:  321:
+function test_is_char_immediate called 1 returned 100% blocks executed 71%
+        1:  322:void test_is_char_immediate(void) {
+        1:  323:    Obj* c = mk_char_unboxed('A');
+call    0 returned 1
+       1*:  324:    ASSERT(is_char(c));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  325:    PASS();
+call    0 returned 1
+        -:  326:}
+        -:  327:
+function test_is_char_int called 1 returned 100% blocks executed 71%
+        1:  328:void test_is_char_int(void) {
+        1:  329:    Obj* x = mk_int_unboxed(65);
+call    0 returned 1
+       1*:  330:    ASSERT(!is_char(x));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  331:    PASS();
+call    0 returned 1
+        -:  332:}
+        -:  333:
+function test_is_char_null called 1 returned 100% blocks executed 67%
+        1:  334:void test_is_char_null(void) {
+       1*:  335:    ASSERT(!is_char(NULL));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  336:    PASS();
+call    0 returned 1
+        -:  337:}
+        -:  338:
+        -:  339:/* ========== Arithmetic with Immediates ========== */
+        -:  340:
+function test_add_immediates called 1 returned 100% blocks executed 57%
+        1:  341:void test_add_immediates(void) {
+        1:  342:    Obj* a = mk_int_unboxed(10);
+call    0 returned 1
+        1:  343:    Obj* b = mk_int_unboxed(20);
+call    0 returned 1
+        1:  344:    Obj* result = add(a, b);
+call    0 returned 1
+       1*:  345:    ASSERT(IS_IMMEDIATE_INT(result));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  346:    ASSERT_EQ(obj_to_int(result), 30);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  347:    PASS();
+call    0 returned 1
+        -:  348:}
+        -:  349:
+function test_sub_immediates called 1 returned 100% blocks executed 57%
+        1:  350:void test_sub_immediates(void) {
+        1:  351:    Obj* a = mk_int_unboxed(50);
+call    0 returned 1
+        1:  352:    Obj* b = mk_int_unboxed(30);
+call    0 returned 1
+        1:  353:    Obj* result = sub(a, b);
+call    0 returned 1
+       1*:  354:    ASSERT(IS_IMMEDIATE_INT(result));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  355:    ASSERT_EQ(obj_to_int(result), 20);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  356:    PASS();
+call    0 returned 1
+        -:  357:}
+        -:  358:
+function test_mul_immediates called 1 returned 100% blocks executed 57%
+        1:  359:void test_mul_immediates(void) {
+        1:  360:    Obj* a = mk_int_unboxed(7);
+call    0 returned 1
+        1:  361:    Obj* b = mk_int_unboxed(6);
+call    0 returned 1
+        1:  362:    Obj* result = mul(a, b);
+call    0 returned 1
+       1*:  363:    ASSERT(IS_IMMEDIATE_INT(result));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  364:    ASSERT_EQ(obj_to_int(result), 42);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  365:    PASS();
+call    0 returned 1
+        -:  366:}
+        -:  367:
+function test_div_immediates called 1 returned 100% blocks executed 57%
+        1:  368:void test_div_immediates(void) {
+        1:  369:    Obj* a = mk_int_unboxed(100);
+call    0 returned 1
+        1:  370:    Obj* b = mk_int_unboxed(10);
+call    0 returned 1
+        1:  371:    Obj* result = div_op(a, b);
+call    0 returned 1
+       1*:  372:    ASSERT(IS_IMMEDIATE_INT(result));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  373:    ASSERT_EQ(obj_to_int(result), 10);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  374:    PASS();
+call    0 returned 1
+        -:  375:}
+        -:  376:
+function test_mod_immediates called 1 returned 100% blocks executed 57%
+        1:  377:void test_mod_immediates(void) {
+        1:  378:    Obj* a = mk_int_unboxed(17);
+call    0 returned 1
+        1:  379:    Obj* b = mk_int_unboxed(5);
+call    0 returned 1
+        1:  380:    Obj* result = mod_op(a, b);
+call    0 returned 1
+       1*:  381:    ASSERT(IS_IMMEDIATE_INT(result));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  382:    ASSERT_EQ(obj_to_int(result), 2);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  383:    PASS();
+call    0 returned 1
+        -:  384:}
+        -:  385:
+function test_add_mixed_imm_boxed called 1 returned 100% blocks executed 60%
+        1:  386:void test_add_mixed_imm_boxed(void) {
+        1:  387:    Obj* a = mk_int_unboxed(10);
+call    0 returned 1
+        1:  388:    Obj* b = mk_int(20);
+call    0 returned 1
+        1:  389:    Obj* result = add(a, b);
+call    0 returned 1
+       1*:  390:    ASSERT(IS_IMMEDIATE_INT(result));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  391:    ASSERT_EQ(obj_to_int(result), 30);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  392:    dec_ref(b);
+call    0 returned 1
+        1:  393:    PASS();
+call    0 returned 1
+        -:  394:}
+        -:  395:
+        -:  396:/* ========== Comparison with Immediates ========== */
+        -:  397:
+function test_lt_immediates called 1 returned 100% blocks executed 78%
+        1:  398:void test_lt_immediates(void) {
+        1:  399:    Obj* a = mk_int_unboxed(5);
+call    0 returned 1
+        1:  400:    Obj* b = mk_int_unboxed(10);
+call    0 returned 1
+        1:  401:    Obj* result = lt_op(a, b);
+call    0 returned 1
+       1*:  402:    ASSERT(obj_to_bool(result) == 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  403:    PASS();
+call    0 returned 1
+        -:  404:}
+        -:  405:
+function test_gt_immediates called 1 returned 100% blocks executed 78%
+        1:  406:void test_gt_immediates(void) {
+        1:  407:    Obj* a = mk_int_unboxed(10);
+call    0 returned 1
+        1:  408:    Obj* b = mk_int_unboxed(5);
+call    0 returned 1
+        1:  409:    Obj* result = gt_op(a, b);
+call    0 returned 1
+       1*:  410:    ASSERT(obj_to_bool(result) == 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  411:    PASS();
+call    0 returned 1
+        -:  412:}
+        -:  413:
+function test_eq_immediates called 1 returned 100% blocks executed 78%
+        1:  414:void test_eq_immediates(void) {
+        1:  415:    Obj* a = mk_int_unboxed(42);
+call    0 returned 1
+        1:  416:    Obj* b = mk_int_unboxed(42);
+call    0 returned 1
+        1:  417:    Obj* result = eq_op(a, b);
+call    0 returned 1
+       1*:  418:    ASSERT(obj_to_bool(result) == 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  419:    PASS();
+call    0 returned 1
+        -:  420:}
+        -:  421:
+function test_le_immediates called 1 returned 100% blocks executed 78%
+        1:  422:void test_le_immediates(void) {
+        1:  423:    Obj* a = mk_int_unboxed(5);
+call    0 returned 1
+        1:  424:    Obj* b = mk_int_unboxed(5);
+call    0 returned 1
+        1:  425:    Obj* result = le_op(a, b);
+call    0 returned 1
+       1*:  426:    ASSERT(obj_to_bool(result) == 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  427:    PASS();
+call    0 returned 1
+        -:  428:}
+        -:  429:
+function test_ge_immediates called 1 returned 100% blocks executed 78%
+        1:  430:void test_ge_immediates(void) {
+        1:  431:    Obj* a = mk_int_unboxed(10);
+call    0 returned 1
+        1:  432:    Obj* b = mk_int_unboxed(5);
+call    0 returned 1
+        1:  433:    Obj* result = ge_op(a, b);
+call    0 returned 1
+       1*:  434:    ASSERT(obj_to_bool(result) == 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  435:    PASS();
+call    0 returned 1
+        -:  436:}
+        -:  437:
+        -:  438:/* ========== Reference Counting with Immediates ========== */
+        -:  439:
+function test_inc_ref_immediate called 1 returned 100% blocks executed 62%
+        1:  440:void test_inc_ref_immediate(void) {
+        1:  441:    Obj* x = mk_int_unboxed(42);
+call    0 returned 1
+        1:  442:    inc_ref(x);  /* Should be no-op */
+call    0 returned 1
+       1*:  443:    ASSERT_EQ(INT_IMM_VALUE(x), 42);  /* Still valid */
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  444:    PASS();
+call    0 returned 1
+        -:  445:}
+        -:  446:
+function test_dec_ref_immediate called 1 returned 100% blocks executed 62%
+        1:  447:void test_dec_ref_immediate(void) {
+        1:  448:    Obj* x = mk_int_unboxed(42);
+call    0 returned 1
+        1:  449:    dec_ref(x);  /* Should be no-op */
+call    0 returned 1
+       1*:  450:    ASSERT_EQ(INT_IMM_VALUE(x), 42);  /* Still valid */
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  451:    PASS();
+call    0 returned 1
+        -:  452:}
+        -:  453:
+function test_free_obj_immediate called 1 returned 100% blocks executed 62%
+        1:  454:void test_free_obj_immediate(void) {
+        1:  455:    Obj* x = mk_int_unboxed(42);
+call    0 returned 1
+        1:  456:    free_obj(x);  /* Should be no-op */
+call    0 returned 1
+       1*:  457:    ASSERT_EQ(INT_IMM_VALUE(x), 42);  /* Still valid */
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  458:    PASS();
+call    0 returned 1
+        -:  459:}
+        -:  460:
+function test_free_unique_immediate called 1 returned 100% blocks executed 62%
+        1:  461:void test_free_unique_immediate(void) {
+        1:  462:    Obj* x = mk_int_unboxed(42);
+call    0 returned 1
+        1:  463:    free_unique(x);  /* Should be no-op */
+call    0 returned 1
+       1*:  464:    ASSERT_EQ(INT_IMM_VALUE(x), 42);  /* Still valid */
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  465:    PASS();
+call    0 returned 1
+        -:  466:}
+        -:  467:
+        -:  468:/* ========== Stress Tests ========== */
+        -:  469:
+function test_tagged_stress_many_ints called 1 returned 100% blocks executed 62%
+        1:  470:void test_tagged_stress_many_ints(void) {
+    10001:  471:    for (int i = 0; i < 10000; i++) {
+branch  0 taken 10000
+branch  1 taken 1 (fallthrough)
+    10000:  472:        Obj* x = mk_int_unboxed(i);
+call    0 returned 10000
+   10000*:  473:        ASSERT(IS_IMMEDIATE_INT(x));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 10000
+call    2 never executed
+   10000*:  474:        ASSERT_EQ(INT_IMM_VALUE(x), i);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 10000
+call    2 never executed
+        -:  475:    }
+        1:  476:    PASS();
+call    0 returned 1
+        -:  477:}
+        -:  478:
+function test_tagged_stress_mixed_ops called 1 returned 100% blocks executed 71%
+        1:  479:void test_tagged_stress_mixed_ops(void) {
+     1001:  480:    for (int i = 0; i < 1000; i++) {
+branch  0 taken 1000
+branch  1 taken 1 (fallthrough)
+     1000:  481:        Obj* a = mk_int_unboxed(i);
+call    0 returned 1000
+     1000:  482:        Obj* b = mk_int_unboxed(i + 1);
+call    0 returned 1000
+     1000:  483:        Obj* sum = add(a, b);
+call    0 returned 1000
+    1000*:  484:        ASSERT_EQ(obj_to_int(sum), 2 * i + 1);
+call    0 returned 1000
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1000
+call    3 never executed
+call    4 never executed
+        -:  485:    }
+        1:  486:    PASS();
+call    0 returned 1
+        -:  487:}
+        -:  488:
+function test_tagged_stress_chars called 1 returned 100% blocks executed 62%
+        1:  489:void test_tagged_stress_chars(void) {
+      129:  490:    for (int i = 0; i < 128; i++) {
+branch  0 taken 128
+branch  1 taken 1 (fallthrough)
+      128:  491:        Obj* c = mk_char_unboxed(i);
+call    0 returned 128
+     128*:  492:        ASSERT(IS_IMMEDIATE_CHAR(c));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 128
+call    2 never executed
+     128*:  493:        ASSERT_EQ(CHAR_IMM_VALUE(c), i);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 128
+call    2 never executed
+        -:  494:    }
+        1:  495:    PASS();
+call    0 returned 1
+        -:  496:}
+        -:  497:
+        -:  498:/* ========== Run All Tagged Pointer Tests ========== */
+        -:  499:
+function run_tagged_pointer_tests called 1 returned 100% blocks executed 62%
+        1:  500:void run_tagged_pointer_tests(void) {
+        1:  501:    TEST_SUITE("Tagged Pointers");
+call    0 returned 1
+        -:  502:
+        1:  503:    TEST_SECTION("Immediate Integers");
+call    0 returned 1
+       1*:  504:    RUN_TEST(test_imm_int_positive);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  505:    RUN_TEST(test_imm_int_negative);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  506:    RUN_TEST(test_imm_int_zero);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  507:    RUN_TEST(test_imm_int_large_positive);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  508:    RUN_TEST(test_imm_int_large_negative);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  509:    RUN_TEST(test_imm_int_range_stress);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  510:
+        1:  511:    TEST_SECTION("Immediate Booleans");
+call    0 returned 1
+       1*:  512:    RUN_TEST(test_imm_bool_true);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  513:    RUN_TEST(test_imm_bool_false);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  514:    RUN_TEST(test_imm_bool_distinct);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  515:    RUN_TEST(test_mk_bool);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  516:
+        1:  517:    TEST_SECTION("Immediate Characters");
+call    0 returned 1
+       1*:  518:    RUN_TEST(test_imm_char_ascii);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  519:    RUN_TEST(test_imm_char_zero);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  520:    RUN_TEST(test_imm_char_unicode_basic);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  521:    RUN_TEST(test_imm_char_unicode_emoji);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  522:    RUN_TEST(test_imm_char_max_unicode);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  523:
+        1:  524:    TEST_SECTION("Tag Detection");
+call    0 returned 1
+       1*:  525:    RUN_TEST(test_tag_detection_int);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  526:    RUN_TEST(test_tag_detection_char);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  527:    RUN_TEST(test_tag_detection_bool);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  528:    RUN_TEST(test_tag_detection_boxed);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  529:    RUN_TEST(test_tag_detection_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  530:
+        1:  531:    TEST_SECTION("obj_to_int");
+call    0 returned 1
+       1*:  532:    RUN_TEST(test_obj_to_int_immediate);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  533:    RUN_TEST(test_obj_to_int_boxed);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  534:    RUN_TEST(test_obj_to_int_bool_true);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  535:    RUN_TEST(test_obj_to_int_bool_false);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  536:    RUN_TEST(test_obj_to_int_char);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  537:    RUN_TEST(test_obj_to_int_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  538:
+        1:  539:    TEST_SECTION("obj_to_bool");
+call    0 returned 1
+       1*:  540:    RUN_TEST(test_obj_to_bool_true);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  541:    RUN_TEST(test_obj_to_bool_false);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  542:    RUN_TEST(test_obj_to_bool_int_nonzero);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  543:    RUN_TEST(test_obj_to_bool_int_zero);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  544:    RUN_TEST(test_obj_to_bool_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  545:    RUN_TEST(test_obj_to_bool_boxed);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  546:
+        1:  547:    TEST_SECTION("obj_tag");
+call    0 returned 1
+       1*:  548:    RUN_TEST(test_obj_tag_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  549:    RUN_TEST(test_obj_tag_imm_int);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  550:    RUN_TEST(test_obj_tag_imm_char);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  551:    RUN_TEST(test_obj_tag_imm_bool);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  552:    RUN_TEST(test_obj_tag_boxed_int);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  553:    RUN_TEST(test_obj_tag_boxed_float);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  554:    RUN_TEST(test_obj_tag_pair);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  555:
+        1:  556:    TEST_SECTION("is_int");
+call    0 returned 1
+       1*:  557:    RUN_TEST(test_is_int_immediate);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  558:    RUN_TEST(test_is_int_boxed);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  559:    RUN_TEST(test_is_int_bool);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  560:    RUN_TEST(test_is_int_char);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  561:    RUN_TEST(test_is_int_float);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  562:    RUN_TEST(test_is_int_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  563:
+        1:  564:    TEST_SECTION("is_char");
+call    0 returned 1
+       1*:  565:    RUN_TEST(test_is_char_immediate);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  566:    RUN_TEST(test_is_char_int);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  567:    RUN_TEST(test_is_char_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  568:
+        1:  569:    TEST_SECTION("Arithmetic with Immediates");
+call    0 returned 1
+       1*:  570:    RUN_TEST(test_add_immediates);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  571:    RUN_TEST(test_sub_immediates);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  572:    RUN_TEST(test_mul_immediates);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  573:    RUN_TEST(test_div_immediates);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  574:    RUN_TEST(test_mod_immediates);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  575:    RUN_TEST(test_add_mixed_imm_boxed);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  576:
+        1:  577:    TEST_SECTION("Comparison with Immediates");
+call    0 returned 1
+       1*:  578:    RUN_TEST(test_lt_immediates);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  579:    RUN_TEST(test_gt_immediates);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  580:    RUN_TEST(test_eq_immediates);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  581:    RUN_TEST(test_le_immediates);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  582:    RUN_TEST(test_ge_immediates);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  583:
+        1:  584:    TEST_SECTION("Reference Counting with Immediates");
+call    0 returned 1
+       1*:  585:    RUN_TEST(test_inc_ref_immediate);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  586:    RUN_TEST(test_dec_ref_immediate);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  587:    RUN_TEST(test_free_obj_immediate);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  588:    RUN_TEST(test_free_unique_immediate);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  589:
+        1:  590:    TEST_SECTION("Stress Tests");
+call    0 returned 1
+       1*:  591:    RUN_TEST(test_tagged_stress_many_ints);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  592:    RUN_TEST(test_tagged_stress_mixed_ops);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  593:    RUN_TEST(test_tagged_stress_chars);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        1:  594:}

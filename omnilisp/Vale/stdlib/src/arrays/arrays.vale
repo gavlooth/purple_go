@@ -1,0 +1,98 @@
+
+func each<M Mutability, V Variability, N Int, T, F>(arr &[#N]<M, V>T, func &F) void
+where func(&F,&T)void {
+  i = 0;
+  l = len(&arr);
+  while (i < l) {
+    func(arr[i]);
+    set i = i + 1;
+  }
+}
+
+func eachI<M Mutability, V Variability, N Int, T, F>(arr &[#N]<M, V>T, func F) void
+where func drop(F)void, func(&F,int,&T)void {
+  i = 0;
+  l = len(&arr);
+  while (i < l) {
+    func(i, arr[i]);
+    set i = i + 1;
+  }
+}
+
+func each<M Mutability, T, F>(arr &[]<M>T, func &F) void
+where func(&F,&T)void {
+  i = 0;
+  l = len(&arr);
+  while (i < l) {
+    func(arr[i]);
+    set i = i + 1;
+  }
+}
+
+func eachI<F, M Mutability, T>(arr &[]<M>T, func F) void
+where func drop(F)void, func(&F,int,&T)void {
+  i = 0;
+  l = len(&arr);
+  while (i < l) {
+    func(i, arr[i]);
+    set i = i + 1;
+  }
+}
+
+
+
+
+
+
+struct StaticSizedArrayIter<N Int, M Mutability, V Variability, E> where E Ref {
+  arr &[#N]<M, V>E;
+  pos! int;
+}
+func begin<N Int, M Mutability, V Variability, E>(arr &[#N]<M, V>E) StaticSizedArrayIter<N, M, V, E> {
+  StaticSizedArrayIter<N, M, V, E>(arr, 0)
+}
+func next<N Int, M Mutability, V Variability, E>(iter &StaticSizedArrayIter<N, M, V, E>) Opt<&E> {
+  if iter.pos < iter.arr.len() {
+    Some<&E>(&iter.arr[set iter.pos = iter.pos + 1])
+  } else {
+    None<&E>()
+  }
+}
+
+struct StaticSizedArrayEntriesIter<N Int, M Mutability, V Variability, E> {
+  arr &[#N]<M, V>E;
+  pos! int;
+}
+func entries<N Int, M Mutability, V Variability, E>(arr &[#N]<M, V>E) StaticSizedArrayEntriesIter<N, M, V, E> {
+  StaticSizedArrayEntriesIter<N, M, V, E>(arr, 0)
+}
+func begin<N Int, M Mutability, V Variability, E>(iter &StaticSizedArrayEntriesIter<N, M, V, E>)
+StaticSizedArrayEntriesIter<N, M, V, E> {
+  StaticSizedArrayEntriesIter<N, M, V, E>(iter.arr, iter.pos)
+}
+func next<N Int, M Mutability, V Variability, E>(iter &StaticSizedArrayEntriesIter<N, M, V, E>) Opt<(int, &E)> {
+  if iter.pos < iter.arr.len() {
+    Some<(int, &E)>((iter.pos, &iter.arr[set iter.pos = iter.pos + 1]))
+  } else {
+    None<(int, &E)>()
+  }
+}
+
+
+
+struct RuntimeSizedArrayIter<M Mutability, E> where E Ref {
+  arr &[]<M>E;
+  pos! int;
+}
+
+func begin<M Mutability, E>(arr &[]<M>E) RuntimeSizedArrayIter<M, E> {
+  RuntimeSizedArrayIter<M, E>(arr, 0)
+}
+
+func next<M Mutability, E>(iter &RuntimeSizedArrayIter<M, E>) Opt<&E> {
+  if iter.pos < iter.arr.len() {
+    Some<&E>(&iter.arr[set iter.pos = iter.pos + 1])
+  } else {
+    None<&E>()
+  }
+}

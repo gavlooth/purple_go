@@ -1,0 +1,113 @@
+        -:    0:Source:test_main.c
+        -:    0:Graph:./run_tests_cov-test_main.gcno
+        -:    0:Data:./run_tests_cov-test_main.gcda
+        -:    0:Runs:1
+        -:    1:/* Purple Runtime Test Suite - Single Compilation Unit */
+        -:    2:/* Define POSIX features FIRST before any includes */
+        -:    3:#define _POSIX_C_SOURCE 200112L
+        -:    4:
+        -:    5:#include "test_framework.h"
+        -:    6:#include "../src/runtime.c"
+        -:    7:
+        -:    8:/* Test counter definitions */
+        -:    9:int tests_run = 0;
+        -:   10:int tests_passed = 0;
+        -:   11:int tests_failed = 0;
+        -:   12:const char* current_suite = NULL;
+        -:   13:
+function run_slow_tests_enabled called 1 returned 100% blocks executed 40%
+        1:   14:static int run_slow_tests_enabled(void) {
+        1:   15:    const char* level = getenv("RUNTIME_TEST_LEVEL");
+call    0 returned 1
+        1:   16:    if (!level) return 0;
+branch  0 taken 1 (fallthrough)
+branch  1 taken 0
+    #####:   17:    return strcmp(level, "slow") == 0 || strcmp(level, "all") == 0 || strcmp(level, "1") == 0;
+branch  0 never executed (fallthrough)
+branch  1 never executed
+branch  2 never executed (fallthrough)
+branch  3 never executed
+branch  4 never executed (fallthrough)
+branch  5 never executed
+        -:   18:}
+        -:   19:
+        -:   20:/* Include all test files directly */
+        -:   21:#include "test_constructors.c"
+        -:   22:#include "test_memory.c"
+        -:   23:#include "test_primitives.c"
+        -:   24:#include "test_lists.c"
+        -:   25:#include "test_closures.c"
+        -:   26:#include "test_tagged_pointers.c"
+        -:   27:#include "test_arena.c"
+        -:   28:#include "test_scc.c"
+        -:   29:#include "test_concurrency.c"
+        -:   30:#include "test_weak_refs.c"
+        -:   31:#include "test_borrowref.c"
+        -:   32:#include "test_deferred.c"
+        -:   33:#include "test_channel_semantics.c"
+        -:   34:#include "test_stress.c"
+        -:   35:
+function main called 1 returned 100% blocks executed 89%
+        1:   36:int main(int argc, char** argv) {
+        -:   37:    (void)argc;
+        -:   38:    (void)argv;
+        -:   39:
+        1:   40:    printf("Purple Runtime Test Suite\n");
+call    0 returned 1
+        1:   41:    printf("==========================\n");
+call    0 returned 1
+        1:   42:    printf("Comprehensive testing of C runtime\n\n");
+call    0 returned 1
+        -:   43:
+        -:   44:    /* Core functionality tests */
+        1:   45:    run_constructor_tests();
+call    0 returned 1
+        1:   46:    run_memory_tests();
+call    0 returned 1
+        1:   47:    run_primitive_tests();
+call    0 returned 1
+        -:   48:
+        -:   49:    /* Data structure tests */
+        1:   50:    run_list_tests();
+call    0 returned 1
+        1:   51:    run_closure_tests();
+call    0 returned 1
+        -:   52:
+        -:   53:    /* Tagged pointer tests */
+        1:   54:    run_tagged_pointer_tests();
+call    0 returned 1
+        -:   55:
+        -:   56:    /* Memory management tests */
+        1:   57:    run_arena_tests();
+call    0 returned 1
+        1:   58:    run_scc_tests();
+call    0 returned 1
+        1:   59:    run_weak_refs_tests();
+call    0 returned 1
+        1:   60:    run_borrowref_tests();
+call    0 returned 1
+        1:   61:    run_deferred_tests();
+call    0 returned 1
+        1:   62:    run_channel_semantics_tests();
+call    0 returned 1
+        -:   63:
+        1:   64:    if (run_slow_tests_enabled()) {
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+    #####:   65:        run_concurrency_tests();
+call    0 never executed
+    #####:   66:        run_stress_tests();
+call    0 never executed
+        -:   67:    }
+        -:   68:
+       1*:   69:    TEST_EXIT();
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+branch  3 taken 0 (fallthrough)
+branch  4 taken 1
+call    5 never executed
+call    6 returned 1
+call    7 returned 1
+        -:   70:}

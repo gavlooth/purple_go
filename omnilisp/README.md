@@ -2,17 +2,25 @@
 
 **Omnilisp** is a multi-paradigm Lisp dialect designed to be the ultimate developer's tool. It combines the minimalism of **Scheme**, the industrial power of **Common Lisp**, the modern type system of **Julia**, and the data-driven elegance of **Clojure**.
 
-Implemented via a **Collapsing Tower of Interpreters** (Purple), it provides first-class delimited continuations and high-level reflection without sacrificing performance.
+The repo currently ships a small C compiler/runtime subset. The rest of the language features are the intended design.
 
-## Key Design Pillars
+## Current Implementation (C Compiler)
+*   **Core syntax:** lists `(...)`, quote `'x`, comments `; ...`
+*   **Special forms:** `define`, `lambda`/`fn`, `let`, `let*`, `if`, `do`/`begin`
+*   **Bindings:** list-style `(let ((x 1) (y 2)) ...)` and array-style `(let [x 1 y 2] ...)`
+*   **Primitives:** `+ - * / %`, `< > <= >= =`, `cons car cdr null?`, `display print newline`
+*   **Truthiness:** empty list and numeric zero are false; everything else is truthy
 
-*   **Syntax:** S-expressions with specialized brackets (`[]` for vectors, `{}` for types/dicts).
+## Key Design Pillars (Planned)
+
+*   **Syntax:** S-expressions with specialized brackets (`[]` for arrays, `{}` for types, `#{}` for dicts).
 *   **Dispatch:** Full **Multiple Dispatch** on all arguments (Julia style).
 *   **Types:** Abstract hierarchy with parametric types like `{Vector Int}`.
 *   **Access:** Native **Dot Notation** (`obj.field.subfield`) for clean nested access.
 *   **Control:** **Delimited Continuations** (`prompt`/`control`) and a resumable **Condition System**.
 *   **Hygiene:** Fully **Hygienic Macros** using syntax objects.
 *   **Matching:** **Optima-style** extensible pattern matching.
+*   **Symbols:** No separate keyword type; `:key` is sugar for `'key`.
 
 ## Documentation
 

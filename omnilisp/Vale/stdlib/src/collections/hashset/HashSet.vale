@@ -1,0 +1,278 @@
+import stdlib.optutils.*;
+
+
+#!DeriveStructDrop
+struct HashSet<K Ref imm, H, E>
+where func(&H, K)int, func(&E, K, K)bool, func drop(K)void {
+  hasher H;
+  equator E;
+  table! Array<mut, Opt<K>>;
+  size! int;
+}
+
+func HashSet<K Ref imm, H, E>(hasher H, equator E) HashSet<K Ref imm, H, E>
+where func(&H, K)int, func(&E, K, K)bool, func drop(K)void {
+  HashSet<K Ref imm, H, E>(hasher, equator, 0)
+}
+
+func HashSet<K Ref imm, H, E>(
+  source &HashSet<K Ref imm, H, E>,
+  hasher H,
+  equator E)
+HashSet<K Ref imm, H, E>
+where func(&H, K)int, func(&E, K, K)bool, func drop(K)void {
+  self = HashSet<K Ref imm, H, E>(hasher, equator);
+  foreach x in source {
+    self.add(x);
+  }
+  return self;
+}
+
+func HashSet<K Ref imm, H, E>(
+  hasher H,
+  equator E,
+  capacity int)
+HashSet<K Ref imm, H, E>
+where func(&H, K)int, func(&E, K, K)bool, func drop(K)void {
+  HashSet<K>(
+      hasher,
+      equator,
+      Array<mut, Opt<K>>(
+        capacity,
+        &(index) => {
+          opt Opt<K> = None<K>();
+          opt
+        }),
+      0)
+}
+
+func HashSet<K Ref imm, H, E, M Mutability, N Int>(
+  valuesKSA &[#N]<M>K,
+  hasher H,
+  equator E)
+HashSet<K Ref imm, H, E>
+where func(&H, K)int, func(&E, K, K)bool, func drop(K)void {
+  this = HashSet<K Ref imm, H, E>(hasher, equator, 0);
+  foreach v in valuesKSA {
+    if not this.contains(v) {
+      this.add(v);
+    }
+  }
+  return this;
+}
+
+func HashSet<K Ref imm, H, E, M Mutability>(
+  valuesArray &[]<M>K,
+  hasher H,
+  equator E)
+HashSet<K Ref imm, H, E>
+where func(&H, K)int, func(&E, K, K)bool, func drop(K)void {
+  this = HashSet<K Ref imm, H, E>(hasher, equator, 0);
+  foreach v in valuesArray {
+    if not this.contains(v) {
+      this.add(v);
+    }
+  }
+  return this;
+}
+
+func drop<K Ref imm, H, E>(self HashSet<K Ref imm, H, E>)
+where func drop(H)void, func drop(E)void {
+  destruct self;
+}
+
+func len<K Ref imm, H, E>(self &HashSet<K Ref imm, H, E>) int { self.size }
+
+func isEmpty<K Ref imm, H, E>(self &HashSet<K Ref imm, H, E>) bool { self.size == 0 }
+
+func add<K Ref imm, H, E>(self HashSet<K Ref imm, H, E>, key K) HashSet<K Ref imm, H, E> {
+  self.add(key);
+  return self;
+}
+func add<K Ref imm, H, E>(self &HashSet<K Ref imm, H, E>, key K) void {
+  if self.contains(key) {
+    panic("HashSet already has given key!");
+  }
+  if (self.size + 1) * 2 >= self.table.len() {
+    newSize =
+        if self.table.len() == 0 { 1 }
+        else { self.table.len() * 2 };
+    newTable =
+        Array<mut, Opt<K>>(
+            newSize,
+            &(index) => {
+              opt Opt<K> = None<K>();
+              opt
+            });
+    i = 0;
+    while (i < self.table.len()) {
+      if self.table[i].isEmpty() {
+        // do nothing
+      } else {
+        maybeNode = (set self.table[i] = None<K>());
+        node = get(maybeNode);
+        addNodeToHashSetTable(&newTable, self.hasher, node);
+      }
+      set i = i + 1;
+    }
+    set self.table = newTable;
+  }
+
+  addNodeToHashSetTable(&self.table, self.hasher, key);
+  set self.size = self.size + 1;
+}
+
+func addNodeToHashSetTable<K Ref imm, H>(table &Array<mut, Opt<K>>, hasher &H, key K)
+where func(&H, K)int, func drop(K)void {
+  hash int = abs((&hasher)(key));
+  startIndex = hash mod table.len();
+  index = findEmptyIndexInHashSetForKey(&table, startIndex, key);
+
+  opt Opt<K> = Some(key);
+  set table[index] = opt;
+}
+
+func findEmptyIndexInHashSetForKey<K>(table &Array<mut, Opt<K>>, startIndex int, key K) int
+where func drop(K)void {
+  i = 0;
+  while (i < table.len()) {
+    index = (startIndex + i) mod table.len();
+    something = table[index];
+    if something.isEmpty() {
+      return index;
+    }
+    // continue to next node
+    set i = i + 1;
+  }
+  panic("findEmptyIndexInHashSetForKey went past end of table!");
+}
+
+func findIndexOfKey<K Ref imm, E>(table &Array<mut, Opt<K>>, equator &E, startIndex int, key K) Opt<int>
+where func(&E, K, K)bool, func drop(K)void {
+  i = 0;
+  while (i < table.len()) {
+    index = (startIndex + i) mod table.len();
+    something = table[index];
+    if something.isEmpty() {
+      return None<int>();
+    }
+    node = something.get();
+    if (equator)(node, key) {
+      return Some<int>(index);
+    }
+    // continue to next node
+    set i = i + 1;
+  }
+  return None<int>();
+}
+
+func get<K Ref imm, H, E>(self &HashSet<K Ref imm, H, E>, key K) Opt<K> {
+  if self.table.len() == 0 {
+    return None<K>();
+  }
+  hash int = abs((self.hasher)(key));
+  startIndex = hash mod self.table.len();
+  maybeIndex = findIndexOfKey(&self.table, self.equator, startIndex, key);
+  if maybeIndex.isEmpty() {
+    opt Opt<K> = None<K>();
+    return opt;
+  }
+  node = self.table[maybeIndex.get()].get();
+  opt Opt<K> = Some<K>(node);
+  return opt;
+}
+
+func contains<K Ref imm, H, E>(self &HashSet<K Ref imm, H, E>, key K) bool {
+  not(self.get(key).isEmpty())
+}
+
+func toArray<K Ref imm, H, E>(self &HashSet<K Ref imm, H, E>) Array<imm, K> {
+  list = List<K>();
+  index = 0;
+  while (index < self.table.len()) {
+    maybeNode = self.table[index];
+    if not(maybeNode.isEmpty()) {
+      list.add(maybeNode.get());
+    }
+    set index = index + 1;
+  }
+  return (list).toImmArray();
+}
+
+func innerRemove<K Ref imm, H, E>(
+  table &Array<mut, Opt<K>>,
+  hasher &H,
+  equator &E,
+  key K)
+int
+where func(&H, K)int, func(&E, K, K)bool, func drop(K)void {
+  hash int = abs((&hasher)(key));
+  startIndex = hash mod table.len();
+  maybeIndex = findIndexOfKey(&table, &equator, startIndex, key);
+  index = maybeIndex.get("HashSet.innerRemove: Element doesn't exist!");
+  set table[index] = None<K>();
+  return index;
+}
+
+func remove<K Ref imm, H, E>(
+  self &HashSet<K Ref imm, H, E>,
+  key K)
+void {
+  originalIndex = innerRemove(&self.table, self.hasher, self.equator, key);
+  set self.size = self.size - 1;
+
+  i = 1;
+  while (i < self.table.len()) {
+    neighborIndex = (originalIndex + i) mod len(&self.table);
+    maybeNeighbor = (set self.table[neighborIndex] = None<K>());
+    if not maybeNeighbor.isEmpty() {
+      neighborKey = (maybeNeighbor).get("Neighbor missing!");
+      addNodeToHashSetTable(&self.table, self.hasher, neighborKey);
+    } else {
+      (maybeNeighbor).expect_none();
+      set i = self.table.len(); // break
+    }
+    set i = i + 1;
+  }
+}
+
+func ==<K Ref imm, H, E>(
+  a &HashSet<K Ref imm, H, E>,
+  b &HashSet<K Ref imm, H, E>)
+bool
+{
+  if a.len() != b.len() {
+    return false;
+  }
+  foreach x in a {
+    if not b.contains(x) {
+      return false;
+    }
+  }
+  return true;
+}
+
+func List<K Ref imm, H, E>(sett &HashSet<K Ref imm, H, E>) List<K> {
+  list = List<K>(sett.len());
+  foreach x in sett {
+    list.add(x);
+  }
+  return list;
+}
+
+func GetRandomElement<K Ref imm, H, E>(
+    self &HashSet<K Ref imm, H, E>,
+    seed int)
+Opt<&K> {
+  if self.len() == 0 {
+    return None<&K>();
+  }
+  foreach offset in range(0, self.table.len()) {
+    index = (abs(seed) + offset) mod self.table.len();
+    if not self.table[index].isEmpty() {
+      return Some(&self.table[index].get());
+    }
+  }
+  panic("unreachable");
+}
+

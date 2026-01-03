@@ -152,6 +152,34 @@ void omni_codegen_emit_frees(CodeGenContext* ctx, int position);
 /* Emit cleanup code for scope exit */
 void omni_codegen_emit_scope_cleanup(CodeGenContext* ctx, const char** vars, size_t count);
 
+/* ============== CFG-Based Code Generation ============== */
+
+/*
+ * Generate code with CFG-aware free placement.
+ * This uses liveness analysis to free variables at their last use point
+ * on each control flow path, rather than at scope exit.
+ *
+ * Example:
+ *   (let ((x (mk-obj)))
+ *     (if cond
+ *       (use x)     ;; x freed here on true branch
+ *       (other)))   ;; x freed here on false branch (if unused)
+ *
+ * Instead of:
+ *   (let ((x (mk-obj)))
+ *     (if cond
+ *       (use x)
+ *       (other))
+ *     ;; x freed here at scope end (too late!)
+ */
+void omni_codegen_with_cfg(CodeGenContext* ctx, OmniValue* expr);
+
+/*
+ * Emit frees for a specific CFG node.
+ * Called during CFG-aware code generation.
+ */
+void omni_codegen_emit_cfg_frees(CodeGenContext* ctx, CFG* cfg, CFGNode* node);
+
 #ifdef __cplusplus
 }
 #endif

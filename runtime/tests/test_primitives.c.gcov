@@ -1,0 +1,1984 @@
+        -:    0:Source:test_primitives.c
+        -:    0:Graph:./run_tests_cov-test_main.gcno
+        -:    0:Data:./run_tests_cov-test_main.gcda
+        -:    0:Runs:1
+        -:    1:/* Test Primitive Operations */
+        -:    2:#include "test_framework.h"
+        -:    3:#include <limits.h>
+        -:    4:
+        -:    5:/* === Arithmetic tests === */
+        -:    6:
+function test_prim_add_ints called 1 returned 100% blocks executed 57%
+        1:    7:void test_prim_add_ints(void) {
+        1:    8:    Obj* a = mk_int(2);
+call    0 returned 1
+        1:    9:    Obj* b = mk_int(3);
+call    0 returned 1
+        1:   10:    Obj* r = prim_add(a, b);
+call    0 returned 1
+       1*:   11:    ASSERT_NOT_NULL(r);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   12:    ASSERT_EQ(obj_tag(r), TAG_INT);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+       1*:   13:    ASSERT_EQ(obj_to_int(r), 5);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:   14:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:   15:    PASS();
+call    0 returned 1
+        -:   16:}
+        -:   17:
+function test_prim_add_immediates called 1 returned 100% blocks executed 58%
+        1:   18:void test_prim_add_immediates(void) {
+        1:   19:    Obj* a = mk_int_unboxed(2);
+call    0 returned 1
+        1:   20:    Obj* b = mk_int_unboxed(3);
+call    0 returned 1
+        1:   21:    Obj* r = prim_add(a, b);
+call    0 returned 1
+       1*:   22:    ASSERT(IS_IMMEDIATE(r));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   23:    ASSERT_EQ(INT_IMM_VALUE(r), 5);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   24:    PASS();
+call    0 returned 1
+        -:   25:}
+        -:   26:
+function test_prim_add_floats called 1 returned 100% blocks executed 57%
+        1:   27:void test_prim_add_floats(void) {
+        1:   28:    Obj* a = mk_float(2.5);
+call    0 returned 1
+        1:   29:    Obj* b = mk_float(3.5);
+call    0 returned 1
+        1:   30:    Obj* r = prim_add(a, b);
+call    0 returned 1
+       1*:   31:    ASSERT_NOT_NULL(r);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   32:    ASSERT_EQ(obj_tag(r), TAG_FLOAT);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+       1*:   33:    ASSERT_EQ_FLOAT(num_to_double(r), 6.0, 0.0001);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:   34:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:   35:    PASS();
+call    0 returned 1
+        -:   36:}
+        -:   37:
+function test_prim_add_int_float called 1 returned 100% blocks executed 57%
+        1:   38:void test_prim_add_int_float(void) {
+        1:   39:    Obj* a = mk_int(2);
+call    0 returned 1
+        1:   40:    Obj* b = mk_float(3.5);
+call    0 returned 1
+        1:   41:    Obj* r = prim_add(a, b);
+call    0 returned 1
+       1*:   42:    ASSERT_NOT_NULL(r);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   43:    ASSERT_EQ(obj_tag(r), TAG_FLOAT);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+       1*:   44:    ASSERT_EQ_FLOAT(num_to_double(r), 5.5, 0.0001);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:   45:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:   46:    PASS();
+call    0 returned 1
+        -:   47:}
+        -:   48:
+function test_prim_add_null called 1 returned 100% blocks executed 67%
+        1:   49:void test_prim_add_null(void) {
+        1:   50:    Obj* a = mk_int(2);
+call    0 returned 1
+        1:   51:    Obj* r = prim_add(a, NULL);
+call    0 returned 1
+        -:   52:    /* add(a, NULL) returns a directly */
+       1*:   53:    ASSERT_EQ(r, a);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   54:    dec_ref(a);  /* r and a are same object */
+call    0 returned 1
+        1:   55:    PASS();
+call    0 returned 1
+        -:   56:}
+        -:   57:
+function test_prim_sub_ints called 1 returned 100% blocks executed 71%
+        1:   58:void test_prim_sub_ints(void) {
+        1:   59:    Obj* a = mk_int(10);
+call    0 returned 1
+        1:   60:    Obj* b = mk_int(3);
+call    0 returned 1
+        1:   61:    Obj* r = prim_sub(a, b);
+call    0 returned 1
+       1*:   62:    ASSERT_EQ(obj_to_int(r), 7);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:   63:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:   64:    PASS();
+call    0 returned 1
+        -:   65:}
+        -:   66:
+function test_prim_sub_immediates called 1 returned 100% blocks executed 58%
+        1:   67:void test_prim_sub_immediates(void) {
+        1:   68:    Obj* a = mk_int_unboxed(10);
+call    0 returned 1
+        1:   69:    Obj* b = mk_int_unboxed(3);
+call    0 returned 1
+        1:   70:    Obj* r = prim_sub(a, b);
+call    0 returned 1
+       1*:   71:    ASSERT(IS_IMMEDIATE(r));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   72:    ASSERT_EQ(INT_IMM_VALUE(r), 7);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   73:    PASS();
+call    0 returned 1
+        -:   74:}
+        -:   75:
+function test_prim_sub_negative called 1 returned 100% blocks executed 71%
+        1:   76:void test_prim_sub_negative(void) {
+        1:   77:    Obj* a = mk_int(3);
+call    0 returned 1
+        1:   78:    Obj* b = mk_int(10);
+call    0 returned 1
+        1:   79:    Obj* r = prim_sub(a, b);
+call    0 returned 1
+       1*:   80:    ASSERT_EQ(obj_to_int(r), -7);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:   81:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:   82:    PASS();
+call    0 returned 1
+        -:   83:}
+        -:   84:
+function test_prim_sub_null_left called 1 returned 100% blocks executed 58%
+        1:   85:void test_prim_sub_null_left(void) {
+        1:   86:    Obj* b = mk_int(5);
+call    0 returned 1
+        1:   87:    Obj* r = prim_sub(NULL, b);
+call    0 returned 1
+       1*:   88:    ASSERT(IS_IMMEDIATE(r));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:   89:    ASSERT_EQ(INT_IMM_VALUE(r), -5);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   90:    dec_ref(b);
+call    0 returned 1
+        1:   91:    PASS();
+call    0 returned 1
+        -:   92:}
+        -:   93:
+function test_prim_sub_null_right called 1 returned 100% blocks executed 67%
+        1:   94:void test_prim_sub_null_right(void) {
+        1:   95:    Obj* a = mk_int(5);
+call    0 returned 1
+        1:   96:    Obj* r = prim_sub(a, NULL);
+call    0 returned 1
+       1*:   97:    ASSERT_EQ(r, a);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:   98:    dec_ref(a);
+call    0 returned 1
+        1:   99:    PASS();
+call    0 returned 1
+        -:  100:}
+        -:  101:
+function test_prim_mul_ints called 1 returned 100% blocks executed 71%
+        1:  102:void test_prim_mul_ints(void) {
+        1:  103:    Obj* a = mk_int(6);
+call    0 returned 1
+        1:  104:    Obj* b = mk_int(7);
+call    0 returned 1
+        1:  105:    Obj* r = prim_mul(a, b);
+call    0 returned 1
+       1*:  106:    ASSERT_EQ(obj_to_int(r), 42);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  107:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  108:    PASS();
+call    0 returned 1
+        -:  109:}
+        -:  110:
+function test_prim_mul_immediates called 1 returned 100% blocks executed 58%
+        1:  111:void test_prim_mul_immediates(void) {
+        1:  112:    Obj* a = mk_int_unboxed(6);
+call    0 returned 1
+        1:  113:    Obj* b = mk_int_unboxed(7);
+call    0 returned 1
+        1:  114:    Obj* r = prim_mul(a, b);
+call    0 returned 1
+       1*:  115:    ASSERT(IS_IMMEDIATE(r));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  116:    ASSERT_EQ(INT_IMM_VALUE(r), 42);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  117:    PASS();
+call    0 returned 1
+        -:  118:}
+        -:  119:
+function test_prim_mul_zero called 1 returned 100% blocks executed 71%
+        1:  120:void test_prim_mul_zero(void) {
+        1:  121:    Obj* a = mk_int(100);
+call    0 returned 1
+        1:  122:    Obj* b = mk_int(0);
+call    0 returned 1
+        1:  123:    Obj* r = prim_mul(a, b);
+call    0 returned 1
+       1*:  124:    ASSERT_EQ(obj_to_int(r), 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  125:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  126:    PASS();
+call    0 returned 1
+        -:  127:}
+        -:  128:
+function test_prim_div_ints called 1 returned 100% blocks executed 71%
+        1:  129:void test_prim_div_ints(void) {
+        1:  130:    Obj* a = mk_int(10);
+call    0 returned 1
+        1:  131:    Obj* b = mk_int(3);
+call    0 returned 1
+        1:  132:    Obj* r = prim_div(a, b);
+call    0 returned 1
+       1*:  133:    ASSERT_EQ(obj_to_int(r), 3);  /* Integer division */
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  134:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  135:    PASS();
+call    0 returned 1
+        -:  136:}
+        -:  137:
+function test_prim_div_immediates called 1 returned 100% blocks executed 58%
+        1:  138:void test_prim_div_immediates(void) {
+        1:  139:    Obj* a = mk_int_unboxed(10);
+call    0 returned 1
+        1:  140:    Obj* b = mk_int_unboxed(2);
+call    0 returned 1
+        1:  141:    Obj* r = prim_div(a, b);
+call    0 returned 1
+       1*:  142:    ASSERT(IS_IMMEDIATE(r));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  143:    ASSERT_EQ(INT_IMM_VALUE(r), 5);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  144:    PASS();
+call    0 returned 1
+        -:  145:}
+        -:  146:
+function test_prim_div_floats called 1 returned 100% blocks executed 71%
+        1:  147:void test_prim_div_floats(void) {
+        1:  148:    Obj* a = mk_float(10.0);
+call    0 returned 1
+        1:  149:    Obj* b = mk_float(4.0);
+call    0 returned 1
+        1:  150:    Obj* r = prim_div(a, b);
+call    0 returned 1
+       1*:  151:    ASSERT_EQ_FLOAT(num_to_double(r), 2.5, 0.0001);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  152:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  153:    PASS();
+call    0 returned 1
+        -:  154:}
+        -:  155:
+function test_prim_div_by_zero called 1 returned 100% blocks executed 100%
+        1:  156:void test_prim_div_by_zero(void) {
+        1:  157:    Obj* a = mk_int(10);
+call    0 returned 1
+        1:  158:    Obj* b = mk_int(0);
+call    0 returned 1
+        1:  159:    Obj* r = prim_div(a, b);
+call    0 returned 1
+        -:  160:    /* Should return NULL or error, not crash */
+        1:  161:    dec_ref(a); dec_ref(b);
+call    0 returned 1
+call    1 returned 1
+        1:  162:    if (r) dec_ref(r);
+branch  0 taken 1 (fallthrough)
+branch  1 taken 0
+call    2 returned 1
+        1:  163:    PASS();
+call    0 returned 1
+        1:  164:}
+        -:  165:
+function test_prim_mod_normal called 1 returned 100% blocks executed 71%
+        1:  166:void test_prim_mod_normal(void) {
+        1:  167:    Obj* a = mk_int(10);
+call    0 returned 1
+        1:  168:    Obj* b = mk_int(3);
+call    0 returned 1
+        1:  169:    Obj* r = prim_mod(a, b);
+call    0 returned 1
+       1*:  170:    ASSERT_EQ(obj_to_int(r), 1);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  171:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  172:    PASS();
+call    0 returned 1
+        -:  173:}
+        -:  174:
+function test_prim_mod_immediates called 1 returned 100% blocks executed 58%
+        1:  175:void test_prim_mod_immediates(void) {
+        1:  176:    Obj* a = mk_int_unboxed(10);
+call    0 returned 1
+        1:  177:    Obj* b = mk_int_unboxed(3);
+call    0 returned 1
+        1:  178:    Obj* r = prim_mod(a, b);
+call    0 returned 1
+       1*:  179:    ASSERT(IS_IMMEDIATE(r));
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  180:    ASSERT_EQ(INT_IMM_VALUE(r), 1);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  181:    PASS();
+call    0 returned 1
+        -:  182:}
+        -:  183:
+function test_prim_mod_negative called 1 returned 100% blocks executed 82%
+        1:  184:void test_prim_mod_negative(void) {
+        1:  185:    Obj* a = mk_int(-10);
+call    0 returned 1
+        1:  186:    Obj* b = mk_int(3);
+call    0 returned 1
+        1:  187:    Obj* r = prim_mod(a, b);
+call    0 returned 1
+        -:  188:    /* C modulo behavior with negative numbers */
+       1*:  189:    ASSERT_NOT_NULL(r);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  190:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  191:    PASS();
+call    0 returned 1
+        -:  192:}
+        -:  193:
+function test_prim_abs_positive called 1 returned 100% blocks executed 67%
+        1:  194:void test_prim_abs_positive(void) {
+        1:  195:    Obj* a = mk_int(42);
+call    0 returned 1
+        1:  196:    Obj* r = prim_abs(a);
+call    0 returned 1
+       1*:  197:    ASSERT_EQ(obj_to_int(r), 42);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  198:    dec_ref(a); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  199:    PASS();
+call    0 returned 1
+        -:  200:}
+        -:  201:
+function test_prim_abs_negative called 1 returned 100% blocks executed 67%
+        1:  202:void test_prim_abs_negative(void) {
+        1:  203:    Obj* a = mk_int(-42);
+call    0 returned 1
+        1:  204:    Obj* r = prim_abs(a);
+call    0 returned 1
+       1*:  205:    ASSERT_EQ(obj_to_int(r), 42);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  206:    dec_ref(a); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  207:    PASS();
+call    0 returned 1
+        -:  208:}
+        -:  209:
+function test_prim_abs_zero called 1 returned 100% blocks executed 67%
+        1:  210:void test_prim_abs_zero(void) {
+        1:  211:    Obj* a = mk_int(0);
+call    0 returned 1
+        1:  212:    Obj* r = prim_abs(a);
+call    0 returned 1
+       1*:  213:    ASSERT_EQ(obj_to_int(r), 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  214:    dec_ref(a); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  215:    PASS();
+call    0 returned 1
+        -:  216:}
+        -:  217:
+        -:  218:/* === Comparison tests === */
+        -:  219:
+function test_prim_lt_true called 1 returned 100% blocks executed 83%
+        1:  220:void test_prim_lt_true(void) {
+        1:  221:    Obj* a = mk_int(1);
+call    0 returned 1
+        1:  222:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  223:    Obj* r = prim_lt(a, b);
+call    0 returned 1
+       1*:  224:    ASSERT(obj_to_int(r) != 0);  /* truthy */
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  225:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  226:    PASS();
+call    0 returned 1
+        -:  227:}
+        -:  228:
+function test_prim_lt_false called 1 returned 100% blocks executed 83%
+        1:  229:void test_prim_lt_false(void) {
+        1:  230:    Obj* a = mk_int(2);
+call    0 returned 1
+        1:  231:    Obj* b = mk_int(1);
+call    0 returned 1
+        1:  232:    Obj* r = prim_lt(a, b);
+call    0 returned 1
+       1*:  233:    ASSERT(obj_to_int(r) == 0);  /* falsy */
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  234:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  235:    PASS();
+call    0 returned 1
+        -:  236:}
+        -:  237:
+function test_prim_lt_equal called 1 returned 100% blocks executed 83%
+        1:  238:void test_prim_lt_equal(void) {
+        1:  239:    Obj* a = mk_int(2);
+call    0 returned 1
+        1:  240:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  241:    Obj* r = prim_lt(a, b);
+call    0 returned 1
+       1*:  242:    ASSERT(obj_to_int(r) == 0);  /* equal is not less than */
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  243:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  244:    PASS();
+call    0 returned 1
+        -:  245:}
+        -:  246:
+function test_prim_gt_true called 1 returned 100% blocks executed 83%
+        1:  247:void test_prim_gt_true(void) {
+        1:  248:    Obj* a = mk_int(2);
+call    0 returned 1
+        1:  249:    Obj* b = mk_int(1);
+call    0 returned 1
+        1:  250:    Obj* r = prim_gt(a, b);
+call    0 returned 1
+       1*:  251:    ASSERT(obj_to_int(r) != 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  252:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  253:    PASS();
+call    0 returned 1
+        -:  254:}
+        -:  255:
+function test_prim_gt_false called 1 returned 100% blocks executed 83%
+        1:  256:void test_prim_gt_false(void) {
+        1:  257:    Obj* a = mk_int(1);
+call    0 returned 1
+        1:  258:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  259:    Obj* r = prim_gt(a, b);
+call    0 returned 1
+       1*:  260:    ASSERT(obj_to_int(r) == 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  261:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  262:    PASS();
+call    0 returned 1
+        -:  263:}
+        -:  264:
+function test_prim_le_true called 1 returned 100% blocks executed 83%
+        1:  265:void test_prim_le_true(void) {
+        1:  266:    Obj* a = mk_int(2);
+call    0 returned 1
+        1:  267:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  268:    Obj* r = prim_le(a, b);
+call    0 returned 1
+       1*:  269:    ASSERT(obj_to_int(r) != 0);  /* equal satisfies <= */
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  270:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  271:    PASS();
+call    0 returned 1
+        -:  272:}
+        -:  273:
+function test_prim_le_false called 1 returned 100% blocks executed 83%
+        1:  274:void test_prim_le_false(void) {
+        1:  275:    Obj* a = mk_int(3);
+call    0 returned 1
+        1:  276:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  277:    Obj* r = prim_le(a, b);
+call    0 returned 1
+       1*:  278:    ASSERT(obj_to_int(r) == 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  279:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  280:    PASS();
+call    0 returned 1
+        -:  281:}
+        -:  282:
+function test_prim_ge_true called 1 returned 100% blocks executed 83%
+        1:  283:void test_prim_ge_true(void) {
+        1:  284:    Obj* a = mk_int(2);
+call    0 returned 1
+        1:  285:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  286:    Obj* r = prim_ge(a, b);
+call    0 returned 1
+       1*:  287:    ASSERT(obj_to_int(r) != 0);  /* equal satisfies >= */
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  288:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  289:    PASS();
+call    0 returned 1
+        -:  290:}
+        -:  291:
+function test_prim_ge_false called 1 returned 100% blocks executed 83%
+        1:  292:void test_prim_ge_false(void) {
+        1:  293:    Obj* a = mk_int(1);
+call    0 returned 1
+        1:  294:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  295:    Obj* r = prim_ge(a, b);
+call    0 returned 1
+       1*:  296:    ASSERT(obj_to_int(r) == 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  297:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  298:    PASS();
+call    0 returned 1
+        -:  299:}
+        -:  300:
+function test_prim_eq_same called 1 returned 100% blocks executed 83%
+        1:  301:void test_prim_eq_same(void) {
+        1:  302:    Obj* a = mk_int(42);
+call    0 returned 1
+        1:  303:    Obj* b = mk_int(42);
+call    0 returned 1
+        1:  304:    Obj* r = prim_eq(a, b);
+call    0 returned 1
+       1*:  305:    ASSERT(obj_to_int(r) != 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  306:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  307:    PASS();
+call    0 returned 1
+        -:  308:}
+        -:  309:
+function test_prim_eq_float_same called 1 returned 100% blocks executed 83%
+        1:  310:void test_prim_eq_float_same(void) {
+        1:  311:    Obj* a = mk_float(1.5);
+call    0 returned 1
+        1:  312:    Obj* b = mk_float(1.5);
+call    0 returned 1
+        1:  313:    Obj* r = prim_eq(a, b);
+call    0 returned 1
+       1*:  314:    ASSERT(obj_to_int(r) != 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  315:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  316:    PASS();
+call    0 returned 1
+        -:  317:}
+        -:  318:
+function test_prim_eq_different called 1 returned 100% blocks executed 83%
+        1:  319:void test_prim_eq_different(void) {
+        1:  320:    Obj* a = mk_int(1);
+call    0 returned 1
+        1:  321:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  322:    Obj* r = prim_eq(a, b);
+call    0 returned 1
+       1*:  323:    ASSERT(obj_to_int(r) == 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  324:    dec_ref(a); dec_ref(b); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  325:    PASS();
+call    0 returned 1
+        -:  326:}
+        -:  327:
+function test_prim_not_truthy called 1 returned 100% blocks executed 80%
+        1:  328:void test_prim_not_truthy(void) {
+        1:  329:    Obj* a = mk_int(1);
+call    0 returned 1
+        1:  330:    Obj* r = prim_not(a);
+call    0 returned 1
+       1*:  331:    ASSERT(obj_to_int(r) == 0);  /* not of truthy is falsy */
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  332:    dec_ref(a); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  333:    PASS();
+call    0 returned 1
+        -:  334:}
+        -:  335:
+function test_prim_not_falsy called 1 returned 100% blocks executed 80%
+        1:  336:void test_prim_not_falsy(void) {
+        1:  337:    Obj* a = mk_int(0);
+call    0 returned 1
+        1:  338:    Obj* r = prim_not(a);
+call    0 returned 1
+       1*:  339:    ASSERT(obj_to_int(r) != 0);  /* not of falsy is truthy */
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  340:    dec_ref(a); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  341:    PASS();
+call    0 returned 1
+        -:  342:}
+        -:  343:
+        -:  344:/* === Type predicate tests === */
+        -:  345:
+function test_prim_null_true called 1 returned 100% blocks executed 75%
+        1:  346:void test_prim_null_true(void) {
+        1:  347:    Obj* r = prim_null(NULL);
+call    0 returned 1
+       1*:  348:    ASSERT(obj_to_int(r) != 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  349:    dec_ref(r);
+call    0 returned 1
+        1:  350:    PASS();
+call    0 returned 1
+        -:  351:}
+        -:  352:
+function test_prim_null_false called 1 returned 100% blocks executed 80%
+        1:  353:void test_prim_null_false(void) {
+        1:  354:    Obj* x = mk_int(42);
+call    0 returned 1
+        1:  355:    Obj* r = prim_null(x);
+call    0 returned 1
+       1*:  356:    ASSERT(obj_to_int(r) == 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  357:    dec_ref(x); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  358:    PASS();
+call    0 returned 1
+        -:  359:}
+        -:  360:
+function test_prim_pair_true called 1 returned 100% blocks executed 83%
+        1:  361:void test_prim_pair_true(void) {
+        1:  362:    Obj* p = mk_pair(mk_int(1), mk_int(2));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  363:    Obj* r = prim_pair(p);
+call    0 returned 1
+       1*:  364:    ASSERT(obj_to_int(r) != 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  365:    dec_ref(p); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  366:    PASS();
+call    0 returned 1
+        -:  367:}
+        -:  368:
+function test_prim_pair_false called 1 returned 100% blocks executed 80%
+        1:  369:void test_prim_pair_false(void) {
+        1:  370:    Obj* x = mk_int(42);
+call    0 returned 1
+        1:  371:    Obj* r = prim_pair(x);
+call    0 returned 1
+       1*:  372:    ASSERT(obj_to_int(r) == 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  373:    dec_ref(x); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  374:    PASS();
+call    0 returned 1
+        -:  375:}
+        -:  376:
+function test_prim_int_true called 1 returned 100% blocks executed 80%
+        1:  377:void test_prim_int_true(void) {
+        1:  378:    Obj* x = mk_int(42);
+call    0 returned 1
+        1:  379:    Obj* r = prim_int(x);
+call    0 returned 1
+       1*:  380:    ASSERT(obj_to_int(r) != 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  381:    dec_ref(x); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  382:    PASS();
+call    0 returned 1
+        -:  383:}
+        -:  384:
+function test_prim_int_false called 1 returned 100% blocks executed 80%
+        1:  385:void test_prim_int_false(void) {
+        1:  386:    Obj* x = mk_float(3.14);
+call    0 returned 1
+        1:  387:    Obj* r = prim_int(x);
+call    0 returned 1
+       1*:  388:    ASSERT(obj_to_int(r) == 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  389:    dec_ref(x); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  390:    PASS();
+call    0 returned 1
+        -:  391:}
+        -:  392:
+function test_prim_float_true called 1 returned 100% blocks executed 80%
+        1:  393:void test_prim_float_true(void) {
+        1:  394:    Obj* x = mk_float(3.14);
+call    0 returned 1
+        1:  395:    Obj* r = prim_float(x);
+call    0 returned 1
+       1*:  396:    ASSERT(obj_to_int(r) != 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  397:    dec_ref(x); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  398:    PASS();
+call    0 returned 1
+        -:  399:}
+        -:  400:
+function test_prim_float_false called 1 returned 100% blocks executed 80%
+        1:  401:void test_prim_float_false(void) {
+        1:  402:    Obj* x = mk_int(3);
+call    0 returned 1
+        1:  403:    Obj* r = prim_float(x);
+call    0 returned 1
+       1*:  404:    ASSERT(obj_to_int(r) == 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  405:    dec_ref(x); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  406:    PASS();
+call    0 returned 1
+        -:  407:}
+        -:  408:
+function test_prim_char_true called 1 returned 100% blocks executed 80%
+        1:  409:void test_prim_char_true(void) {
+        1:  410:    Obj* x = mk_char('A');
+call    0 returned 1
+        1:  411:    Obj* r = prim_char(x);
+call    0 returned 1
+       1*:  412:    ASSERT(obj_to_int(r) != 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  413:    dec_ref(x); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  414:    PASS();
+call    0 returned 1
+        -:  415:}
+        -:  416:
+function test_prim_char_false called 1 returned 100% blocks executed 80%
+        1:  417:void test_prim_char_false(void) {
+        1:  418:    Obj* x = mk_int(65);
+call    0 returned 1
+        1:  419:    Obj* r = prim_char(x);
+call    0 returned 1
+       1*:  420:    ASSERT(obj_to_int(r) == 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  421:    dec_ref(x); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  422:    PASS();
+call    0 returned 1
+        -:  423:}
+        -:  424:
+function test_prim_sym_true called 1 returned 100% blocks executed 80%
+        1:  425:void test_prim_sym_true(void) {
+        1:  426:    Obj* x = mk_sym("hello");
+call    0 returned 1
+        1:  427:    Obj* r = prim_sym(x);
+call    0 returned 1
+       1*:  428:    ASSERT(obj_to_int(r) != 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  429:    dec_ref(x); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  430:    PASS();
+call    0 returned 1
+        -:  431:}
+        -:  432:
+function test_prim_sym_false called 1 returned 100% blocks executed 80%
+        1:  433:void test_prim_sym_false(void) {
+        1:  434:    Obj* x = mk_int(1);
+call    0 returned 1
+        1:  435:    Obj* r = prim_sym(x);
+call    0 returned 1
+       1*:  436:    ASSERT(obj_to_int(r) == 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  437:    dec_ref(x); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  438:    PASS();
+call    0 returned 1
+        -:  439:}
+        -:  440:
+        -:  441:/* === Character/Float conversion tests === */
+        -:  442:
+function test_char_to_int called 1 returned 100% blocks executed 67%
+        1:  443:void test_char_to_int(void) {
+        1:  444:    Obj* c = mk_char('A');
+call    0 returned 1
+        1:  445:    Obj* r = char_to_int(c);
+call    0 returned 1
+       1*:  446:    ASSERT_EQ(obj_to_int(r), 65);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  447:    dec_ref(c); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  448:    PASS();
+call    0 returned 1
+        -:  449:}
+        -:  450:
+function test_char_to_int_wrong_type called 1 returned 100% blocks executed 67%
+        1:  451:void test_char_to_int_wrong_type(void) {
+        1:  452:    Obj* n = mk_int(65);
+call    0 returned 1
+        1:  453:    Obj* r = char_to_int(n);
+call    0 returned 1
+       1*:  454:    ASSERT_EQ(obj_to_int(r), 0);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  455:    dec_ref(n); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  456:    PASS();
+call    0 returned 1
+        -:  457:}
+        -:  458:
+function test_int_to_char called 1 returned 100% blocks executed 56%
+        1:  459:void test_int_to_char(void) {
+        1:  460:    Obj* n = mk_int(65);
+call    0 returned 1
+        1:  461:    Obj* r = int_to_char(n);
+call    0 returned 1
+       1*:  462:    ASSERT_EQ(obj_tag(r), TAG_CHAR);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+       1*:  463:    ASSERT_EQ(obj_to_char_val(r), 65);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  464:    dec_ref(n); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  465:    PASS();
+call    0 returned 1
+        -:  466:}
+        -:  467:
+function test_int_to_char_immediate called 1 returned 100% blocks executed 53%
+        1:  468:void test_int_to_char_immediate(void) {
+        1:  469:    Obj* n = mk_int_unboxed(66);
+call    0 returned 1
+        1:  470:    Obj* r = int_to_char(n);
+call    0 returned 1
+       1*:  471:    ASSERT_EQ(obj_tag(r), TAG_CHAR);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+       1*:  472:    ASSERT_EQ(obj_to_char_val(r), 66);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  473:    dec_ref(r);
+call    0 returned 1
+        1:  474:    PASS();
+call    0 returned 1
+        -:  475:}
+        -:  476:
+function test_int_to_float called 1 returned 100% blocks executed 56%
+        1:  477:void test_int_to_float(void) {
+        1:  478:    Obj* n = mk_int(42);
+call    0 returned 1
+        1:  479:    Obj* r = int_to_float(n);
+call    0 returned 1
+       1*:  480:    ASSERT_EQ(obj_tag(r), TAG_FLOAT);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+       1*:  481:    ASSERT_EQ_FLOAT(num_to_double(r), 42.0, 0.0001);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  482:    dec_ref(n); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  483:    PASS();
+call    0 returned 1
+        -:  484:}
+        -:  485:
+function test_float_to_int called 1 returned 100% blocks executed 56%
+        1:  486:void test_float_to_int(void) {
+        1:  487:    Obj* f = mk_float(3.7);
+call    0 returned 1
+        1:  488:    Obj* r = float_to_int(f);
+call    0 returned 1
+       1*:  489:    ASSERT_EQ(obj_tag(r), TAG_INT);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+       1*:  490:    ASSERT_EQ(obj_to_int(r), 3);  /* truncated */
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  491:    dec_ref(f); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  492:    PASS();
+call    0 returned 1
+        -:  493:}
+        -:  494:
+function test_prim_floor called 1 returned 100% blocks executed 67%
+        1:  495:void test_prim_floor(void) {
+        1:  496:    Obj* f = mk_float(3.7);
+call    0 returned 1
+        1:  497:    Obj* r = prim_floor(f);
+call    0 returned 1
+       1*:  498:    ASSERT_EQ_FLOAT(num_to_double(r), 3.0, 0.0001);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  499:    dec_ref(f); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  500:    PASS();
+call    0 returned 1
+        -:  501:}
+        -:  502:
+function test_prim_floor_negative called 1 returned 100% blocks executed 67%
+        1:  503:void test_prim_floor_negative(void) {
+        1:  504:    Obj* f = mk_float(-3.2);
+call    0 returned 1
+        1:  505:    Obj* r = prim_floor(f);
+call    0 returned 1
+       1*:  506:    ASSERT_EQ_FLOAT(num_to_double(r), -4.0, 0.0001);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  507:    dec_ref(f); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  508:    PASS();
+call    0 returned 1
+        -:  509:}
+        -:  510:
+function test_prim_ceil called 1 returned 100% blocks executed 67%
+        1:  511:void test_prim_ceil(void) {
+        1:  512:    Obj* f = mk_float(3.2);
+call    0 returned 1
+        1:  513:    Obj* r = prim_ceil(f);
+call    0 returned 1
+       1*:  514:    ASSERT_EQ_FLOAT(num_to_double(r), 4.0, 0.0001);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  515:    dec_ref(f); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  516:    PASS();
+call    0 returned 1
+        -:  517:}
+        -:  518:
+function test_prim_ceil_negative called 1 returned 100% blocks executed 67%
+        1:  519:void test_prim_ceil_negative(void) {
+        1:  520:    Obj* f = mk_float(-3.7);
+call    0 returned 1
+        1:  521:    Obj* r = prim_ceil(f);
+call    0 returned 1
+       1*:  522:    ASSERT_EQ_FLOAT(num_to_double(r), -3.0, 0.0001);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+        1:  523:    dec_ref(f); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  524:    PASS();
+call    0 returned 1
+        -:  525:}
+        -:  526:
+        -:  527:/* === Type introspection tests === */
+        -:  528:
+function test_ctr_tag_int called 1 returned 100% blocks executed 53%
+        1:  529:void test_ctr_tag_int(void) {
+        1:  530:    Obj* x = mk_int(42);
+call    0 returned 1
+        1:  531:    Obj* r = ctr_tag(x);
+call    0 returned 1
+        -:  532:    /* ctr_tag returns a symbol like "int", "float", etc. */
+       1*:  533:    ASSERT_NOT_NULL(r);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  534:    ASSERT_EQ(obj_tag(r), TAG_SYM);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+       1*:  535:    ASSERT_STR_EQ((char*)r->ptr, "int");
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  536:    dec_ref(x); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  537:    PASS();
+call    0 returned 1
+        -:  538:}
+        -:  539:
+function test_ctr_tag_pair called 1 returned 100% blocks executed 57%
+        1:  540:void test_ctr_tag_pair(void) {
+        1:  541:    Obj* p = mk_pair(mk_int(1), mk_int(2));
+call    0 returned 1
+call    1 returned 1
+call    2 returned 1
+        1:  542:    Obj* r = ctr_tag(p);
+call    0 returned 1
+       1*:  543:    ASSERT_NOT_NULL(r);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  544:    ASSERT_EQ(obj_tag(r), TAG_SYM);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+       1*:  545:    ASSERT_STR_EQ((char*)r->ptr, "cell");  /* pairs are called "cell" */
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  546:    dec_ref(p); dec_ref(r);
+call    0 returned 1
+call    1 returned 1
+        1:  547:    PASS();
+call    0 returned 1
+        -:  548:}
+        -:  549:
+function test_ctr_tag_null called 1 returned 100% blocks executed 47%
+        1:  550:void test_ctr_tag_null(void) {
+        1:  551:    Obj* r = ctr_tag(NULL);
+call    0 returned 1
+       1*:  552:    ASSERT_NOT_NULL(r);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+       1*:  553:    ASSERT_EQ(obj_tag(r), TAG_SYM);
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+call    4 never executed
+       1*:  554:    ASSERT_STR_EQ((char*)r->ptr, "nil");
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  555:    dec_ref(r);
+call    0 returned 1
+        1:  556:    PASS();
+call    0 returned 1
+        -:  557:}
+        -:  558:
+function test_ctr_arg_car called 1 returned 100% blocks executed 77%
+        1:  559:void test_ctr_arg_car(void) {
+        1:  560:    Obj* a = mk_int(1);
+call    0 returned 1
+        1:  561:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  562:    Obj* p = mk_pair(a, b);
+call    0 returned 1
+        1:  563:    Obj* idx = mk_int(0);
+call    0 returned 1
+        1:  564:    Obj* r = ctr_arg(p, idx);
+call    0 returned 1
+       1*:  565:    ASSERT_EQ(r, a);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  566:    dec_ref(p); dec_ref(idx);
+call    0 returned 1
+call    1 returned 1
+        1:  567:    PASS();
+call    0 returned 1
+        -:  568:}
+        -:  569:
+function test_ctr_arg_cdr called 1 returned 100% blocks executed 77%
+        1:  570:void test_ctr_arg_cdr(void) {
+        1:  571:    Obj* a = mk_int(1);
+call    0 returned 1
+        1:  572:    Obj* b = mk_int(2);
+call    0 returned 1
+        1:  573:    Obj* p = mk_pair(a, b);
+call    0 returned 1
+        1:  574:    Obj* idx = mk_int(1);
+call    0 returned 1
+        1:  575:    Obj* r = ctr_arg(p, idx);
+call    0 returned 1
+       1*:  576:    ASSERT_EQ(r, b);
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1
+call    2 never executed
+        1:  577:    dec_ref(p); dec_ref(idx);
+call    0 returned 1
+call    1 returned 1
+        1:  578:    PASS();
+call    0 returned 1
+        -:  579:}
+        -:  580:
+        -:  581:/* === Truthiness tests === */
+        -:  582:
+function test_is_truthy_null called 1 returned 100% blocks executed 67%
+        1:  583:void test_is_truthy_null(void) {
+       1*:  584:    ASSERT(!is_truthy(NULL));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  585:    PASS();
+call    0 returned 1
+        -:  586:}
+        -:  587:
+function test_is_truthy_zero called 1 returned 100% blocks executed 75%
+        1:  588:void test_is_truthy_zero(void) {
+        1:  589:    Obj* x = mk_int(0);
+call    0 returned 1
+       1*:  590:    ASSERT(!is_truthy(x));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  591:    dec_ref(x);
+call    0 returned 1
+        1:  592:    PASS();
+call    0 returned 1
+        -:  593:}
+        -:  594:
+function test_is_truthy_nonzero called 1 returned 100% blocks executed 75%
+        1:  595:void test_is_truthy_nonzero(void) {
+        1:  596:    Obj* x = mk_int(1);
+call    0 returned 1
+       1*:  597:    ASSERT(is_truthy(x));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  598:    dec_ref(x);
+call    0 returned 1
+        1:  599:    PASS();
+call    0 returned 1
+        -:  600:}
+        -:  601:
+function test_is_truthy_pair called 1 returned 100% blocks executed 78%
+        1:  602:void test_is_truthy_pair(void) {
+        1:  603:    Obj* p = mk_pair(mk_int(1), NULL);
+call    0 returned 1
+call    1 returned 1
+       1*:  604:    ASSERT(is_truthy(p));
+call    0 returned 1
+branch  1 taken 0 (fallthrough)
+branch  2 taken 1
+call    3 never executed
+        1:  605:    dec_ref(p);
+call    0 returned 1
+        1:  606:    PASS();
+call    0 returned 1
+        -:  607:}
+        -:  608:
+        -:  609:/* === Run all primitive tests === */
+        -:  610:
+function run_primitive_tests called 1 returned 100% blocks executed 60%
+        1:  611:void run_primitive_tests(void) {
+        1:  612:    TEST_SUITE("Primitive Operations");
+call    0 returned 1
+        -:  613:
+        -:  614:    /* Arithmetic */
+       1*:  615:    RUN_TEST(test_prim_add_ints);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  616:    RUN_TEST(test_prim_add_immediates);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  617:    RUN_TEST(test_prim_add_floats);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  618:    RUN_TEST(test_prim_add_int_float);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  619:    RUN_TEST(test_prim_add_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  620:    RUN_TEST(test_prim_sub_ints);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  621:    RUN_TEST(test_prim_sub_immediates);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  622:    RUN_TEST(test_prim_sub_negative);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  623:    RUN_TEST(test_prim_sub_null_left);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  624:    RUN_TEST(test_prim_sub_null_right);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  625:    RUN_TEST(test_prim_mul_ints);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  626:    RUN_TEST(test_prim_mul_immediates);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  627:    RUN_TEST(test_prim_mul_zero);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  628:    RUN_TEST(test_prim_div_ints);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  629:    RUN_TEST(test_prim_div_immediates);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  630:    RUN_TEST(test_prim_div_floats);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  631:    RUN_TEST(test_prim_div_by_zero);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  632:    RUN_TEST(test_prim_mod_normal);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  633:    RUN_TEST(test_prim_mod_immediates);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  634:    RUN_TEST(test_prim_mod_negative);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  635:    RUN_TEST(test_prim_abs_positive);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  636:    RUN_TEST(test_prim_abs_negative);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  637:    RUN_TEST(test_prim_abs_zero);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  638:
+        -:  639:    /* Comparison */
+       1*:  640:    RUN_TEST(test_prim_lt_true);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  641:    RUN_TEST(test_prim_lt_false);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  642:    RUN_TEST(test_prim_lt_equal);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  643:    RUN_TEST(test_prim_gt_true);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  644:    RUN_TEST(test_prim_gt_false);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  645:    RUN_TEST(test_prim_le_true);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  646:    RUN_TEST(test_prim_le_false);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  647:    RUN_TEST(test_prim_ge_true);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  648:    RUN_TEST(test_prim_ge_false);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  649:    RUN_TEST(test_prim_eq_same);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  650:    RUN_TEST(test_prim_eq_float_same);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  651:    RUN_TEST(test_prim_eq_different);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  652:    RUN_TEST(test_prim_not_truthy);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  653:    RUN_TEST(test_prim_not_falsy);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  654:
+        -:  655:    /* Type predicates */
+       1*:  656:    RUN_TEST(test_prim_null_true);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  657:    RUN_TEST(test_prim_null_false);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  658:    RUN_TEST(test_prim_pair_true);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  659:    RUN_TEST(test_prim_pair_false);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  660:    RUN_TEST(test_prim_int_true);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  661:    RUN_TEST(test_prim_int_false);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  662:    RUN_TEST(test_prim_float_true);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  663:    RUN_TEST(test_prim_float_false);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  664:    RUN_TEST(test_prim_char_true);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  665:    RUN_TEST(test_prim_char_false);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  666:    RUN_TEST(test_prim_sym_true);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  667:    RUN_TEST(test_prim_sym_false);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  668:
+        -:  669:    /* Conversions */
+       1*:  670:    RUN_TEST(test_char_to_int);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  671:    RUN_TEST(test_char_to_int_wrong_type);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  672:    RUN_TEST(test_int_to_char);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  673:    RUN_TEST(test_int_to_char_immediate);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  674:    RUN_TEST(test_int_to_float);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  675:    RUN_TEST(test_float_to_int);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  676:    RUN_TEST(test_prim_floor);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  677:    RUN_TEST(test_prim_floor_negative);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  678:    RUN_TEST(test_prim_ceil);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  679:    RUN_TEST(test_prim_ceil_negative);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  680:
+        -:  681:    /* Type introspection */
+       1*:  682:    RUN_TEST(test_ctr_tag_int);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  683:    RUN_TEST(test_ctr_tag_pair);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  684:    RUN_TEST(test_ctr_tag_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  685:    RUN_TEST(test_ctr_arg_car);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  686:    RUN_TEST(test_ctr_arg_cdr);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        -:  687:
+        -:  688:    /* Truthiness */
+       1*:  689:    RUN_TEST(test_is_truthy_null);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  690:    RUN_TEST(test_is_truthy_zero);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  691:    RUN_TEST(test_is_truthy_nonzero);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+       1*:  692:    RUN_TEST(test_is_truthy_pair);
+call    0 returned 1
+call    1 returned 1
+branch  2 taken 0 (fallthrough)
+branch  3 taken 1
+branch  4 never executed (fallthrough)
+branch  5 never executed
+call    6 never executed
+        1:  693:}
