@@ -61,7 +61,7 @@ static int stress_count_list_length(Obj* xs) {
     int len = 0;
     while (xs && xs->tag == TAG_PAIR) {
         len++;
-        xs = obj_cdr(xs);
+        xs = xs->b;
     }
     return len;
 }
@@ -130,9 +130,10 @@ void test_stress_closure_10k_calls(void) {
         Obj* args[] = {arg};
         Obj* result = call_closure(closure, args, 1);
         ASSERT_EQ(obj_to_int(result), i);
+        dec_ref(result);
     }
 
-    free_obj(closure);
+    dec_ref(closure);
     PASS();
 }
 
@@ -140,7 +141,7 @@ void test_stress_closure_create_destroy(void) {
     for (int i = 0; i < 5000; i++) {
         Obj* closure = mk_closure(stress_identity_fn, NULL, NULL, 0, 1);
         ASSERT_NOT_NULL(closure);
-        free_obj(closure);
+        dec_ref(closure);
     }
     PASS();
 }
@@ -150,7 +151,7 @@ void test_stress_closure_with_captures(void) {
         Obj* caps[3] = {mk_int(i), mk_int(i + 1), mk_int(i + 2)};
         Obj* closure = mk_closure(stress_identity_fn, caps, NULL, 3, 1);
         ASSERT_NOT_NULL(closure);
-        free_obj(closure);
+        dec_ref(closure);
         for (int j = 0; j < 3; j++) {
             dec_ref(caps[j]);
         }
@@ -280,7 +281,7 @@ void test_stress_weak_ref_many(void) {
 
     /* Free half, check weak refs */
     for (int i = 0; i < 500; i++) {
-        free_obj(objs[i]);
+        dec_ref(objs[i]);
         ASSERT_EQ(refs[i]->alive, 0);
     }
 
@@ -452,15 +453,16 @@ void test_stress_concurrent_atoms(void) {
     /* Join all */
     for (int i = 0; i < 10; i++) {
         thread_join(threads[i]);
-        free_obj(threads[i]);
-        free_obj(closures[i]);
+        dec_ref(threads[i]);
+        dec_ref(closures[i]);
     }
 
     Obj* final = atom_deref(atom);
     ASSERT_EQ(obj_to_int(final), 1000);  /* 10 threads * 100 increments */
     dec_ref(final);
-    free_obj(inc_closure);
-    free_obj(atom);
+    dec_ref(inc_closure);
+    dec_ref(atom);
+    dec_ref(val);
     PASS();
 }
 
@@ -477,10 +479,10 @@ void test_stress_channel_throughput(void) {
         Obj* val = channel_recv(ch);
         ASSERT_NOT_NULL(val);
         ASSERT_EQ(obj_to_int(val), i);
-        free_obj(val);
+        dec_ref(val);
     }
 
-    free_obj(ch);
+    dec_ref(ch);
     PASS();
 }
 
@@ -514,13 +516,13 @@ void test_stress_integration(void) {
             Obj* arg = mk_int_unboxed(j);
             Obj* args[] = {arg};
             Obj* result = call_closure(closures[i], args, 1);
-            (void)result;
+            dec_ref(result);
         }
     }
 
     /* Cleanup */
     for (int i = 0; i < 10; i++) {
-        free_obj(closures[i]);
+        dec_ref(closures[i]);
     }
     for (int i = 0; i < 100; i++) {
         dec_ref(heap_objs[i]);

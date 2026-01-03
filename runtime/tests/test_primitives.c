@@ -15,6 +15,15 @@ void test_prim_add_ints(void) {
     PASS();
 }
 
+void test_prim_add_immediates(void) {
+    Obj* a = mk_int_unboxed(2);
+    Obj* b = mk_int_unboxed(3);
+    Obj* r = prim_add(a, b);
+    ASSERT(IS_IMMEDIATE(r));
+    ASSERT_EQ(INT_IMM_VALUE(r), 5);
+    PASS();
+}
+
 void test_prim_add_floats(void) {
     Obj* a = mk_float(2.5);
     Obj* b = mk_float(3.5);
@@ -40,13 +49,9 @@ void test_prim_add_int_float(void) {
 void test_prim_add_null(void) {
     Obj* a = mk_int(2);
     Obj* r = prim_add(a, NULL);
-    /* add(a, NULL) returns a directly, so r == a - only dec_ref once */
-    if (r != a) {
-        dec_ref(a);
-        if (r) dec_ref(r);
-    } else {
-        dec_ref(a);  /* r and a are same object */
-    }
+    /* add(a, NULL) returns a directly */
+    ASSERT_EQ(r, a);
+    dec_ref(a);  /* r and a are same object */
     PASS();
 }
 
@@ -59,6 +64,15 @@ void test_prim_sub_ints(void) {
     PASS();
 }
 
+void test_prim_sub_immediates(void) {
+    Obj* a = mk_int_unboxed(10);
+    Obj* b = mk_int_unboxed(3);
+    Obj* r = prim_sub(a, b);
+    ASSERT(IS_IMMEDIATE(r));
+    ASSERT_EQ(INT_IMM_VALUE(r), 7);
+    PASS();
+}
+
 void test_prim_sub_negative(void) {
     Obj* a = mk_int(3);
     Obj* b = mk_int(10);
@@ -68,12 +82,38 @@ void test_prim_sub_negative(void) {
     PASS();
 }
 
+void test_prim_sub_null_left(void) {
+    Obj* b = mk_int(5);
+    Obj* r = prim_sub(NULL, b);
+    ASSERT(IS_IMMEDIATE(r));
+    ASSERT_EQ(INT_IMM_VALUE(r), -5);
+    dec_ref(b);
+    PASS();
+}
+
+void test_prim_sub_null_right(void) {
+    Obj* a = mk_int(5);
+    Obj* r = prim_sub(a, NULL);
+    ASSERT_EQ(r, a);
+    dec_ref(a);
+    PASS();
+}
+
 void test_prim_mul_ints(void) {
     Obj* a = mk_int(6);
     Obj* b = mk_int(7);
     Obj* r = prim_mul(a, b);
     ASSERT_EQ(obj_to_int(r), 42);
     dec_ref(a); dec_ref(b); dec_ref(r);
+    PASS();
+}
+
+void test_prim_mul_immediates(void) {
+    Obj* a = mk_int_unboxed(6);
+    Obj* b = mk_int_unboxed(7);
+    Obj* r = prim_mul(a, b);
+    ASSERT(IS_IMMEDIATE(r));
+    ASSERT_EQ(INT_IMM_VALUE(r), 42);
     PASS();
 }
 
@@ -92,6 +132,15 @@ void test_prim_div_ints(void) {
     Obj* r = prim_div(a, b);
     ASSERT_EQ(obj_to_int(r), 3);  /* Integer division */
     dec_ref(a); dec_ref(b); dec_ref(r);
+    PASS();
+}
+
+void test_prim_div_immediates(void) {
+    Obj* a = mk_int_unboxed(10);
+    Obj* b = mk_int_unboxed(2);
+    Obj* r = prim_div(a, b);
+    ASSERT(IS_IMMEDIATE(r));
+    ASSERT_EQ(INT_IMM_VALUE(r), 5);
     PASS();
 }
 
@@ -120,6 +169,15 @@ void test_prim_mod_normal(void) {
     Obj* r = prim_mod(a, b);
     ASSERT_EQ(obj_to_int(r), 1);
     dec_ref(a); dec_ref(b); dec_ref(r);
+    PASS();
+}
+
+void test_prim_mod_immediates(void) {
+    Obj* a = mk_int_unboxed(10);
+    Obj* b = mk_int_unboxed(3);
+    Obj* r = prim_mod(a, b);
+    ASSERT(IS_IMMEDIATE(r));
+    ASSERT_EQ(INT_IMM_VALUE(r), 1);
     PASS();
 }
 
@@ -195,11 +253,29 @@ void test_prim_gt_true(void) {
     PASS();
 }
 
+void test_prim_gt_false(void) {
+    Obj* a = mk_int(1);
+    Obj* b = mk_int(2);
+    Obj* r = prim_gt(a, b);
+    ASSERT(obj_to_int(r) == 0);
+    dec_ref(a); dec_ref(b); dec_ref(r);
+    PASS();
+}
+
 void test_prim_le_true(void) {
     Obj* a = mk_int(2);
     Obj* b = mk_int(2);
     Obj* r = prim_le(a, b);
     ASSERT(obj_to_int(r) != 0);  /* equal satisfies <= */
+    dec_ref(a); dec_ref(b); dec_ref(r);
+    PASS();
+}
+
+void test_prim_le_false(void) {
+    Obj* a = mk_int(3);
+    Obj* b = mk_int(2);
+    Obj* r = prim_le(a, b);
+    ASSERT(obj_to_int(r) == 0);
     dec_ref(a); dec_ref(b); dec_ref(r);
     PASS();
 }
@@ -213,9 +289,27 @@ void test_prim_ge_true(void) {
     PASS();
 }
 
+void test_prim_ge_false(void) {
+    Obj* a = mk_int(1);
+    Obj* b = mk_int(2);
+    Obj* r = prim_ge(a, b);
+    ASSERT(obj_to_int(r) == 0);
+    dec_ref(a); dec_ref(b); dec_ref(r);
+    PASS();
+}
+
 void test_prim_eq_same(void) {
     Obj* a = mk_int(42);
     Obj* b = mk_int(42);
+    Obj* r = prim_eq(a, b);
+    ASSERT(obj_to_int(r) != 0);
+    dec_ref(a); dec_ref(b); dec_ref(r);
+    PASS();
+}
+
+void test_prim_eq_float_same(void) {
+    Obj* a = mk_float(1.5);
+    Obj* b = mk_float(1.5);
     Obj* r = prim_eq(a, b);
     ASSERT(obj_to_int(r) != 0);
     dec_ref(a); dec_ref(b); dec_ref(r);
@@ -304,6 +398,14 @@ void test_prim_float_true(void) {
     PASS();
 }
 
+void test_prim_float_false(void) {
+    Obj* x = mk_int(3);
+    Obj* r = prim_float(x);
+    ASSERT(obj_to_int(r) == 0);
+    dec_ref(x); dec_ref(r);
+    PASS();
+}
+
 void test_prim_char_true(void) {
     Obj* x = mk_char('A');
     Obj* r = prim_char(x);
@@ -312,10 +414,26 @@ void test_prim_char_true(void) {
     PASS();
 }
 
+void test_prim_char_false(void) {
+    Obj* x = mk_int(65);
+    Obj* r = prim_char(x);
+    ASSERT(obj_to_int(r) == 0);
+    dec_ref(x); dec_ref(r);
+    PASS();
+}
+
 void test_prim_sym_true(void) {
     Obj* x = mk_sym("hello");
     Obj* r = prim_sym(x);
     ASSERT(obj_to_int(r) != 0);
+    dec_ref(x); dec_ref(r);
+    PASS();
+}
+
+void test_prim_sym_false(void) {
+    Obj* x = mk_int(1);
+    Obj* r = prim_sym(x);
+    ASSERT(obj_to_int(r) == 0);
     dec_ref(x); dec_ref(r);
     PASS();
 }
@@ -330,12 +448,29 @@ void test_char_to_int(void) {
     PASS();
 }
 
+void test_char_to_int_wrong_type(void) {
+    Obj* n = mk_int(65);
+    Obj* r = char_to_int(n);
+    ASSERT_EQ(obj_to_int(r), 0);
+    dec_ref(n); dec_ref(r);
+    PASS();
+}
+
 void test_int_to_char(void) {
     Obj* n = mk_int(65);
     Obj* r = int_to_char(n);
     ASSERT_EQ(obj_tag(r), TAG_CHAR);
     ASSERT_EQ(obj_to_char_val(r), 65);
     dec_ref(n); dec_ref(r);
+    PASS();
+}
+
+void test_int_to_char_immediate(void) {
+    Obj* n = mk_int_unboxed(66);
+    Obj* r = int_to_char(n);
+    ASSERT_EQ(obj_tag(r), TAG_CHAR);
+    ASSERT_EQ(obj_to_char_val(r), 66);
+    dec_ref(r);
     PASS();
 }
 
@@ -478,17 +613,24 @@ void run_primitive_tests(void) {
 
     /* Arithmetic */
     RUN_TEST(test_prim_add_ints);
+    RUN_TEST(test_prim_add_immediates);
     RUN_TEST(test_prim_add_floats);
     RUN_TEST(test_prim_add_int_float);
     RUN_TEST(test_prim_add_null);
     RUN_TEST(test_prim_sub_ints);
+    RUN_TEST(test_prim_sub_immediates);
     RUN_TEST(test_prim_sub_negative);
+    RUN_TEST(test_prim_sub_null_left);
+    RUN_TEST(test_prim_sub_null_right);
     RUN_TEST(test_prim_mul_ints);
+    RUN_TEST(test_prim_mul_immediates);
     RUN_TEST(test_prim_mul_zero);
     RUN_TEST(test_prim_div_ints);
+    RUN_TEST(test_prim_div_immediates);
     RUN_TEST(test_prim_div_floats);
     RUN_TEST(test_prim_div_by_zero);
     RUN_TEST(test_prim_mod_normal);
+    RUN_TEST(test_prim_mod_immediates);
     RUN_TEST(test_prim_mod_negative);
     RUN_TEST(test_prim_abs_positive);
     RUN_TEST(test_prim_abs_negative);
@@ -499,9 +641,13 @@ void run_primitive_tests(void) {
     RUN_TEST(test_prim_lt_false);
     RUN_TEST(test_prim_lt_equal);
     RUN_TEST(test_prim_gt_true);
+    RUN_TEST(test_prim_gt_false);
     RUN_TEST(test_prim_le_true);
+    RUN_TEST(test_prim_le_false);
     RUN_TEST(test_prim_ge_true);
+    RUN_TEST(test_prim_ge_false);
     RUN_TEST(test_prim_eq_same);
+    RUN_TEST(test_prim_eq_float_same);
     RUN_TEST(test_prim_eq_different);
     RUN_TEST(test_prim_not_truthy);
     RUN_TEST(test_prim_not_falsy);
@@ -514,12 +660,17 @@ void run_primitive_tests(void) {
     RUN_TEST(test_prim_int_true);
     RUN_TEST(test_prim_int_false);
     RUN_TEST(test_prim_float_true);
+    RUN_TEST(test_prim_float_false);
     RUN_TEST(test_prim_char_true);
+    RUN_TEST(test_prim_char_false);
     RUN_TEST(test_prim_sym_true);
+    RUN_TEST(test_prim_sym_false);
 
     /* Conversions */
     RUN_TEST(test_char_to_int);
+    RUN_TEST(test_char_to_int_wrong_type);
     RUN_TEST(test_int_to_char);
+    RUN_TEST(test_int_to_char_immediate);
     RUN_TEST(test_int_to_float);
     RUN_TEST(test_float_to_int);
     RUN_TEST(test_prim_floor);

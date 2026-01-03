@@ -255,8 +255,8 @@ void test_borrow_in_closure(void) {
     Obj* result = call_closure(closure, NULL, 0);
     ASSERT_EQ(obj_to_int(result), 42);
 
-    free_obj(result);
-    free_obj(closure);
+    dec_ref(result);
+    dec_ref(closure);
     dec_ref(cap);
     PASS();
 }
@@ -275,7 +275,7 @@ void test_borrow_invalid_in_closure(void) {
     /* Closure validation should fail */
     ASSERT(!closure_validate((Closure*)closure->ptr));
 
-    free_obj(closure);
+    dec_ref(closure);
     dec_ref(cap);
     PASS();
 }

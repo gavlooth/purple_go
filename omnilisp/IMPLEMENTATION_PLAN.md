@@ -51,7 +51,7 @@ The C runtime remains unchanged. The Go compiler frontend is rewritten 100%.
 
 | Component | Change Level | Description |
 |-----------|--------------|-------------|
-| **pkg/parser/pika.go** | 100% Rewrite | New bracket semantics, dot notation, string interpolation |
+| **src/runtime/reader/pika.c** | New Implementation | Pika Parser: New bracket semantics, dot notation, string interpolation (C Implementation) |
 | **pkg/ast/value.go** | 80% Rewrite | New types: Array, Dict, Tuple, Struct, Enum, TypeAnnotation |
 | **pkg/eval/eval.go** | 95% Rewrite | New special forms, multiple dispatch, match semantics |
 | **pkg/eval/primitives.go** | 60% Rewrite | New primitive operations |
@@ -61,57 +61,69 @@ The C runtime remains unchanged. The Go compiler frontend is rewritten 100%.
 
 ---
 
-## Phase 1: Parser Rewrite (pkg/parser/pika.go)
+## Phase 1: Parser Implementation (src/runtime/reader/pika.c)
 
-### 1.1 New Bracket Types
+We will implement the Pika parser directly in C to support the "Tower of Interpreters" model (Level 0 parsing).
 
-```go
-// Token types to add
-const (
-    TokLParen    = '('   // Forms, function calls
-    TokRParen    = ')'
-    TokLBracket  = '['   // Arrays, bindings, params, branches
-    TokRBracket  = ']'
-    TokLBrace    = '{'   // Type forms
-    TokRBrace    = '}'
-    TokHashBrace = '#{'  // Dict literals
-)
+### 1.1 C Tokenizer
+
+```c
+typedef enum {
+    TOK_LPAREN,   // (
+    TOK_RPAREN,   // )
+    TOK_LBRACKET, // [
+    TOK_RBRACKET, // ]
+    TOK_LBRACE,   // {
+    TOK_RBRACE,   // }
+    TOK_HASHBRACE,// #{
+    TOK_DOT,      // .
+    TOK_STRING,   // "..."
+    TOK_INT,      // 123
+    TOK_FLOAT,    // 123.456
+    TOK_SYMBOL,   // name
+    TOK_KEYWORD,  // :key
+    TOK_EOF
+} TokenType;
+
+// Tokenizer state
+typedef struct {
+    const char* input;
+    size_t pos;
+    size_t len;
+} Lexer;
 ```
 
-### 1.2 Parser Changes
+### 1.2 Parser Changes (C)
 
-| Rule | Current | New |
-|------|---------|-----|
-| `parseList` | Only `()` | `()` for forms |
-| `parseArray` | N/A | `[]` for arrays/bindings |
-| `parseTypeLit` | N/A | `{}` for types |
-| `parseDict` | N/A | `#{}` for dicts |
-| `parseSymbol` | Standard | Add `:symbol` shorthand |
-| `parseString` | Basic | Add `$interpolation` |
-| `parseExpr` | Basic | Add dot notation |
+The parser will construct `OmniValue` objects directly using the runtime's object system.
 
-### 1.3 Dot Notation Parsing
+| Feature | Description |
+|---------|-------------|
+| `parse_list` | `()` -> List or Function Call |
+| `parse_array` | `[]` -> Array Object |
+| `parse_type` | `{}` -> Type Object |
+| `parse_dict` | `#{}` -> Dictionary Object |
+| `parse_dot` | `obj.field` -> Accessor form |
 
-```go
+### 1.3 Dot Notation Parsing (C)
+
+```c
+// Logic to transform tokens into 'get' forms:
 // obj.field     -> (get obj 'field)
 // obj.(expr)    -> (get obj expr)
-// obj.[indices] -> (multi-get obj indices)
-// .field        -> (lambda (it) (get it 'field))
 ```
 
-### 1.4 String Interpolation
+### 1.4 String Interpolation (C)
 
-```go
-// "Hello, $name"      -> (string-concat "Hello, " name)
-// "Sum: $(+ a b)"     -> (string-concat "Sum: " (+ a b))
-```
+The C parser must handle `$` inside strings and generate `(string-concat ...)` forms.
 
-### 1.5 Files to Modify
+### 1.5 Files to Create/Modify
 
 ```
-pkg/parser/pika.go       # Complete rewrite
-pkg/parser/parser.go     # May need updates
-pkg/parser/pika_test.go  # New tests
+src/runtime/reader/pika.c       # Core parser logic
+src/runtime/reader/pika.h       # Public API
+src/runtime/reader/token.h      # Token definitions
+src/runtime/include/omnilisp.h  # Expose omni_read()
 ```
 
 ---
@@ -566,13 +578,14 @@ switch (get_type(value)) {
 
 ## Implementation Order
 
-### Phase 1: Parser Foundation ✅ COMPLETE
-- [x] Add bracket tokenization (`[]`, `{}`, `#{}`)
-- [x] Implement array literal parsing `[1 2 3]`
-- [x] Implement type literal parsing `{Int}`, `{Array Int}`
-- [x] Implement dict literal parsing `#{:a 1}`
-- [x] Add `:symbol` shorthand
-- [x] Parser tests
+### Phase 1: Parser Foundation (C) ✅
+- [ ] Implement tokenizer in C (`src/runtime/reader/`)
+- [ ] Implement array literal parsing `[]`
+- [ ] Implement type literal parsing `{}`
+- [ ] Implement dict literal parsing `#{}`
+- [ ] Implement dot notation `obj.field`
+- [ ] Implement string interpolation
+- [ ] Bind `omni_read` to runtime
 
 ### Phase 2: AST Extensions ✅ COMPLETE
 - [x] Add new Value tags (TArray, TDict, TTuple, etc.)
@@ -646,8 +659,11 @@ switch (get_type(value)) {
 ## File Change Summary
 
 ### Complete Rewrites
-- `pkg/parser/pika.go` - New parser
 - `pkg/eval/eval.go` - New evaluator core
+
+### New Implementations (C)
+- `src/runtime/reader/pika.c` - C Parser (Pika)
+- `src/runtime/reader/pika.h` - C Parser Headers
 
 ### Major Modifications
 - `pkg/ast/value.go` - New types
@@ -669,15 +685,15 @@ switch (get_type(value)) {
 
 ## Verification Checklist
 
-### Parser ✅
-- [x] `()` parses as forms
-- [x] `[]` parses as arrays/bindings
-- [x] `{}` parses as type forms
-- [x] `#{}` parses as dicts
-- [x] `:symbol` shorthand works
-- [x] `$interpolation` works
-- [x] `obj.field` parses correctly
-- [x] `.field` creates accessor lambda
+### Parser (C)
+- [ ] `()` parses as forms
+- [ ] `[]` parses as arrays/bindings
+- [ ] `{}` parses as type forms
+- [ ] `#{}` parses as dicts
+- [ ] `:symbol` shorthand works
+- [ ] `$interpolation` works
+- [ ] `obj.field` parses correctly
+- [ ] `.field` creates accessor lambda
 
 ### Evaluator ✅
 - [x] `define` handles all cases

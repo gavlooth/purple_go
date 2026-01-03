@@ -119,6 +119,11 @@ Value* mk_int(long i) {
     return v;
 }
 
+Value* mk_nil(void) {
+    static Value nil_singleton = { .tag = T_NIL };
+    return &nil_singleton;
+}
+
 Value* mk_sym(const char* s) {
     if (!s) s = "";
     Value* v = alloc_val(T_SYM);

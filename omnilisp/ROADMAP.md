@@ -19,8 +19,8 @@ This roadmap outlines the steps to build the Omnilisp language using the C-based
     *   Implement GC interface or RefCounting (if not using pure Arena/Region).
 
 ## Phase 1: The Reader (Lexer & Parser)
-**Goal:** Convert source text into AST (S-expressions).
-*   [ ] **Tokenizer:**
+**Goal:** Convert source text into AST (S-expressions) within the C runtime (`src/runtime/reader`).
+*   [ ] **Tokenizer (C):**
     *   Handle `(` `)` `[` `]` `{` `}` `#{` `}`.
     *   Handle `..` and `...` (Rest/Variadic).
     *   Handle `.` as dot-operator (distinguish from number decimal).

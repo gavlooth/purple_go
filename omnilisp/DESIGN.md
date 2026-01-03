@@ -1,4 +1,5 @@
 # Omnilisp Design Specification
+Tag: Syntax Guide
 
 ## 1. Core Philosophy
 

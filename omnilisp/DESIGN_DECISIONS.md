@@ -1,4 +1,5 @@
 # OmniLisp Open Design Decisions
+Tag: Syntax Guide
 
 This document lists **remaining** design decisions that need resolution.
 For resolved decisions, see the Decision Log at the bottom.

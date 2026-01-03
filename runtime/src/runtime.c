@@ -114,6 +114,8 @@ Obj* call_closure(Obj* clos, Obj** args, int arg_count);
 void closure_release(Closure* c);
 void release_user_obj(Obj* x);
 void free_channel_obj(Obj* ch_obj);
+void free_atom_obj(Obj* atom_obj);
+void free_thread_obj(Obj* thread_obj);
 void scan_user_obj(Obj* obj);
 void clear_marks_user_obj(Obj* obj);
 
@@ -2255,6 +2257,19 @@ void print_list(Obj* xs) {
 void print_obj(Obj* x) {
     if (!x) {
         printf("()");
+        return;
+    }
+    /* Handle immediate (tagged pointer) values first */
+    if (IS_IMMEDIATE_INT(x)) {
+        printf("%ld", (long)INT_IMM_VALUE(x));
+        return;
+    }
+    if (IS_IMMEDIATE_CHAR(x)) {
+        printf("%c", (char)CHAR_IMM_VALUE(x));
+        return;
+    }
+    if (IS_IMMEDIATE_BOOL(x)) {
+        printf("%s", x == PURPLE_TRUE ? "#t" : "#f");
         return;
     }
     switch (x->tag) {

@@ -9,7 +9,6 @@ void test_mk_weak_ref(void) {
     ASSERT_NOT_NULL(w);
     ASSERT_EQ(w->target, &dummy);
     ASSERT_EQ(w->alive, 1);
-    free(w);
     PASS();
 }
 
@@ -18,7 +17,6 @@ void test_mk_weak_ref_null_target(void) {
     ASSERT_NOT_NULL(w);
     ASSERT_NULL(w->target);
     ASSERT_EQ(w->alive, 1);
-    free(w);
     PASS();
 }
 
@@ -29,7 +27,6 @@ void test_deref_weak_valid(void) {
     _InternalWeakRef* w = _mk_weak_ref(&dummy);
     void* deref = _deref_weak(w);
     ASSERT_EQ(deref, &dummy);
-    free(w);
     PASS();
 }
 
@@ -45,7 +42,6 @@ void test_deref_weak_invalidated(void) {
     _invalidate_weak(w);
     void* deref = _deref_weak(w);
     ASSERT_NULL(deref);
-    free(w);
     PASS();
 }
 
@@ -57,7 +53,6 @@ void test_invalidate_weak(void) {
     ASSERT_EQ(w->alive, 1);
     _invalidate_weak(w);
     ASSERT_EQ(w->alive, 0);
-    free(w);
     PASS();
 }
 
@@ -72,7 +67,6 @@ void test_invalidate_weak_twice(void) {
     _invalidate_weak(w);
     _invalidate_weak(w);  /* Should be idempotent */
     ASSERT_EQ(w->alive, 0);
-    free(w);
     PASS();
 }
 
@@ -131,6 +125,8 @@ void test_weak_ref_to_obj(void) {
     ASSERT_EQ(deref, obj);
 
     dec_ref(obj);
+    ASSERT_EQ(w->alive, 0);
+    ASSERT_NULL(_deref_weak(w));
     PASS();
 }
 
@@ -187,7 +183,7 @@ void test_weak_ref_to_nested_pair(void) {
 
     /* Both should be invalidated */
     ASSERT_EQ(w_outer->alive, 0);
-    /* Note: inner might still be alive depending on RC behavior */
+    ASSERT_EQ(w_inner->alive, 0);
     PASS();
 }
 
@@ -290,7 +286,6 @@ void test_weak_ref_deref_after_multiple_invalidations(void) {
 
     void* deref = _deref_weak(w);
     ASSERT_NULL(deref);
-    free(w);
     PASS();
 }
 
@@ -314,7 +309,6 @@ void test_weak_ref_to_immediate(void) {
     /* Immediates don't have identity but can still be pointed to */
     ASSERT_EQ(w->target, imm);
     ASSERT_EQ(w->alive, 1);
-    free(w);
     PASS();
 }
 

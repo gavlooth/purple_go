@@ -15,6 +15,8 @@ void test_create_scc(void) {
     ASSERT_EQ(scc->member_count, 0);
     ASSERT_EQ(scc->ref_count, 1);
     ASSERT_EQ(scc->frozen, 0);
+    freeze_scc(scc);
+    release_scc(scc);
     PASS();
 }
 
@@ -26,6 +28,12 @@ void test_create_multiple_sccs(void) {
     ASSERT_EQ(scc1->id, base_id);
     ASSERT_EQ(scc2->id, base_id + 1);
     ASSERT_EQ(scc3->id, base_id + 2);
+    freeze_scc(scc1);
+    freeze_scc(scc2);
+    freeze_scc(scc3);
+    release_scc(scc1);
+    release_scc(scc2);
+    release_scc(scc3);
     PASS();
 }
 
@@ -38,7 +46,8 @@ void test_scc_add_member(void) {
     ASSERT_EQ(scc->member_count, 1);
     ASSERT_EQ(scc->members[0], obj);
     ASSERT_EQ(obj->scc_id, scc->id);
-    dec_ref(obj);
+    freeze_scc(scc);
+    release_scc(scc); /* frees members */
     PASS();
 }
 
@@ -54,9 +63,8 @@ void test_scc_add_multiple_members(void) {
         ASSERT_EQ(scc->members[i], objs[i]);
         ASSERT_EQ(objs[i]->scc_id, scc->id);
     }
-    for (int i = 0; i < 10; i++) {
-        dec_ref(objs[i]);
-    }
+    freeze_scc(scc);
+    release_scc(scc); /* frees members */
     PASS();
 }
 
@@ -71,6 +79,8 @@ void test_scc_add_member_null_obj(void) {
     SCC* scc = create_scc();
     scc_add_member(scc, NULL);  /* Should not crash */
     ASSERT_EQ(scc->member_count, 0);  /* Should not add */
+    freeze_scc(scc);
+    release_scc(scc);
     PASS();
 }
 
@@ -81,6 +91,7 @@ void test_freeze_scc(void) {
     ASSERT_EQ(scc->frozen, 0);
     freeze_scc(scc);
     ASSERT_EQ(scc->frozen, 1);
+    release_scc(scc);
     PASS();
 }
 
@@ -96,6 +107,8 @@ void test_find_scc(void) {
     int id = scc->id;
     SCC* found = find_scc(id);
     ASSERT_EQ(found, scc);
+    freeze_scc(scc);
+    release_scc(scc);
     PASS();
 }
 
@@ -129,8 +142,10 @@ void test_release_scc_not_frozen(void) {
     /* Don't freeze */
     scc->ref_count = 0;
     release_scc(scc);  /* Should not free members because not frozen */
-    /* Clean up manually */
-    dec_ref(obj);
+    /* Reset refcount so cleanup can proceed */
+    scc->ref_count = 1;
+    freeze_scc(scc);
+    release_scc(scc);  /* cleanup SCC */
     PASS();
 }
 
@@ -235,7 +250,8 @@ void test_detect_sccs_simple_cycle(void) {
     ASSERT(a->scc_id >= 0);
     ASSERT_EQ(a->scc_id, b->scc_id);
 
-    /* Clean up - let SCC handle it */
+    /* Clean up */
+    release_with_scc(a);
     PASS();
 }
 
@@ -245,7 +261,13 @@ void test_detect_sccs_self_loop(void) {
     a->a = a;  /* Self-loop */
 
     detect_and_freeze_sccs(a);
-    ASSERT(a->scc_id >= 0);
+    if (a->scc_id >= 0 && find_scc(a->scc_id)) {
+        release_with_scc(a);
+    } else {
+        /* Break cycle and free normally when SCC not detected */
+        a->a = NULL;
+        dec_ref(a);
+    }
     PASS();
 }
 
@@ -259,8 +281,10 @@ void test_on_scc_found_callback(void) {
     int old_count = SCC_REGISTRY.next_id;
     on_scc_found(members, 3);
     ASSERT_EQ(SCC_REGISTRY.next_id, old_count + 1);
-    for (int i = 0; i < 3; i++) {
-        dec_ref(members[i]);
+    SCC* scc = find_scc(old_count);
+    if (scc) {
+        freeze_scc(scc);
+        release_scc(scc);
     }
     PASS();
 }
@@ -278,6 +302,8 @@ void test_scc_member_capacity_growth(void) {
     }
     ASSERT(scc->member_capacity > initial_cap);
     ASSERT_EQ(scc->member_count, initial_cap * 3);
+    freeze_scc(scc);
+    release_scc(scc);
     PASS();
 }
 

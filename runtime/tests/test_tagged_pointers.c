@@ -151,7 +151,7 @@ void test_tag_detection_boxed(void) {
     ASSERT(!IS_IMMEDIATE(x));
     ASSERT(IS_BOXED(x));
     ASSERT(!IS_IMMEDIATE_INT(x));
-    free_obj(x);
+    dec_ref(x);
     PASS();
 }
 
@@ -172,7 +172,7 @@ void test_obj_to_int_immediate(void) {
 void test_obj_to_int_boxed(void) {
     Obj* x = mk_int(888);
     ASSERT_EQ(obj_to_int(x), 888);
-    free_obj(x);
+    dec_ref(x);
     PASS();
 }
 
@@ -229,7 +229,7 @@ void test_obj_to_bool_null(void) {
 void test_obj_to_bool_boxed(void) {
     Obj* x = mk_int(1);
     ASSERT_EQ(obj_to_bool(x), 1);
-    free_obj(x);
+    dec_ref(x);
     PASS();
 }
 
@@ -260,21 +260,21 @@ void test_obj_tag_imm_bool(void) {
 void test_obj_tag_boxed_int(void) {
     Obj* x = mk_int(7);
     ASSERT_EQ(obj_tag(x), TAG_INT);
-    free_obj(x);
+    dec_ref(x);
     PASS();
 }
 
 void test_obj_tag_boxed_float(void) {
     Obj* x = mk_float(3.14);
     ASSERT_EQ(obj_tag(x), TAG_FLOAT);
-    free_obj(x);
+    dec_ref(x);
     PASS();
 }
 
 void test_obj_tag_pair(void) {
     Obj* p = mk_pair(mk_int_unboxed(1), mk_int_unboxed(2));
     ASSERT_EQ(obj_tag(p), TAG_PAIR);
-    free_obj(p);
+    dec_ref(p);
     PASS();
 }
 
@@ -289,7 +289,7 @@ void test_is_int_immediate(void) {
 void test_is_int_boxed(void) {
     Obj* x = mk_int(42);
     ASSERT(is_int(x));
-    free_obj(x);
+    dec_ref(x);
     PASS();
 }
 
@@ -308,7 +308,7 @@ void test_is_int_char(void) {
 void test_is_int_float(void) {
     Obj* f = mk_float(3.14);
     ASSERT(!is_int(f));
-    free_obj(f);
+    dec_ref(f);
     PASS();
 }
 
@@ -389,7 +389,7 @@ void test_add_mixed_imm_boxed(void) {
     Obj* result = add(a, b);
     ASSERT(IS_IMMEDIATE_INT(result));
     ASSERT_EQ(obj_to_int(result), 30);
-    free_obj(b);
+    dec_ref(b);
     PASS();
 }
 

@@ -103,6 +103,7 @@ typedef struct Value {
 // -- Value Constructors --
 Value* alloc_val(Tag tag);
 Value* mk_int(long i);
+Value* mk_nil(void);
 Value* mk_sym(const char* s);
 Value* mk_cell(Value* car, Value* cdr);
 Value* mk_prim(PrimFn fn);

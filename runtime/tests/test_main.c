@@ -11,6 +11,12 @@ int tests_passed = 0;
 int tests_failed = 0;
 const char* current_suite = NULL;
 
+static int run_slow_tests_enabled(void) {
+    const char* level = getenv("RUNTIME_TEST_LEVEL");
+    if (!level) return 0;
+    return strcmp(level, "slow") == 0 || strcmp(level, "all") == 0 || strcmp(level, "1") == 0;
+}
+
 /* Include all test files directly */
 #include "test_constructors.c"
 #include "test_memory.c"
@@ -24,6 +30,7 @@ const char* current_suite = NULL;
 #include "test_weak_refs.c"
 #include "test_borrowref.c"
 #include "test_deferred.c"
+#include "test_channel_semantics.c"
 #include "test_stress.c"
 
 int main(int argc, char** argv) {
@@ -52,12 +59,12 @@ int main(int argc, char** argv) {
     run_weak_refs_tests();
     run_borrowref_tests();
     run_deferred_tests();
+    run_channel_semantics_tests();
 
-    /* Concurrency tests - skipped (blocking issues) */
-    // run_concurrency_tests();
-
-    /* Stress tests - skipped for now */
-    // run_stress_tests();
+    if (run_slow_tests_enabled()) {
+        run_concurrency_tests();
+        run_stress_tests();
+    }
 
     TEST_EXIT();
 }

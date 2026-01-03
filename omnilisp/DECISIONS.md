@@ -1,4 +1,5 @@
 # Omnilisp Design Decisions
+Tag: Syntax Guide
 
 This document catalogs open design questions requiring resolution before implementation.
 

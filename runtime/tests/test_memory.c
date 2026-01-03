@@ -328,7 +328,9 @@ void test_obj_car_normal(void) {
     Obj* a = mk_int(1);
     Obj* b = mk_int(2);
     Obj* p = mk_pair(a, b);
-    ASSERT_EQ(obj_car(p), a);
+    Obj* car = obj_car(p);
+    ASSERT_EQ(car, a);
+    dec_ref(car);
     /* free_tree recursively frees the pair and its children */
     free_tree(p);
     PASS();
@@ -338,7 +340,9 @@ void test_obj_cdr_normal(void) {
     Obj* a = mk_int(1);
     Obj* b = mk_int(2);
     Obj* p = mk_pair(a, b);
-    ASSERT_EQ(obj_cdr(p), b);
+    Obj* cdr = obj_cdr(p);
+    ASSERT_EQ(cdr, b);
+    dec_ref(cdr);
     /* free_tree recursively frees the pair and its children */
     free_tree(p);
     PASS();
@@ -369,6 +373,113 @@ void test_obj_cdr_non_pair(void) {
     Obj* result = obj_cdr(x);
     ASSERT_NULL(result);
     dec_ref(x);
+    PASS();
+}
+
+/* === release_children tests === */
+
+void test_release_children_pair(void) {
+    Obj* a = mk_int(1);
+    Obj* b = mk_int(2);
+    inc_ref(a);
+    inc_ref(b);
+    Obj* p = mk_pair(a, b);
+
+    release_children(p);
+    ASSERT_EQ(a->mark, 1);
+    ASSERT_EQ(b->mark, 1);
+
+    p->a = NULL;
+    p->b = NULL;
+    dec_ref(p);
+    dec_ref(a);
+    dec_ref(b);
+    PASS();
+}
+
+void test_release_children_box(void) {
+    Obj* v = mk_int(9);
+    Obj* b = mk_box(v);
+
+    release_children(b);
+    ASSERT_EQ(v->mark, 1);
+
+    b->ptr = NULL;
+    dec_ref(b);
+    dec_ref(v);
+    PASS();
+}
+
+static Obj* mem_return_1(Obj** caps, Obj** args, int nargs) {
+    (void)caps; (void)args; (void)nargs;
+    return mk_int(1);
+}
+
+void test_release_children_closure(void) {
+    Obj* cap = mk_int(7);
+    Obj* caps[1] = {cap};
+    Obj* clos = mk_closure(mem_return_1, caps, NULL, 1, 0);
+
+    release_children(clos);
+    ASSERT_EQ(cap->mark, 1);
+
+    clos->ptr = NULL;
+    dec_ref(clos);
+    dec_ref(cap);
+    PASS();
+}
+
+void test_release_children_sym_error(void) {
+    Obj* s = mk_sym("sym");
+    Obj* e = mk_error("err");
+
+    release_children(s);
+    release_children(e);
+
+    s->ptr = NULL;
+    e->ptr = NULL;
+    dec_ref(s);
+    dec_ref(e);
+    PASS();
+}
+
+void test_release_children_channel(void) {
+    Obj* ch = make_channel(1);
+    release_children(ch);
+    ASSERT_NULL(ch->ptr);
+    dec_ref(ch);
+    PASS();
+}
+
+void test_release_children_atom(void) {
+    Obj* init = mk_int(3);
+    Obj* a = make_atom(init);
+    dec_ref(init);
+    release_children(a);
+    ASSERT_NULL(a->ptr);
+    dec_ref(a);
+    PASS();
+}
+
+static Obj* mem_thread_fn(Obj** caps, Obj** args, int nargs) {
+    (void)caps; (void)args; (void)nargs;
+    return mk_int(1);
+}
+
+void test_release_children_thread(void) {
+    Obj* clos = mk_closure(mem_thread_fn, NULL, NULL, 0, 0);
+    Obj* th = spawn_thread(clos);
+    release_children(th);
+    ASSERT_NULL(th->ptr);
+    dec_ref(th);
+    dec_ref(clos);
+    PASS();
+}
+
+void test_free_tree_immediate(void) {
+    Obj* imm = mk_int_unboxed(42);
+    free_tree(imm);  /* Should be no-op */
+    ASSERT_EQ(INT_IMM_VALUE(imm), 42);
     PASS();
 }
 
@@ -435,4 +546,14 @@ void run_memory_tests(void) {
     RUN_TEST(test_obj_cdr_null);
     RUN_TEST(test_obj_car_non_pair);
     RUN_TEST(test_obj_cdr_non_pair);
+
+    TEST_SECTION("release_children");
+    RUN_TEST(test_release_children_pair);
+    RUN_TEST(test_release_children_box);
+    RUN_TEST(test_release_children_closure);
+    RUN_TEST(test_release_children_sym_error);
+    RUN_TEST(test_release_children_channel);
+    RUN_TEST(test_release_children_atom);
+    RUN_TEST(test_release_children_thread);
+    RUN_TEST(test_free_tree_immediate);
 }

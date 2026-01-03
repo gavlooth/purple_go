@@ -8,7 +8,7 @@ void test_make_channel_unbuffered(void) {
     Obj* ch = make_channel(0);
     ASSERT_NOT_NULL(ch);
     ASSERT_EQ(ch->tag, TAG_CHANNEL);
-    free_obj(ch);
+    dec_ref(ch);
     PASS();
 }
 
@@ -16,14 +16,14 @@ void test_make_channel_buffered(void) {
     Obj* ch = make_channel(10);
     ASSERT_NOT_NULL(ch);
     ASSERT_EQ(ch->tag, TAG_CHANNEL);
-    free_obj(ch);
+    dec_ref(ch);
     PASS();
 }
 
 void test_make_channel_large_buffer(void) {
     Obj* ch = make_channel(1000);
     ASSERT_NOT_NULL(ch);
-    free_obj(ch);
+    dec_ref(ch);
     PASS();
 }
 
@@ -42,8 +42,8 @@ void test_channel_send_receive_basic(void) {
     ASSERT_NOT_NULL(received);
     ASSERT_EQ(obj_to_int(received), 42);
 
-    free_obj(received);
-    free_obj(ch);
+    dec_ref(received);
+    dec_ref(ch);
     PASS();
 }
 
@@ -60,10 +60,10 @@ void test_channel_send_multiple(void) {
         Obj* received = channel_recv(ch);
         ASSERT_NOT_NULL(received);
         ASSERT_EQ(obj_to_int(received), i);
-        free_obj(received);
+        dec_ref(received);
     }
 
-    free_obj(ch);
+    dec_ref(ch);
     PASS();
 }
 
@@ -77,7 +77,7 @@ void test_channel_send_immediate(void) {
     Obj* received = channel_recv(ch);
     ASSERT_EQ(obj_to_int(received), 99);
 
-    free_obj(ch);
+    dec_ref(ch);
     PASS();
 }
 
@@ -91,7 +91,7 @@ void test_channel_close(void) {
     int sent = channel_send(ch, val);
     ASSERT(!sent);
     dec_ref(val);
-    free_obj(ch);
+    dec_ref(ch);
     PASS();
 }
 
@@ -108,7 +108,7 @@ void test_channel_send_null(void) {
     ASSERT(sent);  /* NULL is a valid value */
     Obj* received = channel_recv(ch);
     ASSERT_NULL(received);
-    free_obj(ch);
+    dec_ref(ch);
     PASS();
 }
 
@@ -117,7 +117,7 @@ void test_channel_recv_from_closed_empty(void) {
     channel_close(ch);
     Obj* received = channel_recv(ch);
     ASSERT_NULL(received);
-    free_obj(ch);
+    dec_ref(ch);
     PASS();
 }
 
@@ -128,14 +128,15 @@ void test_make_atom(void) {
     Obj* atom = make_atom(val);
     ASSERT_NOT_NULL(atom);
     ASSERT_EQ(atom->tag, TAG_ATOM);
-    free_obj(atom);
+    dec_ref(atom);
+    dec_ref(val);
     PASS();
 }
 
 void test_make_atom_null(void) {
     Obj* atom = make_atom(NULL);
     ASSERT_NOT_NULL(atom);
-    free_obj(atom);
+    dec_ref(atom);
     PASS();
 }
 
@@ -143,7 +144,7 @@ void test_make_atom_immediate(void) {
     Obj* val = mk_int_unboxed(99);
     Obj* atom = make_atom(val);
     ASSERT_NOT_NULL(atom);
-    free_obj(atom);
+    dec_ref(atom);
     PASS();
 }
 
@@ -156,7 +157,8 @@ void test_atom_deref(void) {
     ASSERT_NOT_NULL(deref);
     ASSERT_EQ(obj_to_int(deref), 42);
     dec_ref(deref);
-    free_obj(atom);
+    dec_ref(atom);
+    dec_ref(val);
     PASS();
 }
 
@@ -171,7 +173,7 @@ void test_atom_deref_immediate(void) {
     Obj* atom = make_atom(val);
     Obj* deref = atom_deref(atom);
     ASSERT_EQ(obj_to_int(deref), 77);
-    free_obj(atom);
+    dec_ref(atom);
     PASS();
 }
 
@@ -182,16 +184,18 @@ void test_atom_reset(void) {
     Obj* val2 = mk_int(20);
     Obj* atom = make_atom(val1);
 
-    Obj* old = atom_reset(atom, val2);
-    ASSERT_NOT_NULL(old);
-    ASSERT_EQ(obj_to_int(old), 10);
+    Obj* result = atom_reset(atom, val2);
+    ASSERT_NOT_NULL(result);
+    ASSERT_EQ(obj_to_int(result), 20);
 
     Obj* current = atom_deref(atom);
     ASSERT_EQ(obj_to_int(current), 20);
 
-    dec_ref(old);
+    dec_ref(result);
     dec_ref(current);
-    free_obj(atom);
+    dec_ref(val1);
+    dec_ref(val2);
+    dec_ref(atom);
     PASS();
 }
 
@@ -207,14 +211,14 @@ void test_atom_reset_to_null(void) {
     Obj* val = mk_int(42);
     Obj* atom = make_atom(val);
 
-    Obj* old = atom_reset(atom, NULL);
-    ASSERT_EQ(obj_to_int(old), 42);
+    Obj* result = atom_reset(atom, NULL);
+    ASSERT_NULL(result);
 
     Obj* current = atom_deref(atom);
     ASSERT_NULL(current);
 
-    dec_ref(old);
-    free_obj(atom);
+    dec_ref(val);
+    dec_ref(atom);
     PASS();
 }
 
@@ -243,8 +247,9 @@ void test_atom_swap(void) {
 
     dec_ref(result);
     dec_ref(current);
-    free_obj(inc_closure);
-    free_obj(atom);
+    dec_ref(inc_closure);
+    dec_ref(atom);
+    dec_ref(val);
     PASS();
 }
 
@@ -252,7 +257,7 @@ void test_atom_swap_null_atom(void) {
     Obj* inc_closure = mk_closure(conc_increment_closure_fn, NULL, NULL, 0, 1);
     Obj* result = atom_swap(NULL, inc_closure);
     ASSERT_NULL(result);
-    free_obj(inc_closure);
+    dec_ref(inc_closure);
     PASS();
 }
 
@@ -261,7 +266,8 @@ void test_atom_swap_null_fn(void) {
     Obj* atom = make_atom(val);
     Obj* result = atom_swap(atom, NULL);
     ASSERT_NULL(result);
-    free_obj(atom);
+    dec_ref(val);
+    dec_ref(atom);
     PASS();
 }
 
@@ -279,8 +285,9 @@ void test_atom_swap_multiple(void) {
     Obj* final = atom_deref(atom);
     ASSERT_EQ(obj_to_int(final), 10);
     dec_ref(final);
-    free_obj(inc_closure);
-    free_obj(atom);
+    dec_ref(inc_closure);
+    dec_ref(atom);
+    dec_ref(val);
     PASS();
 }
 
@@ -290,19 +297,21 @@ void test_atom_cas_success(void) {
     Obj* val = mk_int(10);
     Obj* atom = make_atom(val);
 
-    Obj* expected = mk_int(10);
+    Obj* expected = val;
     Obj* new_val = mk_int(20);
 
     Obj* result = atom_cas(atom, expected, new_val);
-    ASSERT_NOT_NULL(result);  /* Returns old value on success */
+    ASSERT_NOT_NULL(result);
+    ASSERT_EQ(obj_to_int(result), 1);  /* success */
 
     Obj* current = atom_deref(atom);
     ASSERT_EQ(obj_to_int(current), 20);
 
-    dec_ref(expected);
     dec_ref(result);
     dec_ref(current);
-    free_obj(atom);
+    dec_ref(new_val);
+    dec_ref(atom);
+    dec_ref(val);
     PASS();
 }
 
@@ -314,16 +323,18 @@ void test_atom_cas_failure(void) {
     Obj* new_val = mk_int(20);
 
     Obj* result = atom_cas(atom, expected, new_val);
-    /* CAS returns NULL on failure */
+    ASSERT_NOT_NULL(result);
+    ASSERT_EQ(obj_to_int(result), 0);  /* failure */
 
     Obj* current = atom_deref(atom);
     ASSERT_EQ(obj_to_int(current), 10);  /* Unchanged */
 
     dec_ref(expected);
     dec_ref(new_val);
-    if (result) dec_ref(result);
+    dec_ref(result);
     dec_ref(current);
-    free_obj(atom);
+    dec_ref(atom);
+    dec_ref(val);
     PASS();
 }
 
@@ -332,10 +343,12 @@ void test_atom_cas_null_atom(void) {
     Obj* new_val = mk_int(20);
 
     Obj* result = atom_cas(NULL, expected, new_val);
-    ASSERT_NULL(result);
+    ASSERT_NOT_NULL(result);
+    ASSERT_EQ(obj_to_int(result), 0);
 
     dec_ref(expected);
     dec_ref(new_val);
+    dec_ref(result);
     PASS();
 }
 
@@ -357,14 +370,17 @@ void test_spawn_thread(void) {
     ASSERT_EQ(obj_to_int(result), 42);
 
     dec_ref(result);
-    free_obj(thread);
-    free_obj(closure);
+    dec_ref(thread);
+    dec_ref(closure);
     PASS();
 }
 
 void test_spawn_thread_null(void) {
     Obj* thread = spawn_thread(NULL);
-    ASSERT_NULL(thread);
+    ASSERT_NOT_NULL(thread);
+    Obj* result = thread_join(thread);
+    ASSERT_NULL(result);
+    dec_ref(thread);
     PASS();
 }
 
@@ -387,8 +403,8 @@ void test_spawn_thread_with_captures(void) {
     ASSERT_EQ(obj_to_int(result), 42);
 
     dec_ref(result);
-    free_obj(thread);
-    free_obj(closure);
+    dec_ref(thread);
+    dec_ref(closure);
     dec_ref(cap1);
     dec_ref(cap2);
     PASS();
@@ -415,8 +431,8 @@ void test_thread_join_multiple_times(void) {
 
     dec_ref(result1);
     dec_ref(result2);
-    free_obj(thread);
-    free_obj(closure);
+    dec_ref(thread);
+    dec_ref(closure);
     PASS();
 }
 
@@ -444,7 +460,7 @@ void test_concurrent_channel(void) {
         Obj* val = channel_recv(ch);
         if (val) {
             sum += obj_to_int(val);
-            free_obj(val);
+            dec_ref(val);
         }
     }
 
@@ -452,9 +468,9 @@ void test_concurrent_channel(void) {
 
     ASSERT_EQ(sum, 45);  /* 0+1+2+...+9 = 45 */
 
-    free_obj(thread);
-    free_obj(closure);
-    free_obj(ch);
+    dec_ref(thread);
+    dec_ref(closure);
+    dec_ref(ch);
     PASS();
 }
 
@@ -490,12 +506,13 @@ void test_concurrent_atom(void) {
     ASSERT_EQ(obj_to_int(final), 200);  /* 100 + 100 */
 
     dec_ref(final);
-    free_obj(thread1);
-    free_obj(thread2);
-    free_obj(closure1);
-    free_obj(closure2);
-    free_obj(inc_closure);
-    free_obj(atom);
+    dec_ref(thread1);
+    dec_ref(thread2);
+    dec_ref(closure1);
+    dec_ref(closure2);
+    dec_ref(inc_closure);
+    dec_ref(atom);
+    dec_ref(val);
     PASS();
 }
 
@@ -509,9 +526,9 @@ void test_channel_stress_many_values(void) {
     for (int i = 0; i < 1000; i++) {
         Obj* val = channel_recv(ch);
         ASSERT_EQ(obj_to_int(val), i);
-        free_obj(val);
+        dec_ref(val);
     }
-    free_obj(ch);
+    dec_ref(ch);
     PASS();
 }
 
@@ -528,8 +545,9 @@ void test_atom_stress_many_swaps(void) {
     Obj* final = atom_deref(atom);
     ASSERT_EQ(obj_to_int(final), 1000);
     dec_ref(final);
-    free_obj(inc_closure);
-    free_obj(atom);
+    dec_ref(inc_closure);
+    dec_ref(atom);
+    dec_ref(val);
     PASS();
 }
 
@@ -549,10 +567,10 @@ void test_thread_stress_many_threads(void) {
     for (int i = 0; i < 50; i++) {
         Obj* result = thread_join(threads[i]);
         dec_ref(result);
-        free_obj(threads[i]);
+        dec_ref(threads[i]);
     }
 
-    free_obj(closure);
+    dec_ref(closure);
     PASS();
 }
 

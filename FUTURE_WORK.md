@@ -391,6 +391,45 @@ func TestCompiledMatchesInterpreter(t *testing.T) {
 
 ---
 
+## Part 2: Language & Tooling Goodies (Non-Core)
+
+These items improve developer experience and ecosystem usability. They are optional, but high leverage.
+
+### L.1 Language Server (LSP)
+- Go-to-definition, find references, rename
+- Hover docs and type info
+- Diagnostics surfaced in editors
+
+### L.2 Module System Polish
+- Status: basic module system exists (exports/imports/aliases).
+- Add versioned imports and clear conflict errors.
+- Deterministic module resolution across files/paths.
+
+### L.3 Pattern Matching Upgrades
+- Exhaustiveness warnings
+- Better error reporting for match failures
+
+### L.4 Macro Hygiene
+- Status: hygienic macros exist (gensym + syntax-quote), but mark tracking is simplified.
+- Complete syntax object mark propagation for true hygiene.
+- Better macro error spans.
+
+### L.5 Deterministic Builds
+- Stable output ordering
+- Reproducible codegen for caching and CI
+
+### L.6 Developer Tooling
+- Auto-formatter and lint rules
+- Golden-file test harness
+- Fuzz hooks for parser and optimizer passes
+
+### L.7 Profiling & Tracing
+- Status: basic `(trace ...)` exists for evaluation.
+- Compile-time stats and pass timing.
+- Structured runtime tracing hooks and sampling.
+
+---
+
 ## Implementation Notes
 
 ### Adding a New Optimization
