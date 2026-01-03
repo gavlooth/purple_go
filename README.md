@@ -119,6 +119,8 @@ nil                   ; nil/false
 
 - [Language Reference](docs/LANGUAGE_REFERENCE.md) - Complete language documentation
 - [Architecture](ARCHITECTURE.md) - Implementation details
+- [Memory Optimizations](docs/MEMORY_OPTIMIZATIONS.md) - Reclamation vs safety, strategy routing
+- [Generational Memory](docs/GENERATIONAL_MEMORY.md) - GenRef/IPGE soundness requirements
 - [TODO](TODO.md) - Feature status and roadmap
 
 ## Project Structure

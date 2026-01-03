@@ -4,6 +4,370 @@
 
 All optimizations are **inferred automatically** or enabled via optional hints. Existing Purple code works unchanged - the compiler just generates faster code when it can prove safety.
 
+## Reclamation vs Safety (Do Not Confuse)
+
+**Reclamation (frees memory):**
+- ASAP free insertion (baseline)
+- Reference counting (DAG/shared)
+- SCC / symmetric RC (cycles)
+- Arenas / regions (bulk free)
+- Perceus reuse (free+alloc → reuse)
+
+**Safety (detects stale refs only):**
+- GenRef / IPGE / tagged handles
+- Region refs / constraint refs
+- Borrow/tether checks
+
+Safety layers can be disabled without breaking correctness. Reclamation layers cannot.
+
+## Strategy Selection Matrix (Reclamation)
+
+| Shape | Cycle Status | Mutable? | Escape | Strategy | Runtime ops |
+|-------|--------------|----------|--------|----------|-------------|
+| Tree | N/A | N/A | Any | ASAP | `free_tree` |
+| DAG | N/A | N/A | Any | RC | `inc_ref` / `dec_ref` |
+| Cyclic | Broken (weak edges) | Any | Any | RC | `dec_ref` |
+| Cyclic | Unbroken | Frozen | Any | SCC RC | `scc_release` |
+| Cyclic | Unbroken | Mutable | Any | Symmetric RC | `sym_exit_scope` |
+| Unknown | Unknown | Unknown | Any | Symmetric RC | `sym_exit_scope` |
+| Any | N/A | N/A | Local-only | Arena/Region | `arena_*` / `region_*` |
+
+Notes:
+- Arenas are preferred for **non-escaping** complex cyclic structures.
+- Symmetric RC is the safe fallback when shape is unknown.
+- Weak edges can turn cyclic → DAG, enabling plain RC.
+
+## GenRef / IPGE Soundness Requirements
+
+Generational validation is **unsound** unless the generation field remains readable
+after logical free. You must use **one** of these:
+
+1) **Stable slot pool** (recommended)
+2) **Quarantine allocator** (delay actual free)
+3) **Indirection table** (stable metadata)
+
+Reading `obj->generation` after `free(obj)` is undefined behavior in C.
+
+## Region-Driven RC Elision (From Regions + RC Benchmarks)
+
+This is a compile-time RC reduction strategy inspired by the Vale
+Regions+RC cellular automata benchmark (local repo:
+`/home/heefoo/Documents/code/RegionsRCCellularAutomataBenchmark`).
+The key idea is **region-local borrowing**: if we can prove a value never
+escapes its region, we can skip inc/dec entirely for all inner uses.
+
+### Techniques to Implement
+
+1) **Region-aware RC Elision**
+   - If a value is proven region-local and immutable within a region scope,
+     treat all references as borrowed → **no inc/dec** in inner loops.
+   - Only emit RC ops when a value crosses a region boundary or becomes shared.
+
+2) **Per-Region External Refcount**
+   - Track the **number of escaping references** per region instead of per-object.
+   - When a region object escapes, increment region externals.
+   - When externals drop to 0, free the entire region in O(1).
+
+3) **Borrow/Tether at Loop Entry**
+   - Insert a single borrow/tether at loop or block entry.
+   - Use fast-path deref inside hot loops (no repeated gen/RC checks).
+
+4) **Escape-Driven Routing**
+   - Combine escape + ownership + shape to route:
+     - Region-local → no RC
+     - Shared/escaping → RC
+     - Complex local cycles → arena/region
+
+5) **Reuse + Regions**
+   - If unique and region-local, reuse in place instead of free+alloc
+     (Perceus-style FBIP within region).
+
+### Expected Impact
+
+On RC-heavy, region-friendly code, this can eliminate the majority of RC ops
+and shrink RC overhead substantially. Gains are workload-dependent but can
+be large in nested-array or cellular-automata-style loops.
+
+## Optimization Status (Documented)
+
+Status is **documented** (may lag implementation). See runtime and compiler sources
+for ground truth when in doubt.
+
+| Optimization | Status | Evidence | Notes |
+|--------------|--------|----------|-------|
+| ASAP free insertion | Partial (C codegen) | `csrc/codegen/codegen.c` | Emits `free_obj` at analysis positions |
+| Liveness / last-use | Partial | `csrc/analysis/analysis.c` | Free points computed, limited ownership logic |
+| Escape / stack alloc | Planned | `csrc/analysis/analysis.h` | API exists, no codegen routing |
+| Capture tracking | Partial | `csrc/analysis/analysis.c` | Captured vars marked; ownership integration minimal |
+| Shape analysis | Planned (stub) | `csrc/analysis/analysis.c` | TODO in `omni_analyze_shape` |
+| Back-edge weak refs | Runtime ready | `runtime/src/runtime.c` | Weak refs implemented; compile-time detection TBD |
+| RC (DAG) | Runtime ready | `runtime/src/runtime.c` | `inc_ref` / `dec_ref` |
+| SCC RC | Runtime ready | `runtime/src/runtime.c` | `scc_release` |
+| Symmetric RC | Runtime ready | `runtime/src/runtime.c` | `sym_exit_scope` |
+| Deferred RC | Runtime ready | `runtime/src/runtime.c` | `deferred_release` |
+| Arenas / regions | Runtime ready | `runtime/src/runtime.c` | `arena_*` / region refs |
+| Perceus reuse | Planned (analysis) | `csrc/analysis/analysis.c` | `omni_analyze_reuse` TODO |
+| RC elision (borrow/unique) | Partial | `runtime/src/runtime.c` | Runtime helpers exist; analysis wiring limited |
+| Region-aware RC elision | Planned | `runtime/src/runtime.c`, `csrc/analysis` | Needs compiler routing + region proof |
+| Region external refcount | Planned | `runtime/src/runtime.c` | Requires per-region externals + escape tracking |
+| GenRef / IPGE | Partial (unsound w/ malloc) | `runtime/src/runtime.c`, `runtime/include/purple.h` | Requires stable slots/quarantine |
+| Region / constraint refs | Runtime ready | `runtime/src/runtime.c` | Safety-only (no reclaim) |
+| Concurrency ownership | Planned | `csrc/analysis/analysis.h` | No full compiler routing yet |
+
+## TODO: Pending Optimizations (Not Yet Implemented)
+
+Use this as the checklist for remaining work. These are **not fully implemented**
+or not wired into codegen yet.
+
+1) **Escape‑aware stack allocation** (route local allocations to stack/arena)
+2) **Full liveness‑driven free insertion** (last‑use frees in all paths)
+3) **Ownership‑driven codegen** (borrow/consume/owned routing everywhere)
+4) **Shape analysis + weak back‑edge routing** (compile‑time cycle breaking)
+5) **Perceus reuse analysis** (free+alloc → reuse in codegen)
+6) **Region‑aware RC elision** (skip inc/dec for region‑local borrows)
+7) **Per‑region external refcount** (bulk free when externals reach 0)
+8) **Borrow/tether loop insertion** (single check, hot‑loop fast path)
+9) **Interprocedural summaries for ownership/escape** (caller‑callee RC routing)
+10) **Concurrency ownership inference** (message‑passing transfer rules)
+11) **GenRef/IPGE soundness fix** (stable slots/quarantine/indirection)
+
+## Implementation Map (For New Contributors)
+
+This section is intended for technically adept contributors who are new to the
+codebase. It tells you **where to start**, **what to search for**, and **which
+runtime hooks exist**.
+
+### Core Code Locations
+
+- **Codegen entry**: `csrc/codegen/codegen.c`
+  - Search for: `omni_codegen_emit_frees`, `omni_codegen_generate_program`,
+    `free_obj`, `dec_ref`
+- **Analysis passes**: `csrc/analysis/analysis.c`, `csrc/analysis/analysis.h`
+  - Search for: `omni_analyze_*`, `VarUsage`, `EscapeInfo`, `OwnerInfo`,
+    `ShapeInfo`, `ReuseCandidate`
+- **Runtime**: `runtime/src/runtime.c`
+  - Search for: `inc_ref`, `dec_ref`, `free_obj`, `arena_`, `region_`,
+    `scc_`, `sym_`, `borrow_`
+- **Runtime public header**: `runtime/include/purple.h`
+  - Search for: `BorrowedRef`, `ipge_`, `tether_`
+- **Tests**: `runtime/tests/*`
+  - Search for: `test_*` and `BorrowRef`, `arena`, `scc`, `deferred`
+
+### Optimization → Implementation Guide
+
+Each item below gives a minimal “map” for implementation:
+**entry point**, **analysis data**, **runtime hooks**, and **search terms**.
+
+1) **Escape‑aware stack allocation**
+   - Entry point: `csrc/codegen/codegen.c` (allocation emission)
+   - Analysis: `EscapeInfo` in `csrc/analysis/analysis.c`
+   - Runtime: add/route to stack alloc helpers (search `mk_*` in `runtime/src/runtime.c`)
+   - Search terms: `omni_analyze_escape`, `ESCAPE_NONE`, `mk_int`, `mk_pair`
+
+2) **Full liveness‑driven free insertion**
+   - Entry point: `omni_codegen_emit_frees` in `csrc/codegen/codegen.c`
+   - Analysis: `VarUsage` + `OwnerInfo` + `omni_get_frees_at`
+   - Runtime: `free_obj`, `dec_ref`
+   - Search terms: `last_use`, `free_pos`, `omni_get_frees_at`
+
+3) **Ownership‑driven codegen**
+   - Entry point: call sites that emit `inc_ref/dec_ref` and let‑binding cleanup
+   - Analysis: `OwnerInfo` (`OWNER_LOCAL`, `OWNER_BORROWED`, `OWNER_TRANSFERRED`)
+   - Runtime: `inc_ref`, `dec_ref`, `free_unique`
+   - Search terms: `OWNER_`, `must_free`, `ownership`
+
+4) **Shape analysis + weak back‑edge routing**
+   - Entry point: type/def handling + allocation routing
+   - Analysis: `ShapeInfo`, `omni_analyze_shape`
+   - Runtime: weak refs (`invalidate_weak_refs_for`), `dec_ref`, `scc_release`, `sym_exit_scope`
+   - Search terms: `SHAPE_`, `back_edge`, `weak`
+
+5) **Perceus reuse analysis**
+   - Entry point: allocation emission in codegen (free+alloc → reuse)
+   - Analysis: `ReuseCandidate`, `omni_analyze_reuse` (currently TODO)
+   - Runtime: `reuse_as_*`, `can_reuse`, `consume_for_reuse`
+   - Search terms: `reuse_as_`, `ReuseCandidate`, `Perceus`
+
+6) **Region‑aware RC elision**
+   - Entry point: inc/dec emission paths; add “region‑local” fast path
+   - Analysis: escape + ownership + region boundaries
+   - Runtime: `region_enter`, `region_exit`, `region_alloc`, `region_can_reference`
+   - Search terms: `region_`, `region_ref`, `region_can_reference`
+
+7) **Per‑region external refcount**
+   - Entry point: places where values escape a region
+   - Analysis: escape/ownership + region graph
+   - Runtime: extend `Region`/`RegionObj` with `external_rc`, add `region_register_external`
+   - Search terms: `RegionObj`, `region_exit`, `external`
+
+8) **Borrow/tether loop insertion**
+   - Entry point: loop/let codegen for borrowed vars
+   - Analysis: ownership + purity/borrow classification
+   - Runtime: `tether`, `untether`, `deref_tethered` in `runtime/include/purple.h`
+   - Search terms: `tether`, `borrow_ref`, `deref_borrowed`
+
+9) **Interprocedural summaries (ownership/escape)**
+   - Entry point: function call codegen
+   - Analysis: function summaries (add to `AnalysisContext`)
+   - Runtime: no change required (compile‑time only)
+   - Search terms: `summary`, `call`, `ownership`, `escape`
+
+10) **Concurrency ownership inference**
+   - Entry point: channel/spawn codegen (message passing)
+   - Analysis: ownership transfer at send/recv
+   - Runtime: `channel_*`, `spawn_*`
+   - Search terms: `channel`, `spawn`, `ownership`
+
+11) **GenRef/IPGE soundness fix**
+   - Entry point: all BorrowedRef/BorrowRef access paths
+   - Analysis: decide which allocations need gen‑safety
+   - Runtime: implement one of:
+     - stable slot pool
+     - quarantine allocator
+     - indirection table
+   - Search terms: `BorrowRef`, `BorrowedRef`, `generation`, `ipge_`
+
+### Suggested Workflow
+
+1) Read `runtime/src/runtime.c` around the function names above.
+2) Search `csrc/codegen/codegen.c` for emission sites of `inc_ref/dec_ref/free_obj`.
+3) Follow analysis types in `csrc/analysis/analysis.h` to see what data exists.
+4) Add a small runtime test in `runtime/tests/` for each new optimization.
+
+### Example Transformations (Before / After)
+
+These are **illustrative**; exact codegen formatting may differ.
+
+1) **Liveness free insertion**
+```c
+// Before: free at scope end
+Obj* x = mk_pair(a, b);
+use(x);
+/* ... */
+free_obj(x);
+```
+```c
+// After: free at last use
+Obj* x = mk_pair(a, b);
+use(x);
+free_obj(x);
+/* ... */
+```
+
+2) **Escape‑aware stack allocation**
+```c
+// Before
+Obj* t = mk_int(42);
+use(t);
+dec_ref(t);
+```
+```c
+// After (ESCAPE_NONE)
+Obj* t = mk_int_stack(42);
+use(t);
+/* no free */
+```
+
+3) **Borrowed/ownership‑driven RC elision**
+```c
+// Before
+inc_ref(arg);
+use(arg);
+dec_ref(arg);
+```
+```c
+// After (borrowed)
+use(arg);  /* no inc/dec */
+```
+
+4) **Perceus reuse**
+```c
+// Before
+free_obj(x);
+Obj* y = mk_pair(a, b);
+```
+```c
+// After
+Obj* y = reuse_as_pair(x, a, b);
+```
+
+5) **Region‑aware RC elision**
+```c
+// Before
+inc_ref(v);
+use(v);
+dec_ref(v);
+```
+```c
+// After (region‑local borrow)
+use(v);  /* no RC inside region */
+```
+
+6) **Borrow/tether in hot loops**
+```c
+// Before
+for (...) {
+    Obj* x = deref_borrowed(r);
+    use(x);
+}
+```
+```c
+// After
+Obj* x = tether_borrowed(r);  /* once */
+for (...) {
+    use(x);  /* fast path */
+}
+untether(x);
+```
+
+7) **Shape‑driven routing (weak edges / cycles)**
+```c
+// DAG
+dec_ref(obj);
+```
+```c
+// Cyclic + unbroken + mutable
+sym_exit_scope(scope_obj);
+```
+
+## Glossary + References (Quick Orientation)
+
+**ASAP**: Compile‑time free insertion; no tracing GC (Proust 2017).
+**RC**: Reference counting for shared DAGs; `inc_ref` / `dec_ref`.
+**SCC RC**: Release frozen cycles via local SCC computation.
+**Symmetric RC**: Track scope‑as‑object for mutable cycles; free when orphaned.
+**Perceus**: Reuse analysis; free+alloc → in‑place reuse (PLDI 2021).
+**DPS**: Destination‑passing style; write into caller‑provided memory.
+**Regions**: Lexical lifetime zones; bulk deallocation; O(1) checks (Tofte‑Talpin/MLKit).
+**GenRef/IPGE**: Generational refs for UAF detection; requires stable slot/quarantine.
+**Weak ref / back‑edge**: Compile‑time cycle breaking by weakening back‑edges.
+**Escape analysis**: Classify local/arg/global to choose allocation strategy.
+**Liveness**: Find last use to free early.
+**Shape analysis**: Tree / DAG / cyclic classification (Ghiya‑Hendren).
+
+**Paper/keyword search terms:**
+ASAP (Proust 2017), Perceus (Reinking PLDI 2021), Shape Analysis (Ghiya‑Hendren),
+Region Inference (Tofte‑Talpin, MLKit), Destination‑Passing Style (FHPC 2017),
+Symmetric RC / SCC RC, Vale Regions / Zero‑Cost Borrowing.
+
+## GenRef/IPGE Runtime Soundness Audit (2026-01-03)
+
+Findings:
+- **IPGE/BorrowedRef reads `obj->generation` directly** from heap objects that are
+  freed with `malloc/free` (`free_obj` → `flush_freelist`). After `free`, any
+  generation check is **undefined behavior** unless memory is kept alive.
+- **No stable slot pool/quarantine** exists for `Obj` allocations. The freelist
+  delays frees but does not guarantee safety after a flush.
+- **Legacy GenObj path** uses a separate object with locks and does not free the
+  GenObj itself (safe for reads but leaks unless reclaimed separately).
+- **Thread safety**: IPGE path has no locking; concurrent free/check can race.
+
+Actions to make IPGE sound:
+1) Allocate IPGE-managed objects from a **stable slot pool**, or
+2) Add a **quarantine allocator** that delays `free`, or
+3) Use an **indirection table** for generation metadata, or
+4) Constrain borrow refs so they **cannot outlive** the freelist flush point.
+
 ## Optimization Layers (Unified)
 
 ```

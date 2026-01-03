@@ -24,6 +24,9 @@ Purple Go is a **stage-polymorphic evaluator**: the same evaluator interprets co
 - **Perceus Reuse**: reuse eligible objects (no global scans).
 - **Arena Scopes**: bulk allocation/free for cyclic data that does not escape.
 
+See `docs/MEMORY_OPTIMIZATIONS.md` for the full optimization catalog and the
+reclamation vs safety split (GenRef/IPGE requirements included).
+
 ## Engine Constraints (Non-Negotiable)
 - **No stop-the-world GC**: no global traversal or global pauses.
 - **Locality**: work is per-object, per-scope, or per-subgraph.
